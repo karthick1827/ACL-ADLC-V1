@@ -534,6 +534,12 @@
 
     <!-- Header Actions -->
     <div class="header-actions">
+      <!-- Live Refresh Button -->
+      <button class="btn-disk-sync" id="btnRefresh" onclick="refreshProjectFiles()" title="Reload markdown files from project folder">
+        <span>🔄</span>
+        <span>Refresh Files</span>
+      </button>
+
       <!-- Direct Folder Sync Button (Browser Native Disk Access) -->
       <button class="btn-disk-sync" id="btnSyncDisk" onclick="connectLocalProjectFolder()" title="Link directly to your local project folder for live disk synchronization">
         <span id="syncDiskIcon">📁</span>
@@ -654,21 +660,34 @@
 
     // Initialize Application
     async function init() {
-      // 1. Check if installer embedded files exist in window
+      // 1. Try to fetch live files from dev-server API first
+      try {
+        const res = await fetch("/api/list-markdown-files");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.files)) {
+            files = data.files;
+            localStorage.setItem("acl_adlc_project_markdown_files", JSON.stringify(files));
+            if (files.length > 0) {
+              activeFileId = files.some(f => f.id === activeFileId) ? activeFileId : files[0].id;
+              renderFileTree();
+              loadFile(activeFileId);
+            } else {
+              renderFileTree();
+              loadEmptyState();
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        // Fallback for static viewing without server
+      }
+
+      // 2. Check if embedded files exist in window
       if (window.__ACL_EMBEDDED_FILES__ && Array.isArray(window.__ACL_EMBEDDED_FILES__)) {
         files = window.__ACL_EMBEDDED_FILES__;
       } else {
-        // 2. Check localStorage
-        const stored = localStorage.getItem("acl_adlc_project_markdown_files");
-        if (stored) {
-          try {
-            files = JSON.parse(stored);
-          } catch (e) {
-            files = [];
-          }
-        } else {
-          files = [];
-        }
+        files = [];
       }
 
       if (files.length > 0) {
@@ -679,8 +698,17 @@
         renderFileTree();
         loadEmptyState();
       }
+    }
 
-      // Keyboard Shortcut: Ctrl+S / Cmd+S
+    // Refresh Files Handler
+    async function refreshProjectFiles() {
+      showToast("Refreshing files...", "success");
+      await init();
+      showToast("Files updated", "success");
+    }
+
+    // Keyboard Shortcuts Setup
+    function setupShortcuts() {
       window.addEventListener("keydown", (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === "s") {
           e.preventDefault();
@@ -1010,7 +1038,10 @@
     }
 
     // Start App
-    window.addEventListener("DOMContentLoaded", init);
+    window.addEventListener("DOMContentLoaded", () => {
+      init();
+      setupShortcuts();
+    });
   </script>
 </body>
 </html>
