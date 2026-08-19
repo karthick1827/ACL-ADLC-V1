@@ -43,30 +43,34 @@
       padding: 0;
     }
 
-    body {
+    html, body {
+      height: 100vh;
+      width: 100vw;
+      margin: 0;
+      padding: 0;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: var(--bg-main);
       color: var(--text-primary);
-      min-height: 100vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
-    /* Scrollbars */
+    /* Enhanced Visible Scrollbars */
     ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
     }
     ::-webkit-scrollbar-track {
-      background: var(--bg-surface);
+      background: #f6f8fa;
     }
     ::-webkit-scrollbar-thumb {
       background: #c0c6cc;
       border-radius: var(--radius-sm);
+      border: 2px solid #f6f8fa;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: #a0a6ac;
+      background: #8c959f;
     }
 
     /* Header */
@@ -80,6 +84,7 @@
       padding: 0 1.5rem;
       z-index: 20;
       box-shadow: var(--shadow-sm);
+      flex-shrink: 0;
     }
 
     .brand {
@@ -188,6 +193,7 @@
       flex-direction: column;
       gap: 0.75rem;
       background: #ffffff;
+      flex-shrink: 0;
     }
 
     .search-input-wrapper {
@@ -492,19 +498,22 @@
       width: 100%;
       height: 100%;
       min-height: 0;
-      padding: 1.5rem 2rem;
+      min-width: 0;
+      padding: 1.75rem 2.5rem;
       background: #ffffff;
       color: #1f2328;
       border: none;
       outline: none;
       resize: none;
-      font-family: 'Fira Code', 'Consolas', monospace;
-      font-size: 0.92rem;
-      line-height: 1.65;
+      font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+      font-size: 0.95rem;
+      line-height: 1.75;
       tab-size: 2;
       overflow-y: auto !important;
       overflow-x: auto !important;
       box-sizing: border-box;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
 
     /* Toast Notifications */
