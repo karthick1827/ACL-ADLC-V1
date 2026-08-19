@@ -696,34 +696,38 @@ class Installer {
     this.installedFiles.add(renderGitignore);
 
     // Deploy markdown.html studio to target project root and public directory (if present)
-    const srcMarkdown = path.join(paths.srcDir, 'markdown.html');
-    if (await fs.pathExists(srcMarkdown)) {
-      let htmlContent = await fs.readFile(srcMarkdown, 'utf8');
+    const projectRoot = paths?.projectRoot;
+    if (projectRoot) {
+      const srcMarkdown = path.join(paths.srcDir || getProjectRoot(), 'markdown.html');
+      if (await fs.pathExists(srcMarkdown)) {
+        let htmlContent = await fs.readFile(srcMarkdown, 'utf8');
 
-      // Scan for existing markdown files in project output folders
-      const projectMdFiles = await this._scanProjectMarkdownFiles(paths.projectRoot);
-      if (projectMdFiles.length > 0) {
-        const injection = `  <script>window.__ACL_EMBEDDED_FILES__ = ${JSON.stringify(projectMdFiles)};</script>\n`;
-        htmlContent = htmlContent.replace('</head>', `${injection}</head>`);
+        // Scan for existing markdown files in project output folders
+        const projectMdFiles = await this._scanProjectMarkdownFiles(projectRoot);
+        if (projectMdFiles.length > 0) {
+          const injection = `  <script>window.__ACL_EMBEDDED_FILES__ = ${JSON.stringify(projectMdFiles)};</script>\n`;
+          htmlContent = htmlContent.replace('</head>', `${injection}</head>`);
+        }
+
+        const destMarkdown = path.join(projectRoot, 'markdown.html');
+        await fs.writeFile(destMarkdown, htmlContent, 'utf8');
+        this.installedFiles.add(destMarkdown);
+
+        const publicDir = path.join(projectRoot, 'public');
+        if (await fs.pathExists(publicDir)) {
+          const destPublicMarkdown = path.join(publicDir, 'markdown.html');
+          await fs.writeFile(destPublicMarkdown, htmlContent, 'utf8');
+          this.installedFiles.add(destPublicMarkdown);
+        }
       }
 
-      const destMarkdown = path.join(paths.projectRoot, 'markdown.html');
-      await fs.writeFile(destMarkdown, htmlContent, 'utf8');
-      this.installedFiles.add(destMarkdown);
-
-      const publicDir = path.join(paths.projectRoot, 'public');
-      if (await fs.pathExists(publicDir)) {
-        const destPublicMarkdown = path.join(publicDir, 'markdown.html');
-        await fs.writeFile(destPublicMarkdown, htmlContent, 'utf8');
-        this.installedFiles.add(destPublicMarkdown);
-      }
+      // Auto-configure Vite middleware if Vite config exists in project
+      await this._configureViteProject(projectRoot);
     }
-
-    // Auto-configure Vite middleware if Vite config exists in project
-    await this._configureViteProject(paths.projectRoot);
   }
 
   async _configureViteProject(projectRoot) {
+    if (!projectRoot) return;
     const viteConfigFiles = ['vite.config.js', 'vite.config.ts', 'vite.config.mjs', 'vite.config.cjs'];
     for (const configFile of viteConfigFiles) {
       const configPath = path.join(projectRoot, configFile);
@@ -783,6 +787,7 @@ function aclMarkdownSaverPlugin() {
   }
 
   async _scanProjectMarkdownFiles(projectRoot) {
+    if (!projectRoot) return [];
     const mdFiles = [];
     const scanCandidates = ['_acl-output', 'acl-output', 'planning-artifacts', 'implementation-artifacts', 'docs'];
 
