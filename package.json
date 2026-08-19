@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "acl-adlc",
-  "version": "6.10.2",
+  "version": "6.10.3",
   "description": "AI-driven agile development framework for the ACL Method Module Ecosystem",
   "keywords": [
     "agile",
