@@ -534,12 +534,6 @@
 
     <!-- Header Actions -->
     <div class="header-actions">
-      <!-- Live Refresh Button -->
-      <button class="btn-disk-sync" id="btnRefresh" onclick="refreshProjectFiles()" title="Reload markdown files from project folder">
-        <span>🔄</span>
-        <span>Refresh Files</span>
-      </button>
-
       <!-- Direct Folder Sync Button (Browser Native Disk Access) -->
       <button class="btn-disk-sync" id="btnSyncDisk" onclick="connectLocalProjectFolder()" title="Link directly to your local project folder for live disk synchronization">
         <span id="syncDiskIcon">📁</span>
@@ -698,13 +692,6 @@
         renderFileTree();
         loadEmptyState();
       }
-    }
-
-    // Refresh Files Handler
-    async function refreshProjectFiles() {
-      showToast("Refreshing files...", "success");
-      await init();
-      showToast("Files updated", "success");
     }
 
     // Keyboard Shortcuts Setup
