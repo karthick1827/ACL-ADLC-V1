@@ -780,6 +780,9 @@
           content = `---${fm}---` + parts.slice(2).join("---");
           document.getElementById("markdownTextarea").value = content;
         }
+      } else {
+        content = `---\nstatus: ${newStatus}\n---\n\n` + content;
+        document.getElementById("markdownTextarea").value = content;
       }
 
       handleContentInput();
