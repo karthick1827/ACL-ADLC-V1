@@ -815,7 +815,7 @@ function aclMarkdownSaverPlugin() {
               fs.writeFileSync(targetFile, content, 'utf8');
 
               if (autoPush) {
-                const gitCmd = `git add "${targetFile}" && git commit -m "docs: update ${filename} [${status || 'Accepted'}]" && git push`;
+                const gitCmd = 'git add "' + targetFile + '" && git commit -m "docs: update ' + filename + ' [' + (status || 'Accepted') + ']" && git push';
                 const env = { ...process.env, PATH: (process.env.PATH || '') + ';C:\\Users\\karthick.natarajan\\AppData\\Local\\Programs\\Git\\cmd;C:\\Program Files\\Git\\cmd' };
                 exec(gitCmd, { cwd: process.cwd(), env }, (gitErr, gitStdout, gitStderr) => {
                   if (gitErr) {
