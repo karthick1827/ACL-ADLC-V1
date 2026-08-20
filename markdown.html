@@ -1008,6 +1008,26 @@
       }
     }
 
+    // Strip YAML frontmatter (stepsCompleted, inputDocuments, metadata) and XML wrapper tags for clean GitHub-like preview
+    function cleanMarkdownForPreview(text) {
+      if (!text) return "";
+      let clean = text.trim();
+
+      // 1. Strip YAML frontmatter (--- ... ---)
+      if (clean.startsWith("---")) {
+        const secondDelim = clean.indexOf("\n---", 3);
+        if (secondDelim !== -1) {
+          clean = clean.substring(secondDelim + 4).trimStart();
+        }
+      }
+
+      // 2. Strip XML wrapper tags like <frozen-after-approval ...> and </frozen-after-approval>
+      clean = clean.replace(/<frozen-after-approval[^>]*>/gi, "");
+      clean = clean.replace(/<\/frozen-after-approval>/gi, "");
+
+      return clean;
+    }
+
     // Render Markdown HTML into Preview Container
     function renderPreview() {
       const file = getActiveFile();
@@ -1020,8 +1040,10 @@
         return;
       }
 
+      const displayContent = cleanMarkdownForPreview(raw);
+
       if (typeof marked !== 'undefined') {
-        previewEl.innerHTML = marked.parse(raw);
+        previewEl.innerHTML = marked.parse(displayContent);
         // Apply syntax highlighting
         if (typeof hljs !== 'undefined') {
           previewEl.querySelectorAll('pre code').forEach((block) => {
@@ -1029,7 +1051,7 @@
           });
         }
       } else {
-        previewEl.textContent = raw;
+        previewEl.textContent = displayContent;
       }
     }
 
