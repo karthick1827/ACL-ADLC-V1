@@ -765,8 +765,8 @@ function aclMarkdownSaverPlugin() {
                   const match = content.match(/status:\\s*([^\\n\\r]+)/i);
                   if (match && match[1]) {
                     const raw = match[1].trim().toLowerCase();
-                    if (raw.includes('updated') || raw.includes('final') || raw.includes('approved')) status = 'Updated';
-                    else if (raw.includes('rejected')) status = 'Rejected';
+                    if (raw.includes('accept') || raw.includes('updated') || raw.includes('final') || raw.includes('approved')) status = 'Accepted';
+                    else if (raw.includes('reject')) status = 'Rejected';
                     else status = 'In Review';
                   }
                   mdFiles.push({
@@ -815,7 +815,7 @@ function aclMarkdownSaverPlugin() {
               fs.writeFileSync(targetFile, content, 'utf8');
 
               if (autoPush) {
-                const gitCmd = `git add "${targetFile}" && git commit -m "docs: update ${filename} [${status || 'Updated'}]" && git push`;
+                const gitCmd = `git add "${targetFile}" && git commit -m "docs: update ${filename} [${status || 'Accepted'}]" && git push`;
                 const env = { ...process.env, PATH: (process.env.PATH || '') + ';C:\\Users\\karthick.natarajan\\AppData\\Local\\Programs\\Git\\cmd;C:\\Program Files\\Git\\cmd' };
                 exec(gitCmd, { cwd: process.cwd(), env }, (gitErr, gitStdout, gitStderr) => {
                   if (gitErr) {

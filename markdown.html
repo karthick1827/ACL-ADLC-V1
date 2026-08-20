@@ -416,7 +416,7 @@
       border: 1px solid #d4a72c;
     }
 
-    .status-pill.updated {
+    .status-pill.accepted, .status-pill.updated {
       background: var(--accent-green-bg);
       color: var(--accent-green);
       border: 1px solid #4ac26b;
@@ -809,7 +809,7 @@
           <select id="filterStatusSelect" class="select-control" onchange="renderFileTree()" title="Filter by Status">
             <option value="all">⚡ All Statuses</option>
             <option value="In Review">🟡 In Review</option>
-            <option value="Updated">🟢 Updated</option>
+            <option value="Accepted">🟢 Accepted</option>
             <option value="Rejected">🔴 Rejected</option>
           </select>
         </div>
@@ -831,7 +831,7 @@
           <div class="status-select-wrap">
             <select id="statusSelect" class="status-select" onchange="onStatusChange(this.value)">
               <option value="In Review">🟡 In Review</option>
-              <option value="Updated">🟢 Updated</option>
+              <option value="Accepted">🟢 Accepted</option>
               <option value="Rejected">🔴 Rejected</option>
             </select>
           </div>
@@ -1183,9 +1183,9 @@
       isDirty = false;
       setSyncStatus(gitPushedSuccess ? "Synced with VS Code & GitHub 🚀" : "Synced with VS Code / Git", "green");
       if (gitPushedSuccess) {
-        showToast(`Updated '${file.filename}' & Pushed to GitHub! 🚀`, "success");
+        showToast(`Saved '${file.filename}' [${status}] & Pushed to GitHub! 🚀`, "success");
       } else {
-        showToast(`Updated '${file.filename}' [${status}] successfully!`, "success");
+        showToast(`Saved '${file.filename}' [${status}] successfully!`, "success");
       }
       renderFileTree();
     }
@@ -1236,8 +1236,8 @@
           const match = text.match(/status:\s*([^\n\r]+)/i);
           if (match && match[1]) {
             const raw = match[1].trim().toLowerCase();
-            if (raw.includes("updated")) fileStatus = "Updated";
-            else if (raw.includes("rejected")) fileStatus = "Rejected";
+            if (raw.includes("accept") || raw.includes("updated") || raw.includes("approved") || raw.includes("final")) fileStatus = "Accepted";
+            else if (raw.includes("reject")) fileStatus = "Rejected";
             else fileStatus = "In Review";
           }
 
