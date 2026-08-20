@@ -803,17 +803,34 @@ function aclMarkdownSaverPlugin() {
           req.on('data', chunk => { body += chunk; });
           req.on('end', () => {
             try {
-              const { folderPath, filename, content } = JSON.parse(body);
+              const { folderPath, filename, content, status, autoPush } = JSON.parse(body);
               const fs = require('node:fs');
               const path = require('node:path');
+              const { exec } = require('node:child_process');
               const targetDir = path.resolve(process.cwd(), folderPath || '');
               if (!fs.existsSync(targetDir)) {
                 fs.mkdirSync(targetDir, { recursive: true });
               }
               const targetFile = path.join(targetDir, filename);
               fs.writeFileSync(targetFile, content, 'utf8');
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ success: true, path: targetFile }));
+
+              if (autoPush) {
+                const gitCmd = `git add "${targetFile}" && git commit -m "docs: update ${filename} [${status || 'Updated'}]" && git push`;
+                const env = { ...process.env, PATH: (process.env.PATH || '') + ';C:\\Users\\karthick.natarajan\\AppData\\Local\\Programs\\Git\\cmd;C:\\Program Files\\Git\\cmd' };
+                exec(gitCmd, { cwd: process.cwd(), env }, (gitErr, gitStdout, gitStderr) => {
+                  if (gitErr) {
+                    console.warn('[ACL Git Auto-Push]', gitErr.message || gitStderr);
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ success: true, path: targetFile, gitPushed: false, gitError: gitErr.message }));
+                  } else {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ success: true, path: targetFile, gitPushed: true }));
+                  }
+                });
+              } else {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: true, path: targetFile, gitPushed: false }));
+              }
             } catch (err) {
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');

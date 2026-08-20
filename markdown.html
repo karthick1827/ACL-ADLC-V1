@@ -160,6 +160,31 @@
     }
     .btn-update:active {
       background: #187431;
+    /* Auto-Push to GitHub Checkbox */
+    .auto-push-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 0.45rem 0.8rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+    .auto-push-label:hover {
+      background: var(--bg-hover);
+      border-color: #8c959f;
+    }
+    .auto-push-label input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: var(--accent-green);
+      width: 15px;
+      height: 15px;
     }
 
     /* Main Container */
@@ -558,6 +583,12 @@
 
     <!-- Header Actions -->
     <div class="header-actions">
+      <!-- Auto-Push to GitHub Toggle -->
+      <label class="auto-push-label" title="Automatically commit and push to GitHub whenever you click Update">
+        <input type="checkbox" id="autoPushCheckbox" checked />
+        <span>🚀 Auto-Push to GitHub</span>
+      </label>
+
       <!-- Direct Folder Sync Button (Browser Native Disk Access) -->
       <button class="btn-disk-sync" id="btnSyncDisk" onclick="connectLocalProjectFolder()" title="Link directly to your local project folder for live disk synchronization">
         <span id="syncDiskIcon">📁</span>
@@ -864,24 +895,37 @@
       }
 
       // 3. Attempt dev server API endpoint save if available
+      const autoPush = document.getElementById("autoPushCheckbox") ? document.getElementById("autoPushCheckbox").checked : false;
+      let gitPushedSuccess = false;
       try {
-        await fetch("/api/save-markdown", {
+        const res = await fetch("/api/save-markdown", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             folderPath: file.folderPath,
             filename: file.filename,
             content: file.content,
-            status: file.status
+            status: file.status,
+            autoPush: autoPush
           })
         });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.gitPushed) {
+            gitPushedSuccess = true;
+          }
+        }
       } catch (e) {
         // Fallback gracefully
       }
 
       isDirty = false;
-      setSyncStatus("Synced with VS Code / Git", "green");
-      showToast(`Updated '${file.filename}' [${status}] successfully!`, "success");
+      setSyncStatus(gitPushedSuccess ? "Synced with VS Code & GitHub 🚀" : "Synced with VS Code / Git", "green");
+      if (gitPushedSuccess) {
+        showToast(`Updated '${file.filename}' & Pushed to GitHub! 🚀`, "success");
+      } else {
+        showToast(`Updated '${file.filename}' [${status}] successfully!`, "success");
+      }
       renderFileTree();
     }
 
