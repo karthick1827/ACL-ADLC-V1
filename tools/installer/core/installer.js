@@ -723,17 +723,29 @@ class Installer {
           htmlContent = htmlContent.replace('</head>', `${injection}</head>`);
         }
 
-        const destMarkdown = path.join(projectRoot, 'markdown.html');
-        await fs.writeFile(destMarkdown, htmlContent, 'utf8');
-        this.installedFiles.add(destMarkdown);
-
+        // Deploy exactly ONE unified markdown.html file to avoid clutter/duplication
         const publicDir = path.join(projectRoot, 'public');
-        if (!(await fs.pathExists(publicDir))) {
-          await fs.ensureDir(publicDir);
+        let targetMarkdownFile;
+        if (await fs.pathExists(publicDir)) {
+          targetMarkdownFile = path.join(publicDir, 'markdown.html');
+          const rootDuplicate = path.join(projectRoot, 'markdown.html');
+          if (await fs.pathExists(rootDuplicate)) {
+            await fs.remove(rootDuplicate);
+          }
+        } else {
+          const isWebProject = (await fs.pathExists(path.join(projectRoot, 'vite.config.js'))) ||
+                               (await fs.pathExists(path.join(projectRoot, 'vite.config.ts'))) ||
+                               (await fs.pathExists(path.join(projectRoot, 'package.json')));
+          if (isWebProject) {
+            await fs.ensureDir(publicDir);
+            targetMarkdownFile = path.join(publicDir, 'markdown.html');
+          } else {
+            targetMarkdownFile = path.join(projectRoot, 'markdown.html');
+          }
         }
-        const destPublicMarkdown = path.join(publicDir, 'markdown.html');
-        await fs.writeFile(destPublicMarkdown, htmlContent, 'utf8');
-        this.installedFiles.add(destPublicMarkdown);
+
+        await fs.writeFile(targetMarkdownFile, htmlContent, 'utf8');
+        this.installedFiles.add(targetMarkdownFile);
       }
 
       // Auto-configure Vite middleware if Vite config exists in project
