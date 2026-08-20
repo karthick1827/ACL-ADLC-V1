@@ -698,8 +698,22 @@ class Installer {
     // Deploy markdown.html studio to target project root and public directory (if present)
     const projectRoot = paths?.projectRoot;
     if (projectRoot) {
-      const srcMarkdown = path.join(paths.srcDir || getProjectRoot(), 'markdown.html');
-      if (await fs.pathExists(srcMarkdown)) {
+      const candidatePaths = [
+        path.join(paths.srcDir || getProjectRoot(), 'markdown.html'),
+        path.join(paths.srcDir || getProjectRoot(), 'src', 'markdown.html'),
+        path.join(__dirname, '..', 'markdown.html'),
+        path.join(__dirname, '..', '..', 'markdown.html'),
+        path.join(__dirname, '..', '..', '..', 'markdown.html'),
+        path.join(__dirname, '..', '..', '..', 'src', 'markdown.html')
+      ];
+      let srcMarkdown = null;
+      for (const p of candidatePaths) {
+        if (await fs.pathExists(p)) {
+          srcMarkdown = p;
+          break;
+        }
+      }
+      if (srcMarkdown) {
         let htmlContent = await fs.readFile(srcMarkdown, 'utf8');
 
         // Scan for existing markdown files in project output folders
@@ -714,11 +728,12 @@ class Installer {
         this.installedFiles.add(destMarkdown);
 
         const publicDir = path.join(projectRoot, 'public');
-        if (await fs.pathExists(publicDir)) {
-          const destPublicMarkdown = path.join(publicDir, 'markdown.html');
-          await fs.writeFile(destPublicMarkdown, htmlContent, 'utf8');
-          this.installedFiles.add(destPublicMarkdown);
+        if (!(await fs.pathExists(publicDir))) {
+          await fs.ensureDir(publicDir);
         }
+        const destPublicMarkdown = path.join(publicDir, 'markdown.html');
+        await fs.writeFile(destPublicMarkdown, htmlContent, 'utf8');
+        this.installedFiles.add(destPublicMarkdown);
       }
 
       // Auto-configure Vite middleware if Vite config exists in project

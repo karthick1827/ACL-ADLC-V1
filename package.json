@@ -23,6 +23,12 @@
     "acl": "tools/installer/acl-cli.js",
     "acl-adlc": "tools/installer/acl-cli.js"
   },
+  "files": [
+    "src",
+    "tools",
+    "web-bundles",
+    "markdown.html"
+  ],
   "scripts": {
     "acl:install": "node tools/installer/acl-cli.js install",
     "acl:uninstall": "node tools/installer/acl-cli.js uninstall",
@@ -39,7 +45,7 @@
     "lint": "eslint . --ext .js,.cjs,.mjs,.yaml --max-warnings=0",
     "lint:fix": "eslint . --ext .js,.cjs,.mjs,.yaml --fix",
     "lint:md": "markdownlint-cli2 \"**/*.md\"",
-    "prepare": "command -v husky >/dev/null 2>&1 && husky || exit 0",
+    "prepare": "husky || exit 0",
     "quality": "npm run format:check && npm run lint && npm run lint:md && npm run docs:build && npm run test:site-url && npm run test:install && npm run test:urls && npm run test:renderer && npm run test:dev-auto-contract && npm run validate:refs && npm run validate:skills && npm run docs:validate-sidebar",
     "rebundle": "node tools/installer/bundlers/bundle-web.js rebundle",
     "test": "npm run test:refs && npm run test:install && npm run test:urls && npm run test:site-url && npm run test:channels && npm run test:renderer && npm run test:dev-auto-contract && npm run test:skills && npm run lint && npm run lint:md && npm run format:check",

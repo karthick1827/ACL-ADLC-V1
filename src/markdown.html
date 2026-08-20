@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ACL-ADLC Markdown Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Marked.js for GitHub Flavored Markdown Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  
+  <!-- Highlight.js for Syntax Highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <style>
+    :root {
+      --bg-main: #ffffff;
+      --bg-surface: #f6f8fa;
+      --bg-subtle: #f0f2f5;
+      --bg-hover: #eaeef2;
+      --border-color: #d0d7de;
+      --border-subtle: #e1e4e8;
+      --text-primary: #1f2328;
+      --text-secondary: #656d76;
+      --text-muted: #8c959f;
+
+      --accent-blue: #0969da;
+      --accent-blue-bg: #ddf4ff;
+      --accent-green: #1a7f37;
+      --accent-green-bg: #dafbe1;
+      --accent-yellow: #9a6700;
+      --accent-yellow-bg: #fff8c5;
+      --accent-red: #cf222e;
+      --accent-red-bg: #ffebe9;
+
+      --sidebar-width: 320px;
+      --header-height: 60px;
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+      --shadow-sm: 0 1px 3px rgba(31, 35, 40, 0.08);
+      --shadow-md: 0 4px 12px rgba(31, 35, 40, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100vh;
+      width: 100vw;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Enhanced Visible Scrollbars */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f6f8fa;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #c0c6cc;
+      border-radius: var(--radius-sm);
+      border: 2px solid #f6f8fa;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #8c959f;
+    }
+
+    /* Header */
+    header {
+      height: var(--header-height);
+      background-color: #ffffff;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.5rem;
+      z-index: 20;
+      box-shadow: var(--shadow-sm);
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text-primary);
+    }
+
+    .brand-badge {
+      background: #0969da;
+      color: #ffffff;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-sm);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    /* Auto-Push to GitHub Checkbox */
+    .auto-push-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 0.45rem 0.8rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+    .auto-push-label:hover {
+      background: var(--bg-hover);
+      border-color: #8c959f;
+    }
+    .auto-push-label input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: var(--accent-green);
+      width: 15px;
+      height: 15px;
+    }
+
+    /* Direct Disk Sync Button */
+    .btn-disk-sync {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 0.45rem 0.8rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-disk-sync:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: #8c959f;
+    }
+    .btn-disk-sync.connected {
+      background: var(--accent-blue-bg);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    /* Update Button */
+    .btn-update {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      padding: 0.5rem 1.2rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      background: #1f883d;
+      color: #ffffff;
+      border: 1px solid rgba(27, 31, 36, 0.15);
+      box-shadow: 0 1px 2px rgba(27, 31, 36, 0.1);
+      outline: none;
+    }
+    .btn-update:hover {
+      background: #1a7f37;
+    }
+    .btn-update:active {
+      background: #187431;
+    }
+
+    /* Main Container */
+    .app-container {
+      display: flex;
+      flex: 1;
+      width: 100vw;
+      height: calc(100vh - var(--header-height));
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Left Sidebar */
+    aside.sidebar {
+      width: var(--sidebar-width);
+      min-width: 280px;
+      max-width: 420px;
+      background-color: var(--bg-surface);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .sidebar-controls {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      background: #ffffff;
+      flex-shrink: 0;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-input {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 0.45rem 0.75rem 0.45rem 2rem;
+      border-radius: var(--radius-md);
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .search-input:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 0.65rem;
+      color: var(--text-muted);
+      pointer-events: none;
+      font-size: 0.85rem;
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .select-control {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 0.4rem 0.5rem;
+      border-radius: var(--radius-md);
+      font-size: 0.78rem;
+      outline: none;
+      width: 100%;
+      cursor: pointer;
+    }
+    .select-control:focus {
+      border-color: var(--accent-blue);
+    }
+
+    /* File List & Folder Tree */
+    .file-tree-container {
+      flex: 1;
+      overflow-y: auto !important;
+      overflow-x: hidden;
+      min-height: 0;
+      height: 100%;
+      padding: 0.75rem 0.5rem;
+    }
+
+    .folder-item {
+      margin-bottom: 0.35rem;
+    }
+
+    .folder-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      user-select: none;
+      background: transparent;
+      transition: background 0.1s ease;
+    }
+    .folder-header:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .folder-title-left {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .folder-chevron {
+      font-size: 0.75rem;
+      transition: transform 0.2s ease;
+      color: var(--text-muted);
+    }
+    .folder-chevron.collapsed {
+      transform: rotate(-90deg);
+    }
+
+    .folder-badge {
+      font-size: 0.7rem;
+      background: var(--border-subtle);
+      color: var(--text-secondary);
+      padding: 0.1rem 0.45rem;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+
+    .folder-files-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      padding-left: 0.85rem;
+      margin-top: 0.15rem;
+    }
+    .folder-files-list.hidden {
+      display: none;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.45rem 0.65rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      font-size: 0.83rem;
+      color: var(--text-primary);
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .file-item:hover {
+      background-color: var(--bg-hover);
+    }
+    .file-item.active {
+      background-color: var(--accent-blue-bg);
+      border-color: rgba(9, 105, 218, 0.3);
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .file-item-left {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-icon {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .file-item.active .file-icon {
+      color: var(--accent-blue);
+    }
+
+    /* Status Pills */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      text-transform: capitalize;
+      flex-shrink: 0;
+    }
+
+    .status-pill.in-review {
+      background: var(--accent-yellow-bg);
+      color: var(--accent-yellow);
+      border: 1px solid #d4a72c;
+    }
+
+    .status-pill.accepted, .status-pill.updated {
+      background: var(--accent-green-bg);
+      color: var(--accent-green);
+      border: 1px solid #4ac26b;
+    }
+
+    .status-pill.rejected {
+      background: var(--accent-red-bg);
+      color: var(--accent-red);
+      border: 1px solid #ff8182;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: currentColor;
+    }
+
+    /* Main Workspace */
+    main.workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    /* Status & Metadata Bar above MD File */
+    .editor-status-bar {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+
+    .status-selection-area {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .status-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-select-wrap {
+      display: flex;
+      align-items: center;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 0.3rem 0.65rem;
+    }
+
+    .status-select {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .file-path-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      background: var(--bg-surface);
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      max-width: 450px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .file-path-breadcrumb span.highlight {
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .view-mode-group {
+      display: flex;
+      align-items: center;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 2px;
+    }
+
+    .view-mode-btn {
+      background: transparent;
+      border: none;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .view-mode-btn:hover {
+      color: var(--text-primary);
+    }
+    .view-mode-btn.active {
+      background: #ffffff;
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .file-sync-indicator {
+      font-size: 0.78rem;
+      color: var(--accent-green);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* Editor Container */
+    .editor-wrapper {
+      flex: 1;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: #ffffff;
+    }
+
+    /* Raw Markdown Source Textarea */
+    .markdown-textarea {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      padding: 2rem 3rem;
+      background: #ffffff;
+      color: #1f2328;
+      border: none;
+      outline: none;
+      resize: none;
+      font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+      font-size: 0.95rem;
+      line-height: 1.75;
+      tab-size: 2;
+      overflow-y: auto !important;
+      overflow-x: auto !important;
+      box-sizing: border-box;
+      white-space: pre-wrap;
+      word-break: break-word;
+      display: none;
+    }
+    .markdown-textarea.active {
+      display: block;
+    }
+
+    /* Rich Rendered GitHub Markdown CSS */
+    .markdown-body {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      padding: 2.5rem 3.5rem;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+      font-size: 15.5px;
+      line-height: 1.65;
+      color: #1f2328;
+      background-color: #ffffff;
+      overflow-y: auto !important;
+      overflow-x: auto !important;
+      display: block;
+    }
+    .markdown-body.hidden {
+      display: none;
+    }
+
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+      margin-top: 24px;
+      margin-bottom: 16px;
+      font-weight: 600;
+      line-height: 1.25;
+      color: #1f2328;
+    }
+    .markdown-body h1 {
+      font-size: 2em;
+      padding-bottom: 0.3em;
+      border-bottom: 1px solid #d0d7de;
+    }
+    .markdown-body h2 {
+      font-size: 1.5em;
+      padding-bottom: 0.3em;
+      border-bottom: 1px solid #d0d7de;
+    }
+    .markdown-body h3 { font-size: 1.25em; }
+    .markdown-body h4 { font-size: 1em; }
+    .markdown-body p, .markdown-body blockquote, .markdown-body ul, .markdown-body ol, .markdown-body dl, .markdown-body table, .markdown-body pre {
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+    .markdown-body table {
+      border-spacing: 0;
+      border-collapse: collapse;
+      display: block;
+      width: max-content;
+      max-width: 100%;
+      overflow: auto;
+      margin-top: 12px;
+      margin-bottom: 16px;
+    }
+    .markdown-body table th, .markdown-body table td {
+      padding: 8px 14px;
+      border: 1px solid #d0d7de;
+    }
+    .markdown-body table th {
+      font-weight: 600;
+      background-color: #f6f8fa;
+    }
+    .markdown-body table tr {
+      background-color: #ffffff;
+      border-top: 1px solid #d0d7de;
+    }
+    .markdown-body table tr:nth-child(2n) {
+      background-color: #f6f8fa;
+    }
+    .markdown-body code {
+      padding: 0.2em 0.4em;
+      margin: 0;
+      font-size: 85%;
+      white-space: break-spaces;
+      background-color: rgba(175, 184, 193, 0.2);
+      border-radius: 6px;
+      font-family: 'Fira Code', 'Consolas', monospace;
+    }
+    .markdown-body pre {
+      padding: 16px;
+      overflow: auto;
+      font-size: 85%;
+      line-height: 1.45;
+      background-color: #f6f8fa;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      margin-bottom: 16px;
+    }
+    .markdown-body pre code {
+      padding: 0;
+      background-color: transparent;
+      border: 0;
+    }
+    .markdown-body blockquote {
+      padding: 0 1em;
+      color: #656d76;
+      border-left: 0.25em solid #0969da;
+      background: #f6f8fa;
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      padding: 0.5rem 1rem;
+      margin: 0 0 16px 0;
+    }
+    .markdown-body ul, .markdown-body ol {
+      padding-left: 2em;
+    }
+    .markdown-body hr {
+      height: 0.25em;
+      padding: 0;
+      margin: 24px 0;
+      background-color: #d0d7de;
+      border: 0;
+    }
+    .markdown-body input[type="checkbox"] {
+      margin-right: 0.4em;
+    }
+
+    /* Toast Notifications */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #ffffff;
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 0.85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: var(--shadow-md);
+      z-index: 100;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .toast.success {
+      border-left: 4px solid var(--accent-green);
+    }
+    .toast.error {
+      border-left: 4px solid var(--accent-red);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Application Header -->
+  <header>
+    <div class="brand">
+      <span class="brand-badge">ACL-ADLC</span>
+      <span>Markdown Studio</span>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <!-- Auto-Push to GitHub Toggle -->
+      <label class="auto-push-label" title="Automatically commit and push to GitHub whenever you click Update">
+        <input type="checkbox" id="autoPushCheckbox" checked />
+        <span>🚀 Auto-Push to GitHub</span>
+      </label>
+
+      <!-- Direct Folder Sync Button (Browser Native Disk Access) -->
+      <button class="btn-disk-sync" id="btnSyncDisk" onclick="connectLocalProjectFolder()" title="Link directly to your local project folder for live disk synchronization">
+        <span id="syncDiskIcon">📁</span>
+        <span id="syncDiskText">Connect Project Folder</span>
+      </button>
+
+      <!-- Update Button -->
+      <button class="btn-update" id="btnSave" onclick="saveCurrentFile()" title="Save & Update Markdown File (Ctrl+S / Cmd+S)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        <span id="saveBtnText">Update</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace Layout -->
+  <div class="app-container">
+
+    <!-- Left Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-controls">
+        <!-- Search Input -->
+        <div class="search-input-wrapper">
+          <span class="search-icon">🔍</span>
+          <input 
+            type="text" 
+            id="searchInput" 
+            class="search-input" 
+            placeholder="Search files or paths..." 
+            oninput="renderFileTree()" 
+          />
+        </div>
+
+        <!-- Filter & Sorting Options (Date, Alphabetical, Status) -->
+        <div class="filter-grid">
+          <!-- Sort Options -->
+          <select id="sortSelect" class="select-control" onchange="renderFileTree()" title="Sort Files">
+            <option value="alpha-asc">🔤 Name (A → Z)</option>
+            <option value="alpha-desc">🔤 Name (Z → A)</option>
+            <option value="date-desc">🕒 Date (Newest)</option>
+            <option value="date-asc">🕒 Date (Oldest)</option>
+          </select>
+
+          <!-- Status Filter Options -->
+          <select id="filterStatusSelect" class="select-control" onchange="renderFileTree()" title="Filter by Status">
+            <option value="all">⚡ All Statuses</option>
+            <option value="In Review">🟡 In Review</option>
+            <option value="Accepted">🟢 Accepted</option>
+            <option value="Rejected">🔴 Rejected</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Hierarchical Folder Tree of acl-output -->
+      <div class="file-tree-container" id="fileTreeRoot">
+        <!-- Rendered dynamically by JavaScript -->
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="workspace">
+      <!-- Status & Metadata Bar (Above the Markdown File) -->
+      <div class="editor-status-bar">
+        <!-- Status Dropdown Feature -->
+        <div class="status-selection-area">
+          <span class="status-label">Document Status:</span>
+          <div class="status-select-wrap">
+            <select id="statusSelect" class="status-select" onchange="onStatusChange(this.value)">
+              <option value="In Review">🟡 In Review</option>
+              <option value="Accepted">🟢 Accepted</option>
+              <option value="Rejected">🔴 Rejected</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Folder Path Breadcrumb -->
+        <div class="file-path-breadcrumb" id="filePathBreadcrumb" title="Current File Location">
+          <span>📁</span>
+          <span id="breadcrumbPathText" class="highlight">acl-output / (No markdown files yet)</span>
+        </div>
+
+        <!-- View Mode Switcher (Preview / Edit) -->
+        <div class="view-mode-group">
+          <button class="view-mode-btn active" id="btnModePreview" onclick="setViewMode('preview')">
+            <span>👁️</span>
+            <span>Preview</span>
+          </button>
+          <button class="view-mode-btn" id="btnModeEdit" onclick="setViewMode('edit')">
+            <span>✏️</span>
+            <span>Edit</span>
+          </button>
+        </div>
+
+        <!-- Sync Indicator -->
+        <div class="file-sync-indicator" id="syncStatus">
+          <span>●</span>
+          <span id="syncStatusText">Synced with VS Code / Git</span>
+        </div>
+      </div>
+
+      <!-- Content Area: Rich Markdown View & Source Editor -->
+      <div class="editor-wrapper">
+        <!-- Rich Rendered GitHub Markdown Preview -->
+        <div id="markdownPreview" class="markdown-body"></div>
+
+        <!-- Source Textarea Editor -->
+        <textarea 
+          id="markdownTextarea" 
+          class="markdown-textarea" 
+          placeholder="Select a Markdown file to start editing..." 
+          spellcheck="false"
+          oninput="handleContentInput()"
+        ></textarea>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toastNotification">
+    <span id="toastIcon">✔</span>
+    <span id="toastMsg">Updated successfully</span>
+  </div>
+
+  <script>
+    // State Variables
+    let files = [];
+    let activeFileId = null;
+    let isDirty = false;
+    let currentMode = "preview"; // "preview" or "edit"
+    let projectDirHandle = null;
+
+    // Configure Marked
+    if (typeof marked !== 'undefined') {
+      marked.setOptions({
+        gfm: true,
+        breaks: true,
+        highlight: function(code, lang) {
+          if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+            return hljs.highlight(code, { language: lang }).value;
+          }
+          return code;
+        }
+      });
+    }
+
+    // Initialize Application
+    async function init() {
+      // 1. Try to fetch live files from dev-server API first
+      try {
+        const res = await fetch("/api/list-markdown-files");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.files)) {
+            files = data.files;
+            localStorage.setItem("acl_adlc_project_markdown_files", JSON.stringify(files));
+            if (files.length > 0) {
+              activeFileId = files.some(f => f.id === activeFileId) ? activeFileId : files[0].id;
+              renderFileTree();
+              loadFile(activeFileId);
+            } else {
+              renderFileTree();
+              loadEmptyState();
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        // Fallback for static viewing without server
+      }
+
+      // 2. Check if embedded files exist in window
+      if (window.__ACL_EMBEDDED_FILES__ && Array.isArray(window.__ACL_EMBEDDED_FILES__)) {
+        files = window.__ACL_EMBEDDED_FILES__;
+      } else {
+        files = [];
+      }
+
+      if (files.length > 0) {
+        activeFileId = files[0].id;
+        renderFileTree();
+        loadFile(activeFileId);
+      } else {
+        renderFileTree();
+        loadEmptyState();
+      }
+    }
+
+    // Keyboard Shortcuts Setup
+    function setupShortcuts() {
+      window.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+          e.preventDefault();
+          saveCurrentFile();
+        }
+      });
+    }
+
+    // Get Active File
+    function getActiveFile() {
+      return files.find(f => f.id === activeFileId);
+    }
+
+    // Load Empty State
+    function loadEmptyState() {
+      activeFileId = null;
+      document.getElementById("breadcrumbPathText").textContent = "acl-output / (No markdown files yet)";
+      document.getElementById("statusSelect").disabled = true;
+      const preview = document.getElementById("markdownPreview");
+      const textarea = document.getElementById("markdownTextarea");
+      
+      preview.innerHTML = `
+        <div style="text-align: center; padding: 4rem 2rem; color: #656d76;">
+          <h2 style="border: none; margin-bottom: 0.5rem;">No Markdown Files Generated Yet</h2>
+          <p>As your ACL-ADLC workflows execute (Analysis, Planning, Architecture, Implementation), generated artifacts will appear automatically here in the sidebar.</p>
+        </div>
+      `;
+      textarea.value = "";
+      textarea.placeholder = "No Markdown files generated in acl-output yet.";
+      textarea.readOnly = true;
+      setSyncStatus("Waiting for artifacts...", "yellow");
+    }
+
+    // Set View Mode (preview or edit)
+    function setViewMode(mode) {
+      currentMode = mode;
+      const btnPreview = document.getElementById("btnModePreview");
+      const btnEdit = document.getElementById("btnModeEdit");
+      const previewEl = document.getElementById("markdownPreview");
+      const textareaEl = document.getElementById("markdownTextarea");
+
+      if (mode === "preview") {
+        btnPreview.classList.add("active");
+        btnEdit.classList.remove("active");
+        previewEl.classList.remove("hidden");
+        textareaEl.classList.remove("active");
+        renderPreview();
+      } else {
+        btnEdit.classList.add("active");
+        btnPreview.classList.remove("active");
+        previewEl.classList.add("hidden");
+        textareaEl.classList.add("active");
+        textareaEl.focus();
+      }
+    }
+
+    // Strip YAML frontmatter (stepsCompleted, inputDocuments, metadata) and XML wrapper tags for clean GitHub-like preview
+    function cleanMarkdownForPreview(text) {
+      if (!text) return "";
+      let clean = text.trim();
+
+      // 1. Strip YAML frontmatter (--- ... ---)
+      if (clean.startsWith("---")) {
+        const secondDelim = clean.indexOf("\n---", 3);
+        if (secondDelim !== -1) {
+          clean = clean.substring(secondDelim + 4).trimStart();
+        }
+      }
+
+      // 2. Strip XML wrapper tags like <frozen-after-approval ...> and </frozen-after-approval>
+      clean = clean.replace(/<frozen-after-approval[^>]*>/gi, "");
+      clean = clean.replace(/<\/frozen-after-approval>/gi, "");
+
+      return clean;
+    }
+
+    // Render Markdown HTML into Preview Container
+    function renderPreview() {
+      const file = getActiveFile();
+      const previewEl = document.getElementById("markdownPreview");
+      const textareaEl = document.getElementById("markdownTextarea");
+      const raw = textareaEl.value || (file ? file.content : "");
+
+      if (!raw) {
+        loadEmptyState();
+        return;
+      }
+
+      const displayContent = cleanMarkdownForPreview(raw);
+
+      if (typeof marked !== 'undefined') {
+        previewEl.innerHTML = marked.parse(displayContent);
+        // Apply syntax highlighting
+        if (typeof hljs !== 'undefined') {
+          previewEl.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+          });
+        }
+      } else {
+        previewEl.textContent = displayContent;
+      }
+    }
+
+    // Load Selected File into Workspace
+    function loadFile(id) {
+      activeFileId = id;
+      const file = getActiveFile();
+      if (!file) {
+        loadEmptyState();
+        return;
+      }
+
+      // Update Breadcrumb & Header Status Dropdown
+      document.getElementById("breadcrumbPathText").textContent = `${file.folderPath} / ${file.filename}`;
+      const statusSelect = document.getElementById("statusSelect");
+      statusSelect.disabled = false;
+      statusSelect.value = file.status;
+
+      // Update Textarea Content & Preview
+      const textarea = document.getElementById("markdownTextarea");
+      textarea.readOnly = false;
+      textarea.value = file.content;
+
+      renderPreview();
+      renderFileTree();
+      isDirty = false;
+      setSyncStatus("Synced with VS Code / Git", "green");
+    }
+
+    // Status Dropdown Change Handler
+    function onStatusChange(newStatus) {
+      const file = getActiveFile();
+      if (!file) return;
+
+      file.status = newStatus;
+
+      // Automatically update YAML frontmatter inside the content
+      let content = document.getElementById("markdownTextarea").value;
+      if (content.startsWith("---")) {
+        const parts = content.split("---");
+        if (parts.length >= 3) {
+          let fm = parts[1];
+          if (/status:\s*.+/i.test(fm)) {
+            fm = fm.replace(/status:\s*.+/i, `status: ${newStatus}`);
+          } else {
+            fm = fm + `\nstatus: ${newStatus}`;
+          }
+          content = `---${fm}---` + parts.slice(2).join("---");
+          document.getElementById("markdownTextarea").value = content;
+        }
+      } else {
+        content = `---\nstatus: ${newStatus}\n---\n\n` + content;
+        document.getElementById("markdownTextarea").value = content;
+      }
+
+      renderPreview();
+      handleContentInput();
+      renderFileTree();
+    }
+
+    // Input Change Handler
+    function handleContentInput() {
+      isDirty = true;
+      setSyncStatus("Unsaved changes...", "yellow");
+    }
+
+    // Set Status Message
+    function setSyncStatus(text, color) {
+      const indicator = document.getElementById("syncStatus");
+      const statusText = document.getElementById("syncStatusText");
+      statusText.textContent = text;
+
+      if (color === "green") {
+        indicator.style.color = "var(--accent-green)";
+      } else if (color === "yellow") {
+        indicator.style.color = "var(--accent-yellow)";
+      } else if (color === "red") {
+        indicator.style.color = "var(--accent-red)";
+      }
+    }
+
+    // Save and Sync File (Updates in Browser, Disk, VS Code, and pushes to GitHub)
+    async function saveCurrentFile() {
+      const file = getActiveFile();
+      if (!file) return;
+
+      const content = document.getElementById("markdownTextarea").value;
+      const status = document.getElementById("statusSelect").value;
+      const nowIso = new Date().toISOString();
+
+      file.content = content;
+      file.status = status;
+      file.updatedAt = nowIso;
+
+      // Update Preview
+      renderPreview();
+
+      // 1. Save to Local Cache
+      localStorage.setItem("acl_adlc_project_markdown_files", JSON.stringify(files));
+
+      // 2. If connected via File System Access API, write directly to local file
+      if (file._fileHandle) {
+        try {
+          const writable = await file._fileHandle.createWritable();
+          await writable.write(content);
+          await writable.close();
+        } catch (e) {
+          console.warn("Could not write directly via file handle:", e);
+        }
+      } else if (projectDirHandle) {
+        try {
+          const pathSegments = (file.folderPath + "/" + file.filename).split("/").filter(Boolean);
+          let dir = projectDirHandle;
+          for (let i = 0; i < pathSegments.length - 1; i++) {
+            dir = await dir.getDirectoryHandle(pathSegments[i], { create: true });
+          }
+          const fileHandle = await dir.getFileHandle(pathSegments[pathSegments.length - 1], { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(content);
+          await writable.close();
+        } catch (e) {
+          console.warn("Error writing to project folder handle:", e);
+        }
+      }
+
+      // 3. Attempt dev server API endpoint save with optional Git Auto-Push
+      const autoPush = document.getElementById("autoPushCheckbox") ? document.getElementById("autoPushCheckbox").checked : false;
+      let gitPushedSuccess = false;
+      try {
+        const res = await fetch("/api/save-markdown", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            folderPath: file.folderPath,
+            filename: file.filename,
+            content: file.content,
+            status: file.status,
+            autoPush: autoPush
+          })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.gitPushed) {
+            gitPushedSuccess = true;
+          }
+        }
+      } catch (e) {
+        // Fallback gracefully
+      }
+
+      isDirty = false;
+      setSyncStatus(gitPushedSuccess ? "Synced with VS Code & GitHub 🚀" : "Synced with VS Code / Git", "green");
+      if (gitPushedSuccess) {
+        showToast(`Saved '${file.filename}' [${status}] & Pushed to GitHub! 🚀`, "success");
+      } else {
+        showToast(`Saved '${file.filename}' [${status}] successfully!`, "success");
+      }
+      renderFileTree();
+    }
+
+    // Connect Local Project Folder (Chrome/Edge Native Disk Access)
+    async function connectLocalProjectFolder() {
+      if (!window.showDirectoryPicker) {
+        showToast("Your browser does not support direct folder picker. Local storage sync active.", "error");
+        return;
+      }
+
+      try {
+        projectDirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+        document.getElementById("syncDiskIcon").textContent = "✔";
+        document.getElementById("syncDiskText").textContent = "Project Folder Connected";
+        document.getElementById("btnSyncDisk").classList.add("connected");
+
+        const discovered = [];
+        await scanDirectoryForMd(projectDirHandle, "", discovered);
+
+        if (discovered.length > 0) {
+          files = discovered;
+          activeFileId = files[0].id;
+          renderFileTree();
+          loadFile(activeFileId);
+          showToast(`Loaded ${discovered.length} markdown file(s) from project folder!`, "success");
+        }
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error(err);
+        }
+      }
+    }
+
+    // Recursive directory scanner for File System Access API
+    async function scanDirectoryForMd(dirHandle, currentPath, resultList) {
+      for await (const [name, handle] of dirHandle.entries()) {
+        if (name === "node_modules" || name === ".git" || name === ".husky") continue;
+
+        const nextPath = currentPath ? `${currentPath}/${name}` : name;
+        if (handle.kind === "directory") {
+          await scanDirectoryForMd(handle, nextPath, resultList);
+        } else if (handle.kind === "file" && name.endsWith(".md")) {
+          const fileObj = await handle.getFile();
+          const text = await fileObj.text();
+          
+          let fileStatus = "In Review";
+          const match = text.match(/status:\s*([^\n\r]+)/i);
+          if (match && match[1]) {
+            const raw = match[1].trim().toLowerCase();
+            if (raw.includes("accept") || raw.includes("updated") || raw.includes("approved") || raw.includes("final")) fileStatus = "Accepted";
+            else if (raw.includes("reject")) fileStatus = "Rejected";
+            else fileStatus = "In Review";
+          }
+
+          resultList.push({
+            id: nextPath.replace(/[^a-zA-Z0-9_-]/g, "_"),
+            folderPath: currentPath || "root",
+            filename: name,
+            status: fileStatus,
+            updatedAt: new Date(fileObj.lastModified).toISOString(),
+            content: text,
+            _fileHandle: handle
+          });
+        }
+      }
+    }
+
+    // Render Folder Path Hierarchical Tree
+    function renderFileTree() {
+      const root = document.getElementById("fileTreeRoot");
+      const searchQuery = (document.getElementById("searchInput").value || "").toLowerCase();
+      const sortType = document.getElementById("sortSelect").value;
+      const filterStatus = document.getElementById("filterStatusSelect").value;
+
+      root.innerHTML = "";
+
+      // 1. Filter Files
+      let filtered = files.filter(file => {
+        const matchesSearch = file.filename.toLowerCase().includes(searchQuery) ||
+                              file.folderPath.toLowerCase().includes(searchQuery);
+        const matchesStatus = filterStatus === "all" || file.status === filterStatus;
+        return matchesSearch && matchesStatus;
+      });
+
+      if (filtered.length === 0) {
+        root.innerHTML = `
+          <div style="text-align: center; padding: 2rem 1rem; color: var(--text-muted); font-size: 0.85rem;">
+            No matching markdown files found.
+          </div>
+        `;
+        return;
+      }
+
+      // 2. Sort Files
+      filtered.sort((a, b) => {
+        if (sortType === "alpha-asc") return a.filename.localeCompare(b.filename);
+        if (sortType === "alpha-desc") return b.filename.localeCompare(a.filename);
+        if (sortType === "date-desc") return new Date(b.updatedAt) - new Date(a.updatedAt);
+        if (sortType === "date-asc") return new Date(a.updatedAt) - new Date(b.updatedAt);
+        return 0;
+      });
+
+      // 3. Group by folderPath
+      const groups = {};
+      filtered.forEach(file => {
+        const pathKey = file.folderPath || "root";
+        if (!groups[pathKey]) groups[pathKey] = [];
+        groups[pathKey].push(file);
+      });
+
+      // 4. Render Groups
+      Object.keys(groups).forEach(folderPath => {
+        const folderDiv = document.createElement("div");
+        folderDiv.className = "folder-item";
+
+        const headerDiv = document.createElement("div");
+        headerDiv.className = "folder-header";
+        headerDiv.innerHTML = `
+          <div class="folder-title-left">
+            <span class="folder-chevron">▼</span>
+            <span>📁 ${folderPath}</span>
+          </div>
+          <span class="folder-badge">${groups[folderPath].length}</span>
+        `;
+
+        const filesDiv = document.createElement("div");
+        filesDiv.className = "folder-files-list";
+
+        headerDiv.addEventListener("click", () => {
+          const isHidden = filesDiv.classList.toggle("hidden");
+          const chevron = headerDiv.querySelector(".folder-chevron");
+          if (isHidden) {
+            chevron.classList.add("collapsed");
+          } else {
+            chevron.classList.remove("collapsed");
+          }
+        });
+
+        groups[folderPath].forEach(file => {
+          const fileDiv = document.createElement("div");
+          fileDiv.className = `file-item ${file.id === activeFileId ? "active" : ""}`;
+          fileDiv.onclick = () => loadFile(file.id);
+
+          const statusClass = file.status.toLowerCase().replace(/\s+/g, "-");
+
+          fileDiv.innerHTML = `
+            <div class="file-item-left">
+              <span class="file-icon">📄</span>
+              <span title="${file.filename}">${file.filename}</span>
+            </div>
+            <span class="status-pill ${statusClass}">
+              <span class="dot"></span>
+              ${file.status}
+            </span>
+          `;
+
+          filesDiv.appendChild(fileDiv);
+        });
+
+        folderDiv.appendChild(headerDiv);
+        folderDiv.appendChild(filesDiv);
+        root.appendChild(folderDiv);
+      });
+    }
+
+    // Toast Notification Helper
+    function showToast(message, type = "success") {
+      const toast = document.getElementById("toastNotification");
+      const msg = document.getElementById("toastMsg");
+      const icon = document.getElementById("toastIcon");
+
+      msg.textContent = message;
+      icon.textContent = type === "success" ? "✔" : "✖";
+      toast.className = `toast show ${type}`;
+
+      setTimeout(() => {
+        toast.className = "toast";
+      }, 3500);
+    }
+
+    // Start App
+    window.addEventListener("DOMContentLoaded", () => {
+      init();
+      setupShortcuts();
+    });
+  </script>
+</body>
+</html>
