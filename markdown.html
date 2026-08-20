@@ -1152,32 +1152,37 @@
       // 1. Save to Local Cache
       localStorage.setItem("acl_adlc_project_markdown_files", JSON.stringify(files));
 
-      // 2. If connected via File System Access API, write directly to local file
-      if (file._fileHandle) {
+      // 2. If connected via File System Access API, write directly to that specific project folder on disk
+      if (file._fileHandle || projectDirHandle) {
         try {
-          const writable = await file._fileHandle.createWritable();
-          await writable.write(content);
-          await writable.close();
-        } catch (e) {
-          console.warn("Could not write directly via file handle:", e);
-        }
-      } else if (projectDirHandle) {
-        try {
-          const pathSegments = (file.folderPath + "/" + file.filename).split("/").filter(Boolean);
-          let dir = projectDirHandle;
-          for (let i = 0; i < pathSegments.length - 1; i++) {
-            dir = await dir.getDirectoryHandle(pathSegments[i], { create: true });
+          if (file._fileHandle) {
+            const writable = await file._fileHandle.createWritable();
+            await writable.write(content);
+            await writable.close();
+          } else if (projectDirHandle) {
+            const pathSegments = (file.folderPath + "/" + file.filename).split("/").filter(Boolean);
+            let dir = projectDirHandle;
+            for (let i = 0; i < pathSegments.length - 1; i++) {
+              dir = await dir.getDirectoryHandle(pathSegments[i], { create: true });
+            }
+            const fileHandle = await dir.getFileHandle(pathSegments[pathSegments.length - 1], { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(content);
+            await writable.close();
           }
-          const fileHandle = await dir.getFileHandle(pathSegments[pathSegments.length - 1], { create: true });
-          const writable = await fileHandle.createWritable();
-          await writable.write(content);
-          await writable.close();
+          isDirty = false;
+          setSyncStatus("Synced with Connected Folder Disk", "green");
+          showToast(`Saved '${file.filename}' [${status}] directly to connected project!`, "success");
+          renderFileTree();
+          return;
         } catch (e) {
-          console.warn("Error writing to project folder handle:", e);
+          console.error("Error writing to connected folder:", e);
+          showToast("Error saving to connected folder: " + e.message, "error");
+          return;
         }
       }
 
-      // 3. Attempt dev server API endpoint save with optional Git Auto-Push
+      // 3. Otherwise (Native Dev Server Mode), save via current project dev server API with Git Auto-Push
       const autoPush = document.getElementById("autoPushCheckbox") ? document.getElementById("autoPushCheckbox").checked : false;
       let gitPushedSuccess = false;
       try {
