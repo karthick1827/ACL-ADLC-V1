@@ -704,7 +704,7 @@ class Installer {
         path.join(__dirname, '..', 'markdown.html'),
         path.join(__dirname, '..', '..', 'markdown.html'),
         path.join(__dirname, '..', '..', '..', 'markdown.html'),
-        path.join(__dirname, '..', '..', '..', 'src', 'markdown.html')
+        path.join(__dirname, '..', '..', '..', 'src', 'markdown.html'),
       ];
       let srcMarkdown = null;
       for (const p of candidatePaths) {
@@ -733,9 +733,10 @@ class Installer {
             await fs.remove(rootDuplicate);
           }
         } else {
-          const isWebProject = (await fs.pathExists(path.join(projectRoot, 'vite.config.js'))) ||
-                               (await fs.pathExists(path.join(projectRoot, 'vite.config.ts'))) ||
-                               (await fs.pathExists(path.join(projectRoot, 'package.json')));
+          const isWebProject =
+            (await fs.pathExists(path.join(projectRoot, 'vite.config.js'))) ||
+            (await fs.pathExists(path.join(projectRoot, 'vite.config.ts'))) ||
+            (await fs.pathExists(path.join(projectRoot, 'package.json')));
           if (isWebProject) {
             await fs.ensureDir(publicDir);
             targetMarkdownFile = path.join(publicDir, 'markdown.html');

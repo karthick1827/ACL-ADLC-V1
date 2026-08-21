@@ -112,9 +112,7 @@ async function createSkillCollisionFixture() {
   await fs.ensureDir(agentDir);
   await fs.writeFile(
     path.join(agentDir, 'acl-master.md'),
-    ['---', 'name: ACL Master', 'description: Master agent', '---', '', '<agent name="ACL Master" title="Master">', '</agent>'].join(
-      '\n',
-    ),
+    ['---', 'name: ACL Master', 'description: Master agent', '---', '', '<agent name="ACL Master" title="Master">', '</agent>'].join('\n'),
   );
 
   return { root: fixtureRoot, aclDir: fixtureDir };
