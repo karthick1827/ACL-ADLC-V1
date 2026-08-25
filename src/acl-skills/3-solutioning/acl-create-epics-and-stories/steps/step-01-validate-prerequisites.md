@@ -5,13 +5,6 @@ Before extracting requirements or editing epics.md:
 1. Verify that 'prd.md' AND 'ARCHITECTURE-SPINE.md' (or 'architecture.md') have 'status: Accepted'.
 2. If ANY prerequisite is 'status: In Review' or 'status: Rejected' (or missing):
    - **HALT IMMEDIATELY. DO NOT PROCEED. DO NOT WRITE EPICS.MD.**
-   - Output structured gate blocked error:
-     "========================================================================\n❌ [GATE BLOCKED]: Cannot create Epics and Stories.\n========================================================================\n🛑 Unapproved Prerequisite: Phase 3A Architecture Spine (ARCHITECTURE-SPINE.md)\n🏷️ Current Status: [IN REVIEW / REJECTED]\n\n⚠️ REASON: Architecture is currently IN REVIEW. You cannot create Epics and Stories until your manager reviews and marks Architecture as 'Accepted' in Markdown Studio.\n\n👉 ACTION: Open Markdown Studio (http://localhost:3333 or _acl-output/markdown.html), approve Architecture, and re-invoke.\n========================================================================"
-
-
-## STEP GOAL:
-
-To validate that all required input documents exist and extract all requirements (FRs, NFRs, and additional requirements from UX/Architecture) needed for epic and story creation.
 
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
