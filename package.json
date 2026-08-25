@@ -27,7 +27,6 @@
     "src",
     "tools",
     "web-bundles",
-    "markdown.html",
     "ACL-ADLC-Figma-Precision-Engine-Guide.pdf"
   ],
   "scripts": {

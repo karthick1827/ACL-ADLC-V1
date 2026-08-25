@@ -699,12 +699,11 @@ class Installer {
     const projectRoot = paths?.projectRoot;
     if (projectRoot) {
       const candidatePaths = [
+        path.join(paths.srcDir || getProjectRoot(), 'src', 'public', 'markdown.html'),
+        path.join(getProjectRoot(), 'src', 'public', 'markdown.html'),
+        path.join(__dirname, '..', '..', '..', 'src', 'public', 'markdown.html'),
         path.join(paths.srcDir || getProjectRoot(), 'markdown.html'),
         path.join(paths.srcDir || getProjectRoot(), 'src', 'markdown.html'),
-        path.join(__dirname, '..', 'markdown.html'),
-        path.join(__dirname, '..', '..', 'markdown.html'),
-        path.join(__dirname, '..', '..', '..', 'markdown.html'),
-        path.join(__dirname, '..', '..', '..', 'src', 'markdown.html'),
       ];
       let srcMarkdown = null;
       for (const p of candidatePaths) {
