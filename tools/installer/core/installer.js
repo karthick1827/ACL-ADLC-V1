@@ -775,7 +775,7 @@ function aclMarkdownSaverPlugin() {
             const path = require('node:path');
             const projectRoot = process.cwd();
             const mdFiles = [];
-            const scanCandidates = ['_acl-output', 'acl-output', 'planning-artifacts', 'implementation-artifacts', 'docs'];
+            const scanCandidates = ['_acl-output', '_acl_output', 'acl-output'];
 
             function collect(currentDir, relPrefix) {
               if (!fs.existsSync(currentDir)) return;
@@ -889,7 +889,7 @@ function aclMarkdownSaverPlugin() {
   async _scanProjectMarkdownFiles(projectRoot) {
     if (!projectRoot) return [];
     const mdFiles = [];
-    const scanCandidates = ['_acl-output', 'acl-output', 'planning-artifacts', 'implementation-artifacts', 'docs'];
+    const scanCandidates = ['_acl-output', '_acl_output', 'acl-output'];
 
     for (const folder of scanCandidates) {
       const fullDir = path.join(projectRoot, folder);
