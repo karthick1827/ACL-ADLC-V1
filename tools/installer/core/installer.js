@@ -746,6 +746,18 @@ class Installer {
 
         await fs.writeFile(targetMarkdownFile, htmlContent, 'utf8');
         this.installedFiles.add(targetMarkdownFile);
+
+        // Deploy workflow SVG diagrams alongside markdown.html
+        const targetDir = path.dirname(targetMarkdownFile);
+        const svgSrcDir = path.dirname(srcMarkdown);
+        for (const svgName of ['greenfield.svg', 'brownfield.svg']) {
+          const svgSrc = path.join(svgSrcDir, svgName);
+          if (await fs.pathExists(svgSrc)) {
+            const targetSvg = path.join(targetDir, svgName);
+            await fs.copy(svgSrc, targetSvg);
+            this.installedFiles.add(targetSvg);
+          }
+        }
       }
 
       // Auto-configure Vite middleware if Vite config exists in project

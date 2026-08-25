@@ -576,14 +576,14 @@
       color: var(--accent-blue);
     }
 
-    /* Workflow Presentation Modal (No Scrollbars, Clean Header with Only X Button) */
+            /* Workflow Presentation Modal (No Scrollbars, Clean Header with Only X Button) */
     .workflow-modal-backdrop {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.82);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       z-index: 99999;
@@ -604,9 +604,9 @@
       border: 1px solid rgba(255, 255, 255, 0.15);
       box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 0, 0, 0.5);
       border-radius: 16px;
-      width: 92vw;
+      width: 94vw;
       max-width: 1400px;
-      height: 88vh;
+      height: 90vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -625,6 +625,7 @@
       background: #1e293b;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       min-height: 44px;
+      user-select: none;
     }
     .workflow-close-btn {
       background: rgba(239, 68, 68, 0.15);
@@ -655,16 +656,21 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      user-select: none;
+      cursor: grab;
       scrollbar-width: none;
       -ms-overflow-style: none;
     }
+    .workflow-modal-body:active {
+      cursor: grabbing;
+    }
     .workflow-modal-body::-webkit-scrollbar,
-    .workflow-iframe-viewport::-webkit-scrollbar {
+    .workflow-svg-viewport::-webkit-scrollbar {
       display: none !important;
       width: 0 !important;
       height: 0 !important;
     }
-    .workflow-iframe-viewport {
+    .workflow-svg-viewport {
       width: 100%;
       height: 100%;
       overflow: hidden;
@@ -672,20 +678,23 @@
       align-items: center;
       justify-content: center;
       position: relative;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
     }
-    .workflow-iframe-wrapper {
+    .workflow-svg-wrapper {
       width: 100%;
       height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       transform-origin: center center;
-      overflow: hidden;
+      transition: transform 0.05s ease-out;
+      will-change: transform;
     }
-    .workflow-iframe-wrapper iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      overflow: hidden;
+    .workflow-svg-wrapper img {
+      max-width: 95%;
+      max-height: 95%;
+      object-fit: contain;
+      pointer-events: none;
+      filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
     }
 
 
@@ -845,30 +854,7 @@
       });
     }
 
-              previousAccepted = false;
-        }
-
-        const node = document.createElement("div");
-        node.className = `gate-step-node ${stateClass}`;
-        node.setAttribute("title", `Phase Gate: ${gate.name}\nArtifact: ${gate.file}\nStatus: ${status}\nGate Condition: ${stateTitle}`);
-        node.innerHTML = `<span>${stateIcon}</span> <span>${gate.name}</span>`;
-
-        if (file) {
-          node.onclick = () => loadFile(file.id);
-        }
-
-        track.appendChild(node);
-
-        if (idx < PIPELINE_GATES.length - 1) {
-          const arrow = document.createElement("span");
-          arrow.className = "gate-arrow";
-          arrow.textContent = "→";
-          track.appendChild(arrow);
-        }
-      });
-    }
-
-        async function syncFromLiveDisk(quiet = false) {
+async function syncFromLiveDisk(quiet = false) {
       try {
         const res = await fetch("/api/list-markdown-files");
         if (res.ok) {
@@ -1267,26 +1253,36 @@
 
     
         
+            // ==========================================
+    // Delivery Workflow Dropdown & SVG Modal Logic
     // ==========================================
-    // Delivery Workflow Dropdown & Modal Logic
-    // ==========================================
-    const WORKFLOW_URLS = {
+    const WORKFLOW_SVGS = {
       greenfield: {
         title: "GreenField Delivery Workflow",
-        embedUrl: "https://docs.google.com/presentation/d/1QbxRnlTeQ_nkSX_CGg9r_FEOTWxBGXGWsbJWGpK2yHY/embed?slide=id.g3f856fcfc21_0_0&rm=minimal&start=false&loop=false&delayms=3000"
+        url: "./greenfield.svg"
       },
       brownfield: {
         title: "BrownField Delivery Workflow",
-        embedUrl: "https://docs.google.com/presentation/d/1QbxRnlTeQ_nkSX_CGg9r_FEOTWxBGXGWsbJWGpK2yHY/embed?slide=id.g3f856fcfc21_0_160&rm=minimal&start=false&loop=false&delayms=3000"
+        url: "./brownfield.svg"
       }
     };
 
     let workflowZoomLevel = 1;
+    let workflowPanX = 0;
+    let workflowPanY = 0;
+    let isPanningWorkflow = false;
+    let panStartX = 0;
+    let panStartY = 0;
+
+    function applyWorkflowTransform() {
+      const wrapper = document.getElementById('workflowSvgWrapper');
+      if (wrapper) {
+        wrapper.style.transform = 'translate(' + workflowPanX + 'px, ' + workflowPanY + 'px) scale(' + workflowZoomLevel + ')';
+      }
+    }
 
     function toggleWorkflowDropdown(e) {
-      if (e) {
-        e.stopPropagation();
-      }
+      if (e) e.stopPropagation();
       const menu = document.getElementById('workflowMenu');
       const btn = document.getElementById('btnWorkflow');
       if (menu) {
@@ -1299,11 +1295,9 @@
     }
 
     function selectWorkflowOption(type, e) {
-      if (e) {
-        e.stopPropagation();
-      }
+      if (e) e.stopPropagation();
       closeWorkflowDropdown();
-      if (!type || !WORKFLOW_URLS[type]) return;
+      if (!type || !WORKFLOW_SVGS[type]) return;
       openWorkflowModal(type);
     }
 
@@ -1315,16 +1309,21 @@
     }
 
     function openWorkflowModal(type) {
-      const data = WORKFLOW_URLS[type];
+      const data = WORKFLOW_SVGS[type];
       if (!data) return;
+
       workflowZoomLevel = 1;
+      workflowPanX = 0;
+      workflowPanY = 0;
 
       const modal = document.getElementById('workflowModal');
-      const iframe = document.getElementById('workflowIframe');
-      const wrapper = document.getElementById('workflowIframeWrapper');
+      const img = document.getElementById('workflowSvgImg');
 
-      if (iframe) iframe.src = data.embedUrl;
-      if (wrapper) wrapper.style.transform = 'scale(1)';
+      if (img) {
+        img.src = data.url;
+        img.alt = data.title;
+      }
+      applyWorkflowTransform();
 
       if (modal) {
         modal.classList.add('open');
@@ -1341,9 +1340,9 @@
       if (modal) {
         modal.classList.remove('open');
       }
-      const iframe = document.getElementById('workflowIframe');
-      if (iframe) {
-        iframe.src = 'about:blank';
+      const img = document.getElementById('workflowSvgImg');
+      if (img) {
+        img.src = '';
       }
       document.body.style.overflow = '';
       closeWorkflowDropdown();
@@ -1352,12 +1351,51 @@
     function zoomWorkflow(delta) {
       if (delta === 0) {
         workflowZoomLevel = 1;
+        workflowPanX = 0;
+        workflowPanY = 0;
       } else {
-        workflowZoomLevel = Math.min(Math.max(workflowZoomLevel + delta, 0.4), 2.5);
+        workflowZoomLevel = Math.min(Math.max(workflowZoomLevel + delta, 0.4), 4.0);
       }
-      const wrapper = document.getElementById('workflowIframeWrapper');
-      if (wrapper) wrapper.style.transform = 'scale(' + workflowZoomLevel + ')';
+      applyWorkflowTransform();
     }
+
+    // Mouse wheel zoom inside modal
+    document.addEventListener('wheel', (e) => {
+      const modal = document.getElementById('workflowModal');
+      if (modal && modal.classList.contains('open')) {
+        const body = document.getElementById('workflowModalBody');
+        if (body && (body === e.target || body.contains(e.target))) {
+          e.preventDefault();
+          const delta = e.deltaY < 0 ? 0.15 : -0.15;
+          zoomWorkflow(delta);
+        }
+      }
+    }, { passive: false });
+
+    // Drag-to-pan inside modal
+    document.addEventListener('mousedown', (e) => {
+      const modal = document.getElementById('workflowModal');
+      if (modal && modal.classList.contains('open')) {
+        const body = document.getElementById('workflowModalBody');
+        if (body && (body === e.target || body.contains(e.target)) && !e.target.closest('.workflow-close-btn')) {
+          isPanningWorkflow = true;
+          panStartX = e.clientX - workflowPanX;
+          panStartY = e.clientY - workflowPanY;
+        }
+      }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (isPanningWorkflow) {
+        workflowPanX = e.clientX - panStartX;
+        workflowPanY = e.clientY - panStartY;
+        applyWorkflowTransform();
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      isPanningWorkflow = false;
+    });
 
     document.addEventListener('click', (e) => {
       const wrapper = document.getElementById('workflowDropdownWrapper');
@@ -1372,9 +1410,9 @@
         if (e.key === 'Escape') {
           closeWorkflowModal();
         } else if (e.key === '+' || e.key === '=') {
-          zoomWorkflow(0.15);
+          zoomWorkflow(0.2);
         } else if (e.key === '-') {
-          zoomWorkflow(-0.15);
+          zoomWorkflow(-0.2);
         } else if (e.key === '0') {
           zoomWorkflow(0);
         }
@@ -1384,7 +1422,7 @@
     window.addEventListener("DOMContentLoaded", init);
   </script>
 
-    <!-- Workflow Presentation Modal -->
+        <!-- Workflow Presentation Modal -->
   <div class="workflow-modal-backdrop" id="workflowModal" onclick="closeWorkflowModal(event)">
     <div class="workflow-modal-card" onclick="event.stopPropagation()">
       <!-- Modal Header: ONLY X Close Button -->
@@ -1392,11 +1430,11 @@
         <button class="workflow-close-btn" onclick="closeWorkflowModal()" title="Close (Esc)">✕</button>
       </div>
 
-      <!-- Modal Body / Iframe Viewport (Hidden Scrollbars) -->
-      <div class="workflow-modal-body">
-        <div class="workflow-iframe-viewport">
-          <div class="workflow-iframe-wrapper" id="workflowIframeWrapper">
-            <iframe id="workflowIframe" src="about:blank" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+      <!-- Modal Body / SVG Viewport (Hidden Scrollbars & Interactive Pan/Zoom) -->
+      <div class="workflow-modal-body" id="workflowModalBody">
+        <div class="workflow-svg-viewport" id="workflowSvgViewport">
+          <div class="workflow-svg-wrapper" id="workflowSvgWrapper">
+            <img id="workflowSvgImg" src="" alt="Workflow Diagram" draggable="false" />
           </div>
         </div>
       </div>
