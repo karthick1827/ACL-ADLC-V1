@@ -124,85 +124,7 @@
       box-shadow: var(--shadow-md);
     }
 
-    /* Phase Gate Pipeline Progress Bar */
-    .gate-pipeline-bar {
-      background: #ffffff;
-      border-bottom: 1px solid var(--border-color);
-      padding: 0.45rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      overflow-x: auto;
-      flex-shrink: 0;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-    }
-
-    .gate-pipeline-label {
-      font-size: 0.76rem;
-      font-weight: 700;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      flex-shrink: 0;
-    }
-
-    .gate-steps-track {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex: 1;
-      max-width: 900px;
-    }
-
-    .gate-step-node {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.6rem;
-      border-radius: 9999px;
-      font-size: 0.74rem;
-      font-weight: 600;
-      background: var(--bg-canvas);
-      border: 1px solid var(--border-color);
-      color: var(--text-secondary);
-      transition: all 0.2s ease;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .gate-step-node:hover {
-      border-color: var(--text-muted);
-    }
-    .gate-step-node.accepted {
-      background: var(--accent-green-bg);
-      border-color: #4ac26b;
-      color: var(--accent-green);
-    }
-    .gate-step-node.in-review {
-      background: var(--accent-yellow-bg);
-      border-color: #d4a72c;
-      color: var(--accent-yellow);
-    }
-    .gate-step-node.rejected {
-      background: var(--accent-red-bg);
-      border-color: #ff8182;
-      color: var(--accent-red);
-    }
-    .gate-step-node.locked {
-      background: #f0f2f5;
-      border-color: #e2e5e9;
-      color: #9aa2ac;
-      cursor: not-allowed;
-      opacity: 0.75;
-    }
-
-    .gate-arrow {
-      color: var(--text-muted);
-      font-size: 0.75rem;
-    }
+    
 
     /* Main Workspace Container */
     .app-container {
@@ -813,15 +735,7 @@
     </div>
   </header>
 
-  <!-- Interactive Visual Phase Gate Pipeline Bar -->
-  <div class="gate-pipeline-bar" id="gatePipelineBar">
-    <div class="gate-pipeline-label">
-      <span>🚦 Sequential Gate Guard:</span>
-    </div>
-    <div class="gate-steps-track" id="gateStepsTrack">
-      <!-- Rendered dynamically by renderGatePipeline() -->
-    </div>
-  </div>
+  
 
   <!-- Main Layout -->
   <div class="app-container">
@@ -917,13 +831,6 @@
     let currentMode = "preview";
 
     // Phase Gate Definitions
-    const PIPELINE_GATES = [
-      { id: "p1", name: "1. Analysis (Brief)", folder: "1-analysis", file: "brief.md" },
-      { id: "p2", name: "2. Planning (PRD)", folder: "2-plan-workflows", file: "prd.md" },
-      { id: "p3", name: "3. Solutioning (Arch)", folder: "3-solutioning", file: "ARCHITECTURE-SPINE.md" },
-      { id: "p4", name: "4. Implementation (Code)", folder: "4-implementation", file: "8-LAYER-PRECISION-AUDIT.md" }
-    ];
-
     function formatFileDateTime(isoString) {
       if (!isoString) return new Date().toLocaleString();
       const d = new Date(isoString);
@@ -938,43 +845,7 @@
       });
     }
 
-    // Render Gate Pipeline Track
-    function renderGatePipeline() {
-      const track = document.getElementById("gateStepsTrack");
-      if (!track) return;
-      track.innerHTML = "";
-
-      let previousAccepted = true;
-
-      PIPELINE_GATES.forEach((gate, idx) => {
-        // Find matching file
-        const file = files.find(f => f.filename === gate.file || (f.folderPath && f.folderPath.includes(gate.folder)));
-        const status = file ? file.status : "In Review";
-
-        let stateClass = "in-review";
-        let stateIcon = "🟡";
-        let stateTitle = "Pending Manager Approval";
-
-        if (status === "Accepted") {
-          stateClass = "accepted";
-          stateIcon = "🟢";
-          stateTitle = "Approved by Manager";
-        } else if (status === "Rejected") {
-          stateClass = "rejected";
-          stateIcon = "🔴";
-          stateTitle = "Rejected by Manager — Blocked";
-          previousAccepted = false;
-        } else {
-          if (!previousAccepted) {
-            stateClass = "locked";
-            stateIcon = "🔒";
-            stateTitle = "Locked — Awaiting Prerequisite Gate";
-          } else {
-            stateClass = "in-review";
-            stateIcon = "🟡";
-            stateTitle = "In Review";
-          }
-          previousAccepted = false;
+              previousAccepted = false;
         }
 
         const node = document.createElement("div");
@@ -1007,7 +878,6 @@
               files = [];
               try { localStorage.setItem("acl_adlc_project_markdown_files", JSON.stringify([])); } catch(e){}
               renderFileTree();
-              renderGatePipeline();
               loadEmptyState();
               setSyncStatus("Synced with VS Code (0 files in _acl-output)", "green");
               return true;
@@ -1019,7 +889,6 @@
               files = data.files;
               try { localStorage.setItem("acl_adlc_project_markdown_files", JSON.stringify(files)); } catch(e){}
               renderFileTree();
-              renderGatePipeline();
               if (activeFileId && files.some(f => f.id === activeFileId)) {
                 const active = getActiveFile();
                 if (active) {
@@ -1058,11 +927,9 @@
         if (files.length > 0) {
           activeFileId = files[0].id;
           renderFileTree();
-          renderGatePipeline();
           loadFile(activeFileId);
         } else {
           renderFileTree();
-          renderGatePipeline();
           loadEmptyState();
         }
       }
@@ -1114,8 +981,7 @@
       setSyncStatus("Saved locally to disk & VS Code ✔", "green");
       showToast(`Saved '${file.filename}' [${status}] & Synced with VS Code!`, "success");
       renderFileTree();
-      renderGatePipeline();
-    }
+      }
 
         function updateDocumentStatusFrontmatter(content, newStatus, nowIso = new Date().toISOString()) {
       const cleanStatus = (newStatus || 'In Review').trim();
@@ -1293,7 +1159,6 @@
 
       renderPreview();
       renderFileTree();
-      renderGatePipeline();
       isDirty = false;
     }
 
