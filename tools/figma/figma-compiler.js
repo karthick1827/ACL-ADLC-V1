@@ -3,28 +3,28 @@
  * Transforms raw Figma node trees into clean, exact CSS and Tailwind classes.
  */
 
-class FigmaCompiler {
+const FigmaCompiler = {
   /**
    * Convert Figma color object (0-1 float) to Hex / RGBA CSS string
    */
-  static colorToCss(color, opacity = 1) {
+  colorToCss(color, opacity = 1) {
     if (!color) return 'transparent';
     const r = Math.round((color.r || 0) * 255);
     const g = Math.round((color.g || 0) * 255);
     const b = Math.round((color.b || 0) * 255);
-    const a = color.a !== undefined ? color.a * opacity : opacity;
+    const a = color.a === undefined ? opacity : color.a * opacity;
 
     if (a < 1) {
       return `rgba(${r}, ${g}, ${b}, ${Number(a.toFixed(2))})`;
     }
     const toHex = (n) => n.toString(16).padStart(2, '0');
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  }
+  },
 
   /**
    * Convert Figma Fill array into CSS background / color
    */
-  static parseFills(fills) {
+  parseFills(fills) {
     if (!Array.isArray(fills) || fills.length === 0) return { bgCss: 'transparent', bgTailwind: '', isGradient: false };
 
     const visibleFill = fills.find((f) => f.visible !== false);
@@ -68,12 +68,12 @@ class FigmaCompiler {
     }
 
     return { bgCss: 'transparent', bgTailwind: '', isGradient: false };
-  }
+  },
 
   /**
    * Convert Figma Stroke array to CSS border
    */
-  static parseStrokes(strokes, strokeWeight = 1) {
+  parseStrokes(strokes, strokeWeight = 1) {
     if (!Array.isArray(strokes) || strokes.length === 0) return { borderCss: 'none', borderTailwind: '' };
     const visibleStroke = strokes.find((s) => s.visible !== false);
     if (!visibleStroke) return { borderCss: 'none', borderTailwind: '' };
@@ -85,12 +85,12 @@ class FigmaCompiler {
       strokeWeight,
       color,
     };
-  }
+  },
 
   /**
    * Convert Figma Effects (Drop Shadow, Inner Shadow, Blur) to CSS
    */
-  static parseEffects(effects) {
+  parseEffects(effects) {
     if (!Array.isArray(effects) || effects.length === 0) return { shadowCss: 'none', shadowTailwind: '', blurCss: '' };
 
     const shadows = [];
@@ -118,12 +118,12 @@ class FigmaCompiler {
       shadowTailwind: shadows.length > 0 ? `shadow-[${shadows[0]}]` : '',
       blurCss,
     };
-  }
+  },
 
   /**
    * Convert Corner Radius to Tailwind class
    */
-  static parseCornerRadius(node) {
+  parseCornerRadius(node) {
     if (node.rectangleCornerRadii && Array.isArray(node.rectangleCornerRadii)) {
       const [tl, tr, br, bl] = node.rectangleCornerRadii;
       return {
@@ -143,12 +143,12 @@ class FigmaCompiler {
     if (r >= 999) return { radiusCss: '9999px', radiusTailwind: 'rounded-full' };
 
     return { radiusCss: `${r}px`, radiusTailwind: `rounded-[${r}px]` };
-  }
+  },
 
   /**
    * Convert Typography styles to CSS & Tailwind
    */
-  static parseTypography(style, fills) {
+  parseTypography(style, fills) {
     if (!style) return {};
 
     const fillInfo = this.parseFills(fills);
@@ -165,9 +165,23 @@ class FigmaCompiler {
     else if (fontWeight <= 300) weightTailwind = 'font-light';
 
     let alignTailwind = 'text-left';
-    if (style.textAlignHorizontal === 'CENTER') alignTailwind = 'text-center';
-    else if (style.textAlignHorizontal === 'RIGHT') alignTailwind = 'text-right';
-    else if (style.textAlignHorizontal === 'JUSTIFIED') alignTailwind = 'text-justify';
+    switch (style.textAlignHorizontal) {
+      case 'CENTER': {
+        alignTailwind = 'text-center';
+        break;
+      }
+      case 'RIGHT': {
+        alignTailwind = 'text-right';
+        break;
+      }
+      case 'JUSTIFIED': {
+        {
+          alignTailwind = 'text-justify';
+          // No default
+        }
+        break;
+      }
+    }
 
     return {
       fontFamily,
@@ -187,12 +201,12 @@ class FigmaCompiler {
         .filter(Boolean)
         .join(' '),
     };
-  }
+  },
 
   /**
    * Convert Figma Auto-Layout to precise Flexbox/Grid CSS and Tailwind
    */
-  static parseAutoLayout(node) {
+  parseAutoLayout(node) {
     const isAutoLayout = node.layoutMode === 'HORIZONTAL' || node.layoutMode === 'VERTICAL';
     if (!isAutoLayout) {
       return {
@@ -209,28 +223,79 @@ class FigmaCompiler {
     classes.push(isHorizontal ? 'flex-row' : 'flex-col');
 
     // 2. Primary Alignment (Justify)
-    if (node.primaryAxisAlignItems === 'CENTER') classes.push('justify-center');
-    else if (node.primaryAxisAlignItems === 'MAX') classes.push('justify-end');
-    else if (node.primaryAxisAlignItems === 'SPACE_BETWEEN') classes.push('justify-between');
-    else classes.push('justify-start');
+    switch (node.primaryAxisAlignItems) {
+      case 'CENTER': {
+        classes.push('justify-center');
+        break;
+      }
+      case 'MAX': {
+        classes.push('justify-end');
+        break;
+      }
+      case 'SPACE_BETWEEN': {
+        classes.push('justify-between');
+        break;
+      }
+      default: {
+        classes.push('justify-start');
+      }
+    }
 
     // 3. Counter Alignment (Align Items)
-    if (node.counterAxisAlignItems === 'CENTER') classes.push('items-center');
-    else if (node.counterAxisAlignItems === 'MAX') classes.push('items-end');
-    else if (node.counterAxisAlignItems === 'BASELINE') classes.push('items-baseline');
-    else classes.push('items-start');
+    switch (node.counterAxisAlignItems) {
+      case 'CENTER': {
+        classes.push('items-center');
+        break;
+      }
+      case 'MAX': {
+        classes.push('items-end');
+        break;
+      }
+      case 'BASELINE': {
+        classes.push('items-baseline');
+        break;
+      }
+      default: {
+        classes.push('items-start');
+      }
+    }
 
     // 4. Gap / Item Spacing
     const gap = node.itemSpacing || 0;
     if (gap > 0) {
-      if (gap === 4) classes.push('gap-1');
-      else if (gap === 8) classes.push('gap-2');
-      else if (gap === 12) classes.push('gap-3');
-      else if (gap === 16) classes.push('gap-4');
-      else if (gap === 20) classes.push('gap-5');
-      else if (gap === 24) classes.push('gap-6');
-      else if (gap === 32) classes.push('gap-8');
-      else classes.push(`gap-[${gap}px]`);
+      switch (gap) {
+        case 4: {
+          classes.push('gap-1');
+          break;
+        }
+        case 8: {
+          classes.push('gap-2');
+          break;
+        }
+        case 12: {
+          classes.push('gap-3');
+          break;
+        }
+        case 16: {
+          classes.push('gap-4');
+          break;
+        }
+        case 20: {
+          classes.push('gap-5');
+          break;
+        }
+        case 24: {
+          classes.push('gap-6');
+          break;
+        }
+        case 32: {
+          classes.push('gap-8');
+          break;
+        }
+        default: {
+          classes.push(`gap-[${gap}px]`);
+        }
+      }
     } else if (gap < 0) {
       classes.push(`-space-${isHorizontal ? 'x' : 'y'}-[${Math.abs(gap)}px]`);
     }
@@ -270,12 +335,12 @@ class FigmaCompiler {
       padding: { top: pt, right: pr, bottom: pb, left: pl },
       layoutTailwind: classes.join(' '),
     };
-  }
+  },
 
   /**
    * Compile a Figma node recursively into a clean Design Model
    */
-  static compileNode(node, depth = 0) {
+  compileNode(node, depth = 0) {
     if (!node || node.visible === false) return null;
 
     const fills = this.parseFills(node.fills);
@@ -324,16 +389,16 @@ class FigmaCompiler {
     }
 
     return compiled;
-  }
+  },
 
   /**
    * Compile whole Figma Document / Canvas
    */
-  static compile(figmaDoc) {
+  compile(figmaDoc) {
     if (!figmaDoc) return null;
     const rootNode = figmaDoc.document || figmaDoc;
     return this.compileNode(rootNode);
-  }
-}
+  },
+};
 
 module.exports = { FigmaCompiler };

@@ -3,6 +3,18 @@ name: acl-advanced-elicitation
 description: 'Push the LLM to reconsider, refine, and improve its recent output. Use when user asks for deeper critique or mentions a known deeper critique method, e.g. socratic, first principles, pre-mortem, red team.'
 ---
 
+## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
+Before executing any actions, adopting any persona, greeting the user, or producing output:
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
+2. If ANY markdown file has `status: In Review` or `status: Rejected` (or is unapproved):
+   - **HALT IMMEDIATELY. DO NOT PROCEED. DO NOT ADOPT PERSONA. DO NOT GENERATE FILES.**
+   - **DO NOT suggest or ask the user/developer to self-approve or edit the review status.**
+   - Output the official waiting message:
+     "========================================================================\n⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)\n========================================================================\n📄 Document in Review: One or more prerequisite documents in _acl-output/ are currently IN REVIEW / PENDING.\n\n⚠️ STATUS:\n   As per the ACL-ADLC sequential delivery framework, this document is currently awaiting official review and sign-off by your Manager.\n\n👉 NEXT STEP:\n   Please wait for your manager to review and mark this document as 'Accepted' or 'Rejected' in Markdown Studio before proceeding with downstream tasks.\n========================================================================"
+3. Only proceed if ALL existing documents in `_acl-output/` have `status: Accepted`.
+
+
+
 # Advanced Elicitation
 
 You are ACL's shared refinement checkpoint: other skills invoke you at natural pauses to pressure the piece of work they just produced, and users call you directly on anything recent. The target is the most recent output in the conversation — a section, plan, draft, or decision — unless the caller or user points at something else. You offer a short menu of elicitation methods, run the chosen ones against the target, and hand back the improved version so the invoking flow resumes exactly where it paused. Work in the surrounding session's communication language.

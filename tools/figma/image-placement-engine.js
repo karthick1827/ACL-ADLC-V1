@@ -4,12 +4,12 @@
  * mask group relative offsets, aspect ratios, and masonry geometry.
  */
 
-class FigmaImagePlacementEngine {
+const FigmaImagePlacementEngine = {
   /**
    * Translate Figma 2x3 affine imageTransform matrix into CSS object-position percentage
    * Figma matrix format: [[scaleX, skewX, transX], [skewY, scaleY, transY]]
    */
-  static parseImageTransform(imageTransform) {
+  parseImageTransform(imageTransform) {
     if (!Array.isArray(imageTransform) || imageTransform.length < 2) {
       return { objectPosition: 'center', tailwindPosition: 'object-center', focalX: 50, focalY: 50 };
     }
@@ -34,29 +34,32 @@ class FigmaImagePlacementEngine {
       focalX,
       focalY,
     };
-  }
+  },
 
   /**
    * Parse scaleMode (FILL, FIT, CROP, TILE) into CSS object-fit & rules
    */
-  static parseScaleMode(scaleMode) {
+  parseScaleMode(scaleMode) {
     switch (scaleMode) {
-      case 'FIT':
+      case 'FIT': {
         return { objectFit: 'contain', tailwindFit: 'object-contain' };
-      case 'CROP':
+      }
+      case 'CROP': {
         return { objectFit: 'none', tailwindFit: 'object-none' };
-      case 'TILE':
+      }
+      case 'TILE': {
         return { objectFit: 'repeat', tailwindFit: 'bg-repeat' };
-      case 'FILL':
-      default:
+      }
+      default: {
         return { objectFit: 'cover', tailwindFit: 'object-cover' };
+      }
     }
-  }
+  },
 
   /**
    * Compute exact aspect ratio from node bounding box
    */
-  static parseAspectRatio(bounds) {
+  parseAspectRatio(bounds) {
     if (!bounds || !bounds.width || !bounds.height) return null;
     const w = Math.round(bounds.width);
     const h = Math.round(bounds.height);
@@ -73,12 +76,12 @@ class FigmaImagePlacementEngine {
       aspectRatio: `${aspectW} / ${aspectH}`,
       tailwindAspect: `aspect-[${w}/${h}]`,
     };
-  }
+  },
 
   /**
    * Analyze Mask Groups: Bounding container vs Inner Image offsets
    */
-  static parseMaskGroup(maskNode, imageNode) {
+  parseMaskGroup(maskNode, imageNode) {
     if (!maskNode || !imageNode) return null;
 
     const maskBox = maskNode.absoluteBoundingBox || { x: 0, y: 0, width: 0, height: 0 };
@@ -103,12 +106,12 @@ class FigmaImagePlacementEngine {
         tailwindClasses: `absolute left-[${offsetX}px] top-[${offsetY}px] max-w-none w-[${scaleWidth}px] h-[${scaleHeight}px]`,
       },
     };
-  }
+  },
 
   /**
    * Compile Asymmetric Masonry Clusters into ordered Flex Columns
    */
-  static compileMasonryCluster(nodes, gap = 16) {
+  compileMasonryCluster(nodes, gap = 16) {
     if (!Array.isArray(nodes) || nodes.length === 0) return { columns: [] };
 
     // Group nodes by X coordinate proximity (within 30px threshold)
@@ -151,12 +154,12 @@ class FigmaImagePlacementEngine {
         })),
       })),
     };
-  }
+  },
 
   /**
    * Process a node's image fill with complete placement metadata
    */
-  static compileImageNode(node) {
+  compileImageNode(node) {
     if (!node) return null;
     const imgFill = Array.isArray(node.fills) ? node.fills.find((f) => f.type === 'IMAGE') : null;
     if (!imgFill) return null;
@@ -182,7 +185,7 @@ class FigmaImagePlacementEngine {
         objectPosition: transform.objectPosition,
       },
     };
-  }
-}
+  },
+};
 
 module.exports = { FigmaImagePlacementEngine };

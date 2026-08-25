@@ -2,6 +2,18 @@
 name: acl-architecture
 description: 'Produce the architecture: a lean spine of invariants that keeps everything built from it consistent, projected into whatever format the work needs. Use when the user says "create the architecture", "create technical architecture", "architecture spine", or "create a solution design".'
 ---
+
+## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
+Before executing any actions, adopting any persona, greeting the user, or producing output:
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
+2. If ANY markdown file has `status: In Review` or `status: Rejected` (or is unapproved):
+   - **HALT IMMEDIATELY. DO NOT PROCEED. DO NOT ADOPT PERSONA. DO NOT GENERATE FILES.**
+   - **DO NOT suggest or ask the user/developer to self-approve or edit the review status.**
+   - Output the official waiting message:
+     "========================================================================\n⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)\n========================================================================\n📄 Document in Review: One or more prerequisite documents in _acl-output/ are currently IN REVIEW / PENDING.\n\n⚠️ STATUS:\n   As per the ACL-ADLC sequential delivery framework, this document is currently awaiting official review and sign-off by your Manager.\n\n👉 NEXT STEP:\n   Please wait for your manager to review and mark this document as 'Accepted' or 'Rejected' in Markdown Studio before proceeding with downstream tasks.\n========================================================================"
+3. Only proceed if ALL existing documents in `_acl-output/` have `status: Accepted`.
+
+
 # ACL Architecture
 
 ## Overview
@@ -47,6 +59,18 @@ Writes go through the shared script (don't read the file back except on resume):
 - Forward slashes only. Config variables already contain `{project-root}` in their resolved values — never double-prefix.
 
 ## On Activation
+
+**Phase Gate Guard Precondition (Mandatory):**
+Before proceeding with architecture creation or invoking subagents:
+1. Verify that Phase 2 (`2-plan-workflows/acl-prd/prd.md`) has `status: Accepted` (or execute `node tools/adlc-gate-guard.cjs phase3`).
+2. If `prd.md` is missing, or its status is `In Review` or `Rejected`:
+   - **HALT IMMEDIATELY. DO NOT GENERATE ARCHITECTURE.**
+   - Return a structured Gate Blocked error:
+     "❌ [ADLC GATE REJECTED / BLOCKED]: Cannot proceed with acl-architecture.
+      🛑 Prerequisite: Phase 2: Planning (PRD & Workflows)
+      📄 Artifact:     _acl-output/2-plan-workflows/acl-prd/prd.md
+      🏷️ Current State: [IN REVIEW / REJECTED]
+      ⚠️ REASON: Architecture cannot be created until your manager reviews and approves the PRD ('Accepted') in Markdown Studio."
 
 **Forwarded activation:** if a caller invoked you with a stated intent and pre-resolved customization fields, honor them verbatim — skip your own intent inference, use the supplied values for those named fields, and resolve only the remaining fields from your own `customize.toml`.
 

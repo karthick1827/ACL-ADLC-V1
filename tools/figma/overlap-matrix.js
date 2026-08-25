@@ -3,11 +3,11 @@
  * Detects negative margins, absolute overlays, badge placements, and fixed-width truncations.
  */
 
-class FigmaOverlapMatrix {
+const FigmaOverlapMatrix = {
   /**
    * Analyze child nodes inside a frame for overlapping bounding boxes or special constraints
    */
-  static analyzeNode(node, depth = 0, results = []) {
+  analyzeNode(node, depth = 0, results = []) {
     if (!node || node.visible === false) return results;
 
     const isContainer = node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE' || node.type === 'GROUP';
@@ -32,7 +32,7 @@ class FigmaOverlapMatrix {
       // 2. Absolute Overlays (Badges, Floating Action Buttons, Close Icons)
       const nonAutoChildren = node.children.filter((c) => c.isAbsolute || (node.layoutMode === 'NONE' && c.absoluteBoundingBox));
       if (nonAutoChildren.length > 0 && (isHorizontal || isVertical)) {
-        nonAutoChildren.forEach((child) => {
+        for (const child of nonAutoChildren) {
           results.push({
             containerId: node.id,
             containerName: node.name,
@@ -43,11 +43,11 @@ class FigmaOverlapMatrix {
             zIndexRule: 'z-10 or z-20 overlay',
             details: `Child '${child.name}' is positioned absolutely inside Auto-Layout '${node.name}'.`,
           });
-        });
+        }
       }
 
       // 3. Text Truncation and Fixed-Width Clamping
-      node.children.forEach((child) => {
+      for (const child of node.children) {
         if (child.type === 'TEXT' && child.textAutoResize === 'NONE') {
           results.push({
             containerId: node.id,
@@ -60,7 +60,7 @@ class FigmaOverlapMatrix {
             details: `Text '${child.name}' has fixed dimensions. Apply truncate or line-clamp to prevent container blowout.`,
           });
         }
-      });
+      }
     }
 
     if (Array.isArray(node.children)) {
@@ -70,12 +70,12 @@ class FigmaOverlapMatrix {
     }
 
     return results;
-  }
+  },
 
   /**
    * Generate Markdown Table of Edge-Case Matrix
    */
-  static toMarkdownTable(matrix) {
+  toMarkdownTable(matrix) {
     if (!matrix || matrix.length === 0) {
       return '> No complex layout collisions or negative overlaps detected. Standard Flexbox Auto-Layout applies.\n';
     }
@@ -85,7 +85,7 @@ class FigmaOverlapMatrix {
       '| :--- | :--- | :--- | :--- | :--- |',
     ];
 
-    matrix.forEach((item) => {
+    for (const item of matrix) {
       rows.push(
         '| `' +
           item.containerName +
@@ -99,15 +99,15 @@ class FigmaOverlapMatrix {
           item.zIndexRule +
           ' |',
       );
-    });
+    }
 
     return rows.join('\n');
-  }
+  },
 
   /**
    * Compile edge-case matrix from Figma Document
    */
-  static compile(figmaDoc) {
+  compile(figmaDoc) {
     const root = figmaDoc.document || figmaDoc;
     const matrix = this.analyzeNode(root);
     const markdownTable = this.toMarkdownTable(matrix);
@@ -116,7 +116,7 @@ class FigmaOverlapMatrix {
       markdownTable,
       totalIssues: matrix.length,
     };
-  }
-}
+  },
+};
 
 module.exports = { FigmaOverlapMatrix };

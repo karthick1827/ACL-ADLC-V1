@@ -3,11 +3,11 @@
  * Captures rendered browser screenshot and compares with target Figma reference.
  */
 
-class FigmaVisualVerifier {
+const FigmaVisualVerifier = {
   /**
    * Generate automated multi-modal vision prompt for side-by-side comparison
    */
-  static generateVisionDiffPrompt(componentName, figmaFrameName, figmaTokens) {
+  generateVisionDiffPrompt(componentName, figmaFrameName, figmaTokens) {
     return [
       '# Visual Fidelity & Pixel Diffing Audit: ' + componentName,
       '',
@@ -30,12 +30,12 @@ class FigmaVisualVerifier {
       JSON.stringify(figmaTokens, null, 2),
       '```',
     ].join('\n');
-  }
+  },
 
   /**
    * Run structural inspection and generate Audit Report
    */
-  static generateAuditReport(componentName, figmaNode, renderedBounds) {
+  generateAuditReport(componentName, figmaNode, renderedBounds) {
     const figmaBounds = figmaNode.bounds || { width: 0, height: 0 };
     const widthDelta = renderedBounds ? Math.abs(figmaBounds.width - renderedBounds.width) : 0;
     const heightDelta = renderedBounds ? Math.abs(figmaBounds.height - renderedBounds.height) : 0;
@@ -58,7 +58,7 @@ class FigmaVisualVerifier {
       heightDelta,
       report,
     };
-  }
-}
+  },
+};
 
 module.exports = { FigmaVisualVerifier };

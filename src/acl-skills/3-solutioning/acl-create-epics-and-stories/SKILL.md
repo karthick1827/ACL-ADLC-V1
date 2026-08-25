@@ -3,11 +3,31 @@ name: acl-create-epics-and-stories
 description: 'Break requirements into epics and user stories. Use when the user says "create the epics and stories list"'
 ---
 
+## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
+Before executing any actions, adopting any persona, greeting the user, or producing output:
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
+2. If ANY markdown file has `status: In Review` or `status: Rejected` (or is unapproved):
+   - **HALT IMMEDIATELY. DO NOT PROCEED. DO NOT ADOPT PERSONA. DO NOT GENERATE FILES.**
+   - **DO NOT suggest or ask the user/developer to self-approve or edit the review status.**
+   - Output the official waiting message:
+     "========================================================================\n⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)\n========================================================================\n📄 Document in Review: One or more prerequisite documents in _acl-output/ are currently IN REVIEW / PENDING.\n\n⚠️ STATUS:\n   As per the ACL-ADLC sequential delivery framework, this document is currently awaiting official review and sign-off by your Manager.\n\n👉 NEXT STEP:\n   Please wait for your manager to review and mark this document as 'Accepted' or 'Rejected' in Markdown Studio before proceeding with downstream tasks.\n========================================================================"
+3. Only proceed if ALL existing documents in `_acl-output/` have `status: Accepted`.
+
+
+
 # Create Epics and Stories
 
-**Goal:** Transform PRD requirements and Architecture decisions into comprehensive stories organized by user value, creating detailed, actionable stories with complete acceptance criteria for the Developer agent.
-
-**Your Role:** In addition to your name, communication_style, and persona, you are also a product strategist and technical specifications writer collaborating with a product owner. This is a partnership, not a client-vendor relationship. You bring expertise in requirements decomposition, technical implementation context, and acceptance criteria writing, while the user brings their product vision, user needs, and business requirements. Work together as equals.
+## 🚦 Phase Gate Guard Precondition (Mandatory)
+Before generating or breaking down epics and user stories:
+1. Verify that Phase 2 (PRD) has `status: Accepted` (or execute `node tools/adlc-gate-guard.cjs phase3`).
+2. If `prd.md` is `In Review` or `Rejected`:
+   - **HALT IMMEDIATELY. DO NOT CREATE EPICS OR STORIES.**
+   - Output structured gate blocked error:
+     "❌ [ADLC GATE REJECTED / BLOCKED]: Cannot proceed with Creating Epics and Stories.
+      🛑 Prerequisite: Phase 2: Planning (PRD & Workflows)
+      📄 Artifact:     _acl-output/2-plan-workflows/acl-prd/prd.md
+      🏷️ Current State: [IN REVIEW / REJECTED]
+      ⚠️ REASON: Epics and Stories cannot be created until your manager reviews and approves the PRD ('Accepted') in Markdown Studio."
 
 ## Conventions
 

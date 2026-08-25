@@ -923,8 +923,8 @@ function aclMarkdownSaverPlugin() {
           }
 
           list.push({
-            id: relPath.replace(/[^a-zA-Z0-9_-]/g, '_'),
-            folderPath: path.dirname(relPath).replace(/\\/g, '/'),
+            id: relPath.replaceAll(/[^a-zA-Z0-9_-]/g, '_'),
+            folderPath: path.dirname(relPath).replaceAll('\\', '/'),
             filename: entry.name,
             status,
             updatedAt: stat.mtime ? stat.mtime.toISOString() : new Date().toISOString(),
