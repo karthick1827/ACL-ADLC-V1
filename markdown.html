@@ -4127,7 +4127,7 @@
       border-radius: var(--radius-sm);
       font-size: 0.75rem;
       font-weight: 800;
-      text-transform: uppercase;
+     
     }
 
     .header-actions {
@@ -4624,6 +4624,190 @@
       pointer-events: none;
     }
     .toast.show { opacity: 1; transform: translateY(0); }
+  
+    /* Workflow Dropdown */
+    .workflow-dropdown-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 3px 8px;
+      transition: all 0.2s ease;
+    }
+    .workflow-dropdown-container:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      background: rgba(99, 102, 241, 0.08);
+    }
+    .workflow-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+    .workflow-select {
+      background: transparent;
+      border: none;
+      color: #f1f5f9;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      padding: 4px 6px;
+      border-radius: 4px;
+    }
+    .workflow-select option {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 8px;
+    }
+
+    /* Workflow Presentation Modal */
+    .workflow-modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .workflow-modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .workflow-modal-card {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(99, 102, 241, 0.15);
+      border-radius: 16px;
+      width: 92vw;
+      max-width: 1400px;
+      height: 88vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: scale(0.95) translateY(10px);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .workflow-modal-backdrop.open .workflow-modal-card {
+      transform: scale(1) translateY(0);
+    }
+    .workflow-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: #1e293b;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .workflow-modal-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .workflow-modal-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      background: rgba(99, 102, 241, 0.2);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+    .workflow-modal-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .workflow-ctrl-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .workflow-ctrl-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .workflow-close-btn {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-left: 6px;
+      transition: all 0.15s ease;
+    }
+    .workflow-close-btn:hover {
+      background: #ef4444;
+      color: #fff;
+      border-color: #dc2626;
+      transform: scale(1.05);
+    }
+    .workflow-modal-body {
+      flex: 1;
+      position: relative;
+      background: #090d16;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .workflow-iframe-viewport {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .workflow-iframe-wrapper {
+      width: 100%;
+      height: 100%;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      transform-origin: center center;
+    }
+    .workflow-iframe-wrapper iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
   </style>
 </head>
 <body>
@@ -4631,11 +4815,26 @@
   <!-- Top Application Header -->
   <header>
     <div class="brand">
-      <span class="brand-badge">ACL-ADLC</span>
+      <span class="brand-badge"> VelocityONE</span>
       <span>Markdown Studio</span>
     </div>
 
     <div class="header-actions">
+            <!-- Workflow Selector Dropdown (GreenField / BrownField) -->
+      <div class="workflow-dropdown-container">
+        <label for="workflowSelect" class="workflow-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>Workflow:</span>
+        </label>
+        <select id="workflowSelect" class="workflow-select" onchange="handleWorkflowSelect(this.value)" title="Choose Delivery Workflow Strategy">
+          <option value="" disabled selected>Workflow</option>
+          <option value="greenfield">🌱 GreenField</option>
+          <option value="brownfield">🍂 BrownField</option>
+        </select>
+      </div>
+
       <!-- Sync Status Indicator -->
       <div class="file-sync-indicator" id="syncStatus">
         <span>●</span>
@@ -5202,5 +5401,61 @@
 
     window.addEventListener("DOMContentLoaded", init);
   </script>
+
+  <!-- Workflow Presentation Modal -->
+  <div class="workflow-modal-backdrop" id="workflowModal" onclick="closeWorkflowModal(event)">
+    <div class="workflow-modal-card" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="workflow-modal-header">
+        <div class="workflow-modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          </svg>
+          <span id="workflowModalTitle">Delivery Workflow</span>
+          <span class="workflow-modal-badge" id="workflowModalBadge">Workflow</span>
+        </div>
+
+        <!-- Zoom & Action Controls -->
+        <div class="workflow-modal-controls">
+          <button class="workflow-ctrl-btn" onclick="zoomWorkflow(-0.15)" title="Zoom Out (-)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              <line x1="8" y1="11" x2="14" y2="11"></line>
+            </svg>
+          </button>
+          <button class="workflow-ctrl-btn" onclick="zoomWorkflow(0)" title="Reset Zoom (100%)" id="workflowZoomText">100%</button>
+          <button class="workflow-ctrl-btn" onclick="zoomWorkflow(0.15)" title="Zoom In (+)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              <line x1="11" y1="8" x2="11" y2="14"></line>
+              <line x1="8" y1="11" x2="14" y2="11"></line>
+            </svg>
+          </button>
+          <a class="workflow-ctrl-btn" id="workflowDirectLink" href="#" target="_blank" rel="noopener noreferrer" title="Open Presentation in Google Slides (New Tab)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            <span>Open in Tab</span>
+          </a>
+          <button class="workflow-close-btn" onclick="closeWorkflowModal()" title="Close Presentation (Esc)">✕</button>
+        </div>
+      </div>
+
+      <!-- Modal Body / Iframe Viewport -->
+      <div class="workflow-modal-body">
+        <div class="workflow-iframe-viewport">
+          <div class="workflow-iframe-wrapper" id="workflowIframeWrapper">
+            <iframe id="workflowIframe" src="about:blank" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
