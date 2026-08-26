@@ -5,7 +5,7 @@ purpose: build-substrate    # build-substrate (default) · discussion · report 
 altitude: feature           # initiative (keeps features) · feature (keeps epics) · epic (keeps stories)
 paradigm: '{named design pattern, e.g. hexagonal, layered, pipes-and-filters, actor}'
 scope: '{what this spine governs}'
-status: draft               # draft · final
+status: In Review               # draft · final
 created: '{date}'
 updated: '{date}'
 binds: []                   # capability / unit IDs governed (from the driving spec; at epic altitude, also the inherited parent AD ids)

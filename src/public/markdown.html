@@ -312,7 +312,7 @@
       flex-shrink: 0;
     }
     .status-pill.in-review { background: var(--accent-yellow-bg); color: var(--accent-yellow); border: 1px solid #d4a72c; }
-    .status-pill.accepted { background: var(--accent-green-bg); color: var(--accent-green); border: 1px solid #4ac26b; }
+    .status-pill.approved, .status-pill.accepted { background: var(--accent-green-bg); color: var(--accent-green); border: 1px solid #4ac26b; }
     .status-pill.rejected { background: var(--accent-red-bg); color: var(--accent-red); border: 1px solid #ff8182; }
 
     .dot { width: 6px; height: 6px; border-radius: 50%; background-color: currentColor; }
@@ -773,7 +773,7 @@
           <select id="filterStatusSelect" class="select-control" onchange="renderFileTree()" title="Filter by Status">
             <option value="all">⚡ All Statuses</option>
             <option value="In Review">🟡 In Review</option>
-            <option value="Accepted">🟢 Accepted</option>
+            <option value="Approved">🟢 Approved</option>
             <option value="Rejected">🔴 Rejected</option>
           </select>
         </div>
@@ -791,7 +791,7 @@
           <div class="status-select-wrap">
             <select id="statusSelect" class="status-select" onchange="onStatusChange(this.value)">
               <option value="In Review">🟡 In Review</option>
-              <option value="Accepted">🟢 Accepted</option>
+              <option value="Approved">🟢 Approved</option>
               <option value="Rejected">🔴 Rejected</option>
             </select>
           </div>
@@ -970,7 +970,8 @@ async function syncFromLiveDisk(quiet = false) {
       }
 
         function updateDocumentStatusFrontmatter(content, newStatus, nowIso = new Date().toISOString()) {
-      const cleanStatus = (newStatus || 'In Review').trim();
+      let cleanStatus = (newStatus || 'In Review').trim();
+      if (cleanStatus.toLowerCase() === 'accepted') cleanStatus = 'Approved';
       const gateSig = 'ACL-STUDIO-APPROVAL-' + cleanStatus.toUpperCase().replace(/\s+/g, '-');
       const managedKeys = ['status', 'reviewed_by', 'review_timestamp', 'review_source', 'gate_signature'];
 
@@ -1033,10 +1034,16 @@ async function syncFromLiveDisk(quiet = false) {
 
       root.innerHTML = "";
 
+      const EXCLUDED_CHILDREN = new Set(['addendum.md', 'sources.md', 'review-triage.md', 'patch-plan.md', 'research.md']);
+
       let filtered = files.filter(file => {
+        if (!file.filename || file.filename.startsWith('.') || EXCLUDED_CHILDREN.has(file.filename.toLowerCase())) {
+          return false;
+        }
         const matchesSearch = file.filename.toLowerCase().includes(searchQuery) ||
                               file.folderPath.toLowerCase().includes(searchQuery);
-        const matchesStatus = filterStatus === "all" || file.status === filterStatus;
+        const currentNormStatus = file.status === 'Accepted' ? 'Approved' : file.status;
+        const matchesStatus = filterStatus === "all" || currentNormStatus === filterStatus || file.status === filterStatus;
         return matchesSearch && matchesStatus;
       });
 
@@ -1137,7 +1144,7 @@ async function syncFromLiveDisk(quiet = false) {
       document.getElementById("breadcrumbPathText").textContent = `${file.folderPath} / ${file.filename}`;
       const statusSelect = document.getElementById("statusSelect");
       statusSelect.disabled = false;
-      statusSelect.value = file.status;
+      statusSelect.value = (file.status === "Accepted") ? "Approved" : file.status;
 
       const textarea = document.getElementById("markdownTextarea");
       textarea.readOnly = false;

@@ -5,14 +5,38 @@ description: Create, update, or validate a product brief. Use when the user want
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
-2. If ANY markdown file has `status: In Review` or `status: Rejected` (or is unapproved):
-   - **HALT IMMEDIATELY. DO NOT PROCEED. DO NOT ADOPT PERSONA. DO NOT GENERATE FILES.**
-   - **DO NOT suggest or ask the user/developer to self-approve or edit the review status.**
-   - Output the official waiting message:
-     "========================================================================\n⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)\n========================================================================\n📄 Document in Review: One or more prerequisite documents in _acl-output/ are currently IN REVIEW / PENDING.\n\n⚠️ STATUS:\n   As per the ACL-ADLC sequential delivery framework, this document is currently awaiting official review and sign-off by your Manager.\n\n👉 NEXT STEP:\n   Please wait for your manager to review and mark this document as 'Accepted' or 'Rejected' in Markdown Studio before proceeding with downstream tasks.\n========================================================================"
-3. Only proceed if ALL existing documents in `_acl-output/` have `status: Accepted`.
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
+   - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
+     - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
+     - The AI Agent is **STRICTLY FORBIDDEN** from offering conversational advice, whiteboard diagrams, or brainstorming in chat while waiting for approval.
+     - The AI Agent is **STRICTLY FORBIDDEN** from creating, updating, or modifying downstream files.
+     - The AI Agent is **STRICTLY FORBIDDEN** from asking or suggesting the user/developer to self-approve or change the status.
+   - **THE ONLY PERMITTED ACTION**: Output the official waiting message:
+     ```text
+     ========================================================================
+     ⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)
+     ========================================================================
+     📄 Document in Review: One or more prerequisite documents in _acl-output/ are currently IN REVIEW / PENDING.
+     🏷️ Current Status:      [IN REVIEW / PENDING]
 
+     ⚠️ STATUS:
+        As per the ACL-ADLC sequential delivery framework, this document 
+        is currently awaiting official review and sign-off by your Manager.
+
+     👉 NEXT STEP:
+        Please wait for your manager to review and mark this document as 
+        'Approved' or 'Rejected' in Markdown Studio before proceeding with 
+        downstream tasks.
+     ========================================================================
+     ```
+3. Only proceed if ALL existing documents in `_acl-output/` have `status: Approved`.
+
+## 🛑 STRICT PROHIBITION: No Direct AI Status Manipulation & Manager-Only Approval
+- The AI agent is **STRICTLY PROHIBITED** from using tools (`replace_file_content`, `write_to_file`, `run_command`, etc.) to change `status: In Review` -> `status: Approved` at ANY cost.
+- ONLY THE MANAGER is authorized and permitted to change the status via Markdown Studio (`markdown.html`).
+- The AI agent is **STRICTLY PROHIBITED** from prompting the developer to self-approve or change review statuses.
+- The AI agent MUST ONLY instruct the developer to wait for the manager's review.
 
 
 # Overview
@@ -88,7 +112,7 @@ The workspace persists; stop and resume freely. The opener's philosophy (not in 
 ## Constraints
 
 - **Right-size to purpose.** A passion project does not need investor-grade rigor. A VC pitch input does. Read the room.
-- **Persistence is real-time.** Once Create intent is confirmed, the workspace (run folder, `brief.md` skeleton with `status: draft`, `.memlog.md` seeded via `memlog.py init`) exists on disk and the user knows the path.
+- **Persistence is real-time.** Once Create intent is confirmed, the workspace (run folder, `brief.md` skeleton with `status: In Review`, `.memlog.md` seeded via `memlog.py init`) exists on disk and the user knows the path.
 - **File roles.** `.memlog.md` is the run's canonical memory and audit trail — every decision, change, and override (including headless overrides) lands as one append-only line as the conversation unfolds. All writes go through the shared script, never by hand: `uv run {project-root}/_acl/scripts/memlog.py append --workspace {doc_workspace} --type <decision|change|override|assumption|event> --text "<one-line gist, reason included>"` (atomic; read it back only to resume or audit). The brief is distilled toward it; whatever isn't logged is lost on resume. `addendum.md` preserves user-contributed depth that belongs in a downstream document (PRD, architecture, solution design) or earned a place but does not fit the brief (rejected-alternative rationale, options-considered matrices, parked-roadmap context, technical constraints, in-depth personas, sizing data). Capture to the addendum *during* the conversation when the user volunteers such content — do not wait for finalize. Audit and override information never goes in the addendum.
 - **Continuity across sessions.** If a prior in-progress draft for this project exists, the user is offered to resume.
 - **Extract, don't ingest.** Source artifacts (provided by the user or discovered during the run — transcripts, brainstorms, research reports, code, web results, prior briefs) enter the parent conversation as relevance-filtered extracts, not loaded wholesale. Subagents do the extraction against the user's stated focus; the parent context stays lean.
@@ -97,7 +121,8 @@ The workspace persists; stop and resume freely. The opener's philosophy (not in 
 ## Finalize
 
 1. Memlog audit + addendum review: the user ends this step with an explicit, shared accounting of how the meaningful contents of `.memlog.md` were handled — captured in the brief, captured in `addendum.md` (which may already hold detail captured during the conversation — see `## Constraints` for what belongs there), or set aside as process noise.
-2. Polish: apply each entry in `{workflow.doc_standards}` (a `skill:`, `file:`, or plain-text directive) to `brief.md` (and `addendum.md` if it exists). Run passes as parallel subagents - apply all doc standards to `brief.md` first, then `addendum.md` so we present a high-quality draft for the user to review and finalize.
+2. Finalize review status: Ensure `brief.md` frontmatter has `status: In Review` so it enters the official Markdown Studio approval queue for Manager sign-off.
+3. Polish: apply each entry in `{workflow.doc_standards}` (a `skill:`, `file:`, or plain-text directive) to `brief.md` (and `addendum.md` if it exists). Run passes as parallel subagents - apply all doc standards to `brief.md` first, then `addendum.md` so we present a high-quality draft for the user to review and finalize.
 3. External handoffs: execute each entry in `{workflow.external_handoffs}` to route artifacts beyond local files (Confluence, Notion, ticket systems, etc.) — each directive names the MCP tool and the fields it needs. Invoke the tool, capture any URLs or IDs returned, and surface them in the user message. If a named tool is unavailable, skip that handoff and flag it; local files always exist regardless.
 4. Tell the user it is ready: local paths and external destinations (URLs returned from handoffs). Invoke `acl-help` to suggest what next steps make sense in the acl method ecosystem.
 5. Run `{workflow.on_complete}` if non-empty. Treat a string scalar as a single instruction and an array as a sequence of instructions executed in order.

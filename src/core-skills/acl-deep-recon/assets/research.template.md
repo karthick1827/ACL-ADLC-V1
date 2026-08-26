@@ -4,7 +4,7 @@ type: '{research_type}'
 topic: '{research_topic}'
 decision: '{decision}'
 source: '{source}'
-status: draft
+status: In Review
 preset: '{preset}'
 validation: '{validation}'
 created: '{date}'

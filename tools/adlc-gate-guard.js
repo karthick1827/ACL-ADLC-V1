@@ -41,7 +41,7 @@ function getArtifactStatus(relativePath) {
   const match = content.match(/status:\s*([^\n\r]+)/i);
   if (match && match[1]) {
     const raw = match[1].trim().toLowerCase();
-    if (raw.includes('accept') || raw.includes('approved')) status = 'Accepted';
+    if (raw.includes('accept') || raw.includes('approved') || raw.includes('final')) status = 'Approved';
     else if (raw.includes('reject')) status = 'Rejected';
     else status = 'In Review';
   }
@@ -55,7 +55,8 @@ function evaluateAllGates() {
     results[gateKey] = {
       ...gate,
       ...fileInfo,
-      isAccepted: fileInfo.status === 'Accepted',
+      isAccepted: fileInfo.status === 'Approved' || fileInfo.status === 'Accepted',
+      isApproved: fileInfo.status === 'Approved' || fileInfo.status === 'Accepted',
       isRejected: fileInfo.status === 'Rejected',
       isInReview: fileInfo.status === 'In Review',
     };
@@ -79,7 +80,7 @@ function checkGate(targetPhase) {
       let stateLabel = g.status;
       if (g.isAccepted) {
         icon = '🟢';
-        stateLabel = 'Accepted';
+        stateLabel = 'Approved';
       } else if (g.isRejected) {
         icon = '🔴';
         stateLabel = 'Rejected';

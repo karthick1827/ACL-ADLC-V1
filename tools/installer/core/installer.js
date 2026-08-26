@@ -920,7 +920,12 @@ function aclMarkdownSaverPlugin() {
         const relPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
         if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git') {
           await this._collectMdRecursive(fullPath, relPath, list);
-        } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        } else if (
+          entry.isFile() &&
+          entry.name.endsWith('.md') &&
+          !entry.name.startsWith('.') &&
+          !['addendum.md', 'sources.md', 'review-triage.md', 'patch-plan.md', 'research.md'].includes(entry.name.toLowerCase())
+        ) {
           const content = await fs.readFile(fullPath, 'utf8');
           const stat = await fs.stat(fullPath);
 
@@ -928,8 +933,8 @@ function aclMarkdownSaverPlugin() {
           const match = content.match(/status:\s*([^\n\r]+)/i);
           if (match && match[1]) {
             const raw = match[1].trim().toLowerCase();
-            if (raw.includes('updated')) status = 'Updated';
-            else if (raw.includes('rejected')) status = 'Rejected';
+            if (raw.includes('accept') || raw.includes('approved') || raw.includes('final') || raw.includes('updated')) status = 'Approved';
+            else if (raw.includes('reject')) status = 'Rejected';
             else status = 'In Review';
           }
 

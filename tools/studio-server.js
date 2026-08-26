@@ -28,14 +28,19 @@ function getDiskMarkdownFiles() {
       const rel = relPath ? `${relPath}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
         scan(full, rel);
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      } else if (
+        entry.isFile() &&
+        entry.name.endsWith('.md') &&
+        !entry.name.startsWith('.') &&
+        !['addendum.md', 'sources.md', 'review-triage.md', 'patch-plan.md', 'research.md'].includes(entry.name.toLowerCase())
+      ) {
         const content = fs.readFileSync(full, 'utf8');
         const stat = fs.statSync(full);
         let status = 'In Review';
         const match = content.match(/status:\s*([^\n\r]+)/i);
         if (match && match[1]) {
           const raw = match[1].trim().toLowerCase();
-          if (raw.includes('accept') || raw.includes('approved')) status = 'Accepted';
+          if (raw.includes('accept') || raw.includes('approved') || raw.includes('final')) status = 'Approved';
           else if (raw.includes('reject')) status = 'Rejected';
           else status = 'In Review';
         }
