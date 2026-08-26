@@ -149,9 +149,47 @@ function checkGate(targetName) {
   return { ok: true, target };
 }
 
-if (require.main === module) {
-  const arg = process.argv[2];
-  checkGate(arg);
+function validateAllIntegrity() {
+  const gates = evaluateAllGates();
+  let hasViolation = false;
+
+  console.log('\n========================================================================');
+  console.log('🚦 ACL-ADLC PIPELINE INTEGRITY & GATE VALIDATION');
+  console.log('========================================================================\n');
+
+  for (const [, gate] of Object.entries(GATES)) {
+    if (gate.exists) {
+      console.log(`🔍 Checking artifact: ${gate.name} (${gate.artifact})...`);
+      for (const prereqKey of gate.prerequisites) {
+        const prereq = gates[prereqKey];
+        if (!prereq.isAccepted) {
+          console.error(
+            `❌ [ILLEGAL DOWNSTREAM ARTIFACT]: '${gate.name}' exists at '${gate.path}', but prerequisite '${prereq.name}' is NOT Approved (Current: [${prereq.status.toUpperCase()}]).`,
+          );
+          hasViolation = true;
+        }
+      }
+    }
+  }
+
+  if (hasViolation) {
+    console.error('\n🛑 Gate integrity check failed: Downstream deliverables were generated before upstream manager approval.');
+    console.error('========================================================================\n');
+    process.exit(1);
+  } else {
+    console.log('✅ [GATE INTEGRITY PASSED]: All pipeline artifacts conform to manager approval invariants.\n');
+    console.log('========================================================================\n');
+    return { ok: true };
+  }
 }
 
-module.exports = { checkGate, evaluateAllGates, GATES };
+if (require.main === module) {
+  const arg = process.argv[2];
+  if (arg === '--validate-all' || arg === '--strict' || arg === '--integrity') {
+    validateAllIntegrity();
+  } else {
+    checkGate(arg);
+  }
+}
+
+module.exports = { checkGate, evaluateAllGates, validateAllIntegrity, GATES };

@@ -6,10 +6,11 @@ When a Developer, Product Owner, or Agent creates an upstream deliverable (Produ
 - The Developer / PO / Agent MUST WAIT for the Manager's review and official sign-off in Markdown Studio.
 
 ## 🛑 STRICT PROHIBITIONS FOR ALL AI AGENTS & SKILLS:
-1. **NEVER SUGGEST SELF-APPROVAL**: The AI agent is STRICTLY FORBIDDEN from suggesting or instructing the user/developer to approve the document, change the status to 'Accepted', or bypass the review.
-2. **NEVER ASK THE USER TO APPROVE**: Do NOT say "Go to Markdown Studio and approve it yourself" or "Add reviewed_by: Karthick".
-3. **NEVER ADOPT PERSONA OR CHAT WHILE AWAITING APPROVAL**: When a prerequisite document is in review/pending/rejected, the AI agent MUST NOT adopt any persona (Sally, Winston, Amelia) or engage in chat brainstorming.
-4. **NEVER PROPOSE FILE CREATION OR EDITS FOR DOWNSTREAM STEPS**: Do NOT call tools (write_to_file, replace_file_content, etc.) to create downstream files.
+1. **NEVER PROCEED WITHOUT APPROVED UPSTREAM ARTIFACTS**: Before generating, updating, or editing any PRD, Architecture, Epic, or Code, ALWAYS verify that all upstream prerequisites in `_acl-output/` have `status: Approved` (or `Accepted`). Run `node tools/adlc-gate-guard.cjs <phase>` to verify.
+2. **NEVER SUGGEST SELF-APPROVAL**: The AI agent is STRICTLY FORBIDDEN from suggesting or instructing the user/developer to approve the document, change the status to 'Accepted', or bypass the review.
+3. **NEVER ASK THE USER TO APPROVE**: Do NOT say "Go to Markdown Studio and approve it yourself" or "Add reviewed_by: Karthick".
+4. **NEVER ADOPT PERSONA OR CHAT WHILE AWAITING APPROVAL**: When a prerequisite document is in review/pending/rejected, the AI agent MUST NOT adopt any persona (Sally, Winston, Amelia) or engage in chat brainstorming.
+5. **NEVER PROPOSE FILE CREATION OR EDITS FOR DOWNSTREAM STEPS**: Do NOT call tools (write_to_file, replace_file_content, etc.) to create downstream files while upstream is in review.
 
 ## ✅ THE ONLY PERMITTED AI RESPONSE:
 When invoked on any downstream task while an upstream document is 'In Review' or 'Pending':
@@ -27,6 +28,6 @@ The AI agent MUST ONLY output a professional waiting message:
 
 👉 NEXT STEP:
    Please wait for your manager to review and mark this document as 
-   'Accepted' or 'Rejected' in Markdown Studio before proceeding with 
+   'Accepted' or 'Approved' in Markdown Studio before proceeding with 
    downstream tasks (<Next Phase / Skill Name>).
 ========================================================================

@@ -1,0 +1,31 @@
+# ACL-ADLC Protocol & Phase Gate Rules for Windsurf Cascade
+
+## Universal Phase Gate Invariant (Mandatory & Non-Negotiable)
+Before executing any actions, generating files, editing files, adopting personas, or answering prompts regarding downstream delivery phases:
+1. Check `_acl-output/` or run `node tools/adlc-gate-guard.cjs <phase>`.
+2. If ANY upstream prerequisite document in `_acl-output/` is missing or has status other than `Approved` / `Accepted` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
+   - **TOTAL AGENT BLOCK**:
+     - Do NOT adopt personas or offer conversational brainstorming.
+     - Do NOT create, update, or edit any downstream files (PRD, Architecture, Epics, Stories, Code).
+     - Do NOT ask or suggest the developer to self-approve or alter the status.
+   - **ONLY PERMITTED ACTION**: Output the official lock notice:
+
+```text
+========================================================================
+⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)
+========================================================================
+📄 Document in Review: <Document Name> (<Path>)
+🏷️ Current Status:      [IN REVIEW / PENDING]
+
+⚠️ STATUS:
+   As per the ACL-ADLC sequential delivery framework, this document 
+   is currently awaiting official review and sign-off by your Manager.
+
+👉 NEXT STEP:
+   Please wait for your manager to review and mark this document as 
+   'Accepted' or 'Approved' in Markdown Studio before proceeding with 
+   downstream tasks (<Next Phase / Skill Name>).
+========================================================================
+```
+
+3. Only proceed with downstream tasks once upstream prerequisites have `status: Approved` or `status: Accepted`.

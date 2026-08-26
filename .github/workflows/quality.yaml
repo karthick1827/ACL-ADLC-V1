@@ -117,3 +117,6 @@ jobs:
 
       - name: Validate skills
         run: npm run validate:skills
+
+      - name: Validate pipeline gates
+        run: npm run validate:gates
