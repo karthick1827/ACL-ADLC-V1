@@ -872,7 +872,10 @@ async function syncFromLiveDisk(quiet = false) {
                                JSON.stringify(files.map(f => ({ id: f.id, content: f.content, status: f.status, updatedAt: f.updatedAt })));
             
             if (hasChanged || files.length === 0) {
-              files = data.files;
+              files = data.files.map(f => ({
+                ...f,
+                status: (f.status === 'Accepted' || f.status === 'approved') ? 'Approved' : (f.status || 'In Review')
+              }));
               try { localStorage.setItem("acl_adlc_project_markdown_files", JSON.stringify(files)); } catch(e){}
               renderFileTree();
               if (activeFileId && files.some(f => f.id === activeFileId)) {
@@ -905,7 +908,12 @@ async function syncFromLiveDisk(quiet = false) {
             const cached = localStorage.getItem("acl_adlc_project_markdown_files");
             if (cached) {
               const parsed = JSON.parse(cached);
-              if (Array.isArray(parsed) && parsed.length > 0) files = parsed;
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                files = parsed.map(f => ({
+                  ...f,
+                  status: (f.status === 'Accepted' || f.status === 'approved') ? 'Approved' : (f.status || 'In Review')
+                }));
+              }
             }
           } catch(e){}
         }
@@ -1107,11 +1115,12 @@ async function syncFromLiveDisk(quiet = false) {
           fileDiv.className = `file-item ${file.id === activeFileId ? "active" : ""}`;
           fileDiv.onclick = () => loadFile(file.id);
 
-          const statusClass = file.status.toLowerCase().replace(/\s+/g, "-");
+          const normStatus = (file.status === 'Accepted' || file.status === 'approved' || file.status === 'Approved') ? 'Approved' : (file.status || 'In Review');
+          const statusClass = normStatus.toLowerCase().replace(/\s+/g, "-");
           const fullPath = file.fullPath || (file.folderPath && file.folderPath !== "root" ? `${file.folderPath}/${file.filename}` : file.filename);
           const formattedTime = formatFileDateTime(file.createdAt || file.updatedAt);
 
-          fileDiv.setAttribute("title", `File: ${file.filename}\nLocation: ${file.folderPath || 'root'}\nFull Path: ${fullPath}\nCreated: ${formattedTime}\nStatus: ${file.status}`);
+          fileDiv.setAttribute("title", `File: ${file.filename}\nLocation: ${file.folderPath || 'root'}\nFull Path: ${fullPath}\nCreated: ${formattedTime}\nStatus: ${normStatus}`);
 
           fileDiv.innerHTML = `
             <div class="file-item-left">
@@ -1120,7 +1129,7 @@ async function syncFromLiveDisk(quiet = false) {
             </div>
             <span class="status-pill ${statusClass}">
               <span class="dot"></span>
-              ${file.status}
+              ${normStatus}
             </span>
           `;
 
