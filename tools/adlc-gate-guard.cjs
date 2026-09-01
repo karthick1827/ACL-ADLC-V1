@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const PROJECT_ROOT = path.resolve(__dirname, '..');
+const PROJECT_ROOT = process.cwd();
 const ACL_OUTPUT_DIR = path.join(PROJECT_ROOT, '_acl-output');
 
 const GATES = {
@@ -182,14 +182,95 @@ function validateAllIntegrity() {
     return { ok: true };
   }
 }
+function waitForGate(targetName) {
+  const normalized = (targetName || 'phase2').toLowerCase().replaceAll(/[^a-z0-9_]/g, '');
+
+  let targetGateKey = 'phase2';
+  if (normalized === 'phase3' || normalized === 'phase3a' || normalized.includes('arch')) {
+    targetGateKey = 'phase3_arch';
+  } else if (normalized === 'phase3b' || normalized.includes('ux') || normalized.includes('story') || normalized.includes('epic')) {
+    targetGateKey = 'phase3_stories';
+  } else if (normalized === 'phase4' || normalized.includes('dev') || normalized.includes('figma') || normalized.includes('quick')) {
+    targetGateKey = 'phase4';
+  }
+
+  const target = GATES[targetGateKey];
+  console.log('\n========================================================================');
+  console.log('⏳ ACL-ADLC LIVE GATE WATCHER: Waiting for Manager Approval');
+  console.log('========================================================================');
+  console.log(`🎯 Target Gate:  ${target.name}`);
+  console.log(`📡 Watching disk: _acl-output/ for status changes...\n`);
+
+  const startTime = Date.now();
+  let dots = 0;
+
+  const timer = setInterval(() => {
+    const gates = evaluateAllGates();
+    let allPrereqsApproved = true;
+    const pending = [];
+
+    for (const prereqKey of target.prerequisites) {
+      const prereq = gates[prereqKey];
+      if (!prereq.isAccepted) {
+        allPrereqsApproved = false;
+        pending.push(prereq);
+      }
+    }
+
+    if (allPrereqsApproved) {
+      clearInterval(timer);
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+
+      // Audible terminal bell
+      process.stdout.write('\u0007');
+
+      // Native sound on Windows/Mac
+      if (process.platform === 'win32') {
+        try {
+          const { exec } = require('node:child_process');
+          exec('powershell -Command "[console]::beep(880, 200); [console]::beep(1175, 300)"');
+        } catch {
+          // Audio chime is best-effort
+        }
+      }
+
+      console.log('\n\n========================================================================');
+      console.log(`🎉 [GATE UNLOCKED]: Manager Approval Confirmed! (Wait Time: ${elapsed}s)`);
+      console.log('========================================================================');
+      console.log(`✅ Prerequisite Verified: All required upstream documents are Approved.`);
+      console.log(`🚀 Unlocked: ${target.name}`);
+      console.log(`\n👉 NEXT ACTION: Proceed with your workflow in your AI agent!`);
+      console.log('========================================================================\n');
+      process.exit(0);
+    } else {
+      dots = (dots + 1) % 4;
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      const pendingLabels = pending
+        .map((p) => {
+          if (p.status === 'Missing') return `${p.name} (Waiting for Creation)`;
+          if (p.status === 'Rejected') return `${p.name} (REJECTED by Manager)`;
+          return `${p.name} (IN REVIEW - Awaiting Sign-off)`;
+        })
+        .join(' | ');
+
+      process.stdout.write(
+        `\r⏳ [${new Date().toLocaleTimeString()}] [${pendingLabels}]${'.'.repeat(dots)}${' '.repeat(4 - dots)} (${elapsed}s elapsed)`,
+      );
+    }
+  }, 2000);
+}
 
 if (require.main === module) {
   const arg = process.argv[2];
+  const nextArg = process.argv[3];
+
   if (arg === '--validate-all' || arg === '--strict' || arg === '--integrity') {
     validateAllIntegrity();
+  } else if (arg === '--wait' || arg === '--watch') {
+    waitForGate(nextArg);
   } else {
     checkGate(arg);
   }
 }
 
-module.exports = { checkGate, evaluateAllGates, validateAllIntegrity, GATES };
+module.exports = { checkGate, evaluateAllGates, validateAllIntegrity, waitForGate, GATES };
