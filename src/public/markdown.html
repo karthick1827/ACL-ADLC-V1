@@ -531,72 +531,7 @@
       box-shadow: 0 3px 8px rgba(9, 105, 218, 0.4);
     }
 
-    /* ACL Help Button (Always Enabled) */
-    .btn-help {
-      background: #ffffff;
-      color: #4338ca;
-      border: 1px solid #c7d2fe;
-      padding: 0.45rem 0.9rem;
-      border-radius: var(--radius-md);
-      font-size: 0.84rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      transition: all 0.15s ease;
-      box-shadow: var(--shadow-sm);
-      user-select: none;
-    }
-    .btn-help:hover {
-      background: #eef2ff;
-      border-color: #818cf8;
-      color: #3730a3;
-      transform: translateY(-1px);
-    }
 
-    /* Dynamic Gate Proceed Button */
-    .btn-proceed {
-      background: var(--accent-green);
-      color: #ffffff;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      padding: 0.45rem 1.05rem;
-      border-radius: var(--radius-md);
-      font-size: 0.84rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      transition: all 0.15s ease;
-      box-shadow: var(--shadow-sm);
-      user-select: none;
-    }
-    .btn-proceed.active {
-      background: #1a7f37 !important;
-      color: #ffffff !important;
-      cursor: pointer !important;
-      animation: proceedPulse 2.5s infinite;
-    }
-    @keyframes proceedPulse {
-      0% { box-shadow: 0 0 0 0 rgba(26, 127, 55, 0.4); }
-      70% { box-shadow: 0 0 0 6px rgba(26, 127, 55, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(26, 127, 55, 0); }
-    }
-    .btn-proceed:hover:not(:disabled) {
-      background: #116324;
-      box-shadow: var(--shadow-md);
-      transform: translateY(-1px);
-    }
-    .btn-proceed.disabled, .btn-proceed:disabled {
-      background: #eef2f6 !important;
-      color: #8c959f !important;
-      border-color: var(--border-color) !important;
-      cursor: not-allowed !important;
-      box-shadow: none !important;
-      transform: none !important;
-      opacity: 0.85;
-    }
 
     /* Generic Modals (Branching & Help) */
     .modal-backdrop {
@@ -1114,17 +1049,607 @@
       filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
     }
 
+    /* =================================================== */
+    /* Navigation Drawer & Slideable Menu Styles           */
+    /* =================================================== */
+    .brand-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
 
+    .btn-nav-drawer {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .btn-nav-drawer:hover {
+      background: var(--bg-canvas);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .nav-drawer-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 99990;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-drawer-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .nav-drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 320px;
+      max-width: 85vw;
+      background: #ffffff;
+      border-right: 1px solid #e2e8f0;
+      box-shadow: 10px 0 35px -5px rgba(15, 23, 42, 0.2);
+      z-index: 99995;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(-100%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-drawer.open {
+      transform: translateX(0);
+    }
+
+    .nav-drawer-header {
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .nav-drawer-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .nav-drawer-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .nav-drawer-close {
+      background: transparent;
+      border: none;
+      color: #64748b;
+      font-size: 1.15rem;
+      font-weight: bold;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .nav-drawer-close:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .nav-drawer-menu {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      flex: 1;
+    }
+    .nav-drawer-section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      padding: 0.25rem 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+    .nav-drawer-item {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.75rem 0.95rem;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #334155;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      width: 100%;
+    }
+    .nav-drawer-item:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+    .nav-drawer-item.active {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+      box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
+    }
+    .nav-drawer-item .nav-item-icon {
+      font-size: 1.25rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+    .nav-drawer-item.active .nav-item-icon {
+      background: #dbeafe;
+      border-color: #93c5fd;
+    }
+    .nav-drawer-item .nav-item-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .nav-drawer-item .nav-item-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+    .nav-drawer-item .nav-item-subtitle {
+      font-size: 0.74rem;
+      color: #64748b;
+    }
+    .nav-drawer-item.active .nav-item-subtitle {
+      color: #3b82f6;
+    }
+
+    .nav-drawer-footer {
+      padding: 0.85rem 1.25rem;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+
+    /* =================================================== */
+    /* Delivery Dashboard View Styles (Neat Light Theme)   */
+    /* =================================================== */
+    .dashboard-view {
+      flex: 1;
+      overflow-y: auto;
+      background: #f8fafc;
+      padding: 1.75rem 2rem 3rem 2rem;
+      display: none;
+    }
+    .dashboard-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .dashboard-header-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .dashboard-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .dashboard-title-group h2 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .dashboard-title-group p {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 0.25rem;
+    }
+    .dashboard-badge-viewonly {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    /* 100% Progress Section */
+    .dashboard-progress-section {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 1.15rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .progress-bar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .progress-bar-track {
+      width: 100%;
+      height: 14px;
+      background: #e2e8f0;
+      border-radius: 9999px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #6366f1);
+      border-radius: 9999px;
+      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .progress-bar-subtext {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      color: #64748b;
+    }
+
+    /* Stats Grid */
+    .dashboard-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.85rem;
+    }
+    .stat-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 1rem 1.15rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+    .stat-card-label {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #64748b;
+    }
+    .stat-card-value {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+    }
+    .stat-card-sub {
+      font-size: 0.74rem;
+      color: #94a3b8;
+    }
+
+    /* Phase Cards */
+    .dashboard-phases-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .phase-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .phase-card-header {
+      padding: 1rem 1.25rem;
+      background: #ffffff;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .phase-title-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .phase-icon-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      border: 1px solid #e2e8f0;
+    }
+    .phase-title-text h3 {
+      font-size: 0.96rem;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .phase-title-text span {
+      font-size: 0.78rem;
+      color: #64748b;
+    }
+
+
+    .phase-card-body {
+      padding: 1rem 1.25rem;
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    /* Artifact Row */
+    .dashboard-artifact-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      gap: 0.75rem;
+    }
+    .artifact-row-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 0;
+    }
+    .artifact-icon {
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .artifact-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      min-width: 0;
+    }
+    .artifact-filename {
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .artifact-meta {
+      font-size: 0.75rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .artifact-meta code {
+      background: #f1f5f9;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-family: monospace;
+      color: #475569;
+    }
+
+    /* Status Pills */
+    .dash-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .dash-status-pill.approved {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+    .dash-status-pill.in-review {
+      background: #fffbeb;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+    .dash-status-pill.rejected {
+      background: #fff1f2;
+      color: #be123c;
+      border: 1px solid #fecdd3;
+    }
+    .dash-status-pill.to-do,
+    .dash-status-pill.yet-to-start {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+    }
+    .dash-status-pill.locked {
+      background: #f8fafc;
+      color: #94a3b8;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* Phase 4 Callout Notice */
+    .phase4-callout-card {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 1.15rem 1.25rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+    }
+    .phase4-callout-icon {
+      font-size: 1.5rem;
+      line-height: 1;
+      color: #d97706;
+      flex-shrink: 0;
+    }
+    .phase4-callout-content h4 {
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #92400e;
+      margin-bottom: 0.25rem;
+    }
+    .phase4-callout-content p {
+      font-size: 0.82rem;
+      color: #b45309;
+      line-height: 1.45;
+    }
+
+    /* Epics and Stories List */
+    .epic-group {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+    .epic-header {
+      padding: 0.75rem 1rem;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .stories-list {
+      display: flex;
+      flex-direction: column;
+    }
+    .story-item {
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+    }
+    .story-item:last-child {
+      border-bottom: none;
+    }
+    .story-item-left {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #334155;
+    }
 
   </style>
 </head>
 <body>
 
-    <!-- Top Application Header -->
+  <!-- Slide-out Navigation Drawer -->
+  <div class="nav-drawer-backdrop" id="navDrawerBackdrop" onclick="closeNavDrawer()"></div>
+  <aside class="nav-drawer" id="navDrawer">
+    <div class="nav-drawer-header">
+      <div class="nav-drawer-brand">
+        <span class="brand-badge"> VelocityONE</span>
+        <span class="nav-drawer-title">Navigation</span>
+      </div>
+      <button type="button" class="nav-drawer-close" onclick="closeNavDrawer()" title="Close navigation">✕</button>
+    </div>
+    <nav class="nav-drawer-menu">
+      <div class="nav-drawer-section-label">Main Views</div>
+      <!-- TOP ITEM: Dashboard -->
+      <button type="button" class="nav-drawer-item" id="navItemDashboard" onclick="switchAppView('dashboard')">
+        <span class="nav-item-icon">📊</span>
+        <div class="nav-item-text">
+          <span class="nav-item-title">Dashboard</span>
+          <span class="nav-item-subtitle"> Progress & Phase Telemetry</span>
+        </div>
+      </button>
+      <!-- BOTTOM ITEM: Markdown Studio -->
+      <button type="button" class="nav-drawer-item active" id="navItemStudio" onclick="switchAppView('studio')">
+        <span class="nav-item-icon">📝</span>
+        <div class="nav-item-text">
+          <span class="nav-item-title">Markdown Studio</span>
+          <span class="nav-item-subtitle">Document Editor & Manager Approval</span>
+        </div>
+      </button>
+    </nav>
+    <div class="nav-drawer-footer">
+      <span>ACL-ADLC Delivery System</span>
+      <span style="font-weight: 700;">v6.11.6</span>
+    </div>
+  </aside>
+
+  <!-- Top Application Header -->
   <header>
-    <div class="brand">
-      <span class="brand-badge"> VelocityONE</span>
-      <span>Markdown Studio</span>
+    <div class="brand-container">
+      <button type="button" class="btn-nav-drawer" id="btnNavDrawer" onclick="toggleNavDrawer()" title="Navigation Menu (☰)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+      <div class="brand">
+        <span class="brand-badge"> VelocityONE</span>
+        <span id="appHeaderTitle">Markdown Studio</span>
+      </div>
     </div>
 
     <div class="header-actions">
@@ -1142,18 +1667,6 @@
           </button>
         </div>
       </div>
-
-      <!-- ACL Help Button (Always Enabled) -->
-      <button type="button" class="btn-help" id="btnHelp" onclick="openAclHelpModal()" title="ACL-ADLC Workflow Guide, Roles & Phase Gate Help">
-        <span>💡</span>
-        <span>ACL Help</span>
-      </button>
-
-      <!-- Dynamic Gate Proceed Button -->
-      <button type="button" class="btn-proceed disabled" id="btnProceed" onclick="handleProceedNextStep()" disabled title="Gate Locked: Awaiting Manager Approval">
-        <span id="proceedBtnIcon">⏳</span>
-        <span id="proceedBtnText">Gate Locked</span>
-      </button>
 
       <!-- Sync Status Indicator -->
       <div class="file-sync-indicator" id="syncStatus">
@@ -1176,7 +1689,7 @@
   
 
   <!-- Main Layout -->
-  <div class="app-container">
+  <div class="app-container" id="studioView">
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-controls">
@@ -1256,6 +1769,13 @@
     </main>
   </div>
 
+  <!-- Delivery Dashboard View (Read-Only, Clean Light Theme) -->
+  <div class="dashboard-view" id="dashboardView">
+    <div class="dashboard-container" id="dashboardContainerRoot">
+      <!-- Dynamically generated by renderDeliveryDashboard() -->
+    </div>
+  </div>
+
   <!-- Toast -->
   <div class="toast" id="toastNotification">
     <span id="toastIcon">✔</span>
@@ -1289,41 +1809,82 @@ async function syncFromLiveDisk(quiet = false) {
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.files)) {
-            if (data.files.length === 0) {
+            const ignoredNames = new Set([
+              'skill.md',
+              'agents.md',
+              'readme.md',
+              'changelog.md',
+              'claude.md',
+              'security.md',
+              'contributing.md',
+              'addendum.md',
+              'sources.md',
+              'review-triage.md',
+              'patch-plan.md',
+              'research.md',
+            ]);
+            const filteredFiles = data.files.filter((f) => !ignoredNames.has((f.filename || '').toLowerCase()));
+
+            if (filteredFiles.length === 0) {
               files = [];
-              try { localStorage.setItem("acl_adlc_project_markdown_files", JSON.stringify([])); } catch(e){}
+              try {
+                localStorage.setItem('acl_adlc_project_markdown_files', JSON.stringify([]));
+              } catch (e) {}
               renderFileTree();
               loadEmptyState();
-              setSyncStatus("Synced with VS Code (0 files in _acl-output)", "green");
+              setSyncStatus('Synced with VS Code (0 files in _acl-output)', 'green');
               return true;
             }
-            const hasChanged = JSON.stringify(data.files.map(f => ({ id: f.id, content: f.content, status: f.status, updatedAt: f.updatedAt }))) !==
-                               JSON.stringify(files.map(f => ({ id: f.id, content: f.content, status: f.status, updatedAt: f.updatedAt })));
-            
+            const hasChanged =
+              JSON.stringify(
+                filteredFiles.map((f) => ({
+                  id: f.id,
+                  content: f.content,
+                  status: f.status,
+                  updatedAt: f.updatedAt,
+                })),
+              ) !==
+              JSON.stringify(
+                files.map((f) => ({
+                  id: f.id,
+                  content: f.content,
+                  status: f.status,
+                  updatedAt: f.updatedAt,
+                })),
+              );
+
             if (hasChanged || files.length === 0) {
-              files = data.files.map(f => ({
+              files = filteredFiles.map((f) => ({
                 ...f,
-                status: (f.status === 'Accepted' || f.status === 'approved') ? 'Approved' : (f.status || 'In Review')
+                status:
+                  f.status === 'Accepted' || f.status === 'approved'
+                    ? 'Approved'
+                    : f.status || 'In Review',
               }));
-              try { localStorage.setItem("acl_adlc_project_markdown_files", JSON.stringify(files)); } catch(e){}
+              try {
+                localStorage.setItem('acl_adlc_project_markdown_files', JSON.stringify(files));
+              } catch (e) {}
               renderFileTree();
-              if (activeFileId && files.some(f => f.id === activeFileId)) {
+              if (activeFileId && files.some((f) => f.id === activeFileId)) {
                 const active = getActiveFile();
                 if (active) {
-                  document.getElementById("markdownTextarea").value = active.content;
-                  document.getElementById("statusSelect").value = active.status;
+                  document.getElementById('markdownTextarea').value = active.content;
+                  document.getElementById('statusSelect').value = active.status;
                   renderPreview();
                 }
               } else if (files.length > 0) {
                 loadFile(files[0].id);
               }
             }
-            setSyncStatus("Synced with VS Code (Local Test Mode)", "green");
+            setSyncStatus('Synced with VS Code (Local Test Mode)', 'green');
             evaluateProceedButton();
+            if (activeAppView === 'dashboard') {
+              renderDeliveryDashboard();
+            }
             return true;
           }
         }
-      } catch(e) {}
+      } catch (e) {}
       evaluateProceedButton();
       return false;
     }
@@ -1359,29 +1920,32 @@ async function syncFromLiveDisk(quiet = false) {
       const synced = await syncFromLiveDisk(true);
 
       if (!synced && files.length === 0) {
-        if (
-          window.__ACL_EMBEDDED_FILES__ &&
-          Array.isArray(window.__ACL_EMBEDDED_FILES__) &&
-          window.__ACL_EMBEDDED_FILES__.length > 0
-        ) {
-          files = window.__ACL_EMBEDDED_FILES__;
-        } else {
-          try {
-            const cached = localStorage.getItem('acl_adlc_project_markdown_files');
-            if (cached) {
-              const parsed = JSON.parse(cached);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                files = parsed.map((f) => ({
+        const ignoredNames = new Set([
+          'skill.md',
+          'agents.md',
+          'readme.md',
+          'changelog.md',
+          'claude.md',
+          'security.md',
+          'contributing.md',
+        ]);
+        try {
+          const cached = localStorage.getItem('acl_adlc_project_markdown_files');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              files = parsed
+                .filter((f) => !ignoredNames.has((f.filename || '').toLowerCase()))
+                .map((f) => ({
                   ...f,
                   status:
                     f.status === 'Accepted' || f.status === 'approved'
                       ? 'Approved'
                       : f.status || 'In Review',
                 }));
-              }
             }
-          } catch (e) {}
-        }
+          }
+        } catch (e) {}
 
         if (files.length > 0) {
           activeFileId = files[0].id;
@@ -1452,6 +2016,9 @@ async function syncFromLiveDisk(quiet = false) {
       }
       renderFileTree();
       evaluateProceedButton();
+      if (activeAppView === 'dashboard') {
+        renderDeliveryDashboard();
+      }
     }
 
     function updateDocumentStatusFrontmatter(content, newStatus, nowIso = new Date().toISOString()) {
@@ -1731,391 +2298,14 @@ async function syncFromLiveDisk(quiet = false) {
         <div style="text-align: center; padding: 5rem 2rem; color: var(--text-muted);">
           <div style="font-size: 3rem; margin-bottom: 1rem;">📂</div>
           <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">No Markdown Files Found</h2>
-          <p style="font-size: 0.9rem; max-width: 460px; margin: 0 auto; line-height: 1.5; margin-bottom: 1.5rem;">
-            Click below to initialize your project deliverables in <code style="background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; color: var(--accent-blue);">_acl-output/</code>.
+          <p style="font-size: 0.9rem; max-width: 460px; margin: 0 auto; line-height: 1.5;">
+            Generate deliverables using your AI agent in VS Code or CLI. Documents saved in <code style="background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; color: var(--accent-blue);">_acl-output/</code> will automatically appear here for manager review.
           </p>
-          <button class="btn-proceed" style="margin: 0 auto; display: inline-flex;" onclick="handleProceedNextStep()">
-            <span>🚀</span>
-            <span>Initialize ${activeWorkflowMode === 'brownfield' ? 'Project Context (Phase 0)' : 'Product Brief (Phase 1)'}</span>
-          </button>
         </div>
       `;
-      evaluateProceedButton();
     }
 
-    // ====================================================
-    // Dynamic Gate Proceed Button & Workflow Evaluator
-    // ====================================================
-    async function evaluateProceedButton() {
-      const btn = document.getElementById('btnProceed');
-      const icon = document.getElementById('proceedBtnIcon');
-      const text = document.getElementById('proceedBtnText');
-      if (!btn || !icon || !text) return;
-
-      const file = getActiveFile();
-
-      // Case 1: No files in workspace yet
-      if (!file) {
-        btn.disabled = false;
-        btn.className = 'btn-proceed active';
-        icon.textContent = '⚡';
-        if (activeWorkflowMode === 'brownfield') {
-          text.textContent = 'Initialize Project Context ➔';
-          btn.title = 'Start Brownfield delivery by discovering codebase baseline';
-        } else {
-          text.textContent = 'Start with Product Brief ➔';
-          btn.title = 'Start Greenfield delivery with Product Brief';
-        }
-        return;
-      }
-
-      const isApproved = file.status === 'Approved' || file.status === 'Accepted';
-      const filename = (file.filename || '').toLowerCase();
-      const folderPath = (file.folderPath || '').toLowerCase();
-
-      // Case: Story implementation file in 4-implementation
-      if (filename.includes('story-') || folderPath.includes('4-implementation') || filename.includes('spec.md')) {
-        if (!isApproved) {
-          btn.disabled = true;
-          btn.className = 'btn-proceed disabled';
-          icon.textContent = file.status === 'Rejected' ? '⛔' : '⏳';
-          text.textContent = file.status === 'Rejected' ? `Gate Blocked (${file.filename} Rejected)` : `Gate Locked (${file.filename} In Review)`;
-          btn.title = `Current Story deliverable '${file.filename}' is ${file.status}. Manager sign-off is mandatory before proceeding to the next story.`;
-          return;
-        }
-
-        // Story is approved! Find next story
-        try {
-          const res = await fetch(`${SERVER_API_HOST}/api/implementation-progress`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.progress) {
-              if (data.progress.allCompleted) {
-                btn.disabled = true;
-                btn.className = 'btn-proceed disabled';
-                icon.textContent = '🎉';
-                text.textContent = 'All Epics & Stories Implemented';
-                btn.title = 'All stories across all Epics have been approved and implemented!';
-                return;
-              }
-              if (data.progress.nextStoryToGenerate) {
-                btn.disabled = false;
-                btn.className = 'btn-proceed active';
-                icon.textContent = '🚀';
-                text.textContent = `Proceed to Story ${data.progress.nextStoryToGenerate.id} ➔`;
-                btn.title = `Generate implementation specification for Story ${data.progress.nextStoryToGenerate.id}: ${data.progress.nextStoryToGenerate.title}`;
-                return;
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Could not fetch implementation progress:', e);
-        }
-
-        btn.disabled = false;
-        btn.className = 'btn-proceed active';
-        icon.textContent = '🚀';
-        text.textContent = 'Proceed to Next Story ➔';
-        btn.title = 'Proceed to next story implementation';
-        return;
-      }
-
-      if (!isApproved) {
-        btn.disabled = true;
-        btn.className = 'btn-proceed disabled';
-        icon.textContent = file.status === 'Rejected' ? '⛔' : '⏳';
-        text.textContent = `Gate Locked (${file.status || 'In Review'})`;
-        btn.title = `Current deliverable '${file.filename}' is ${file.status}. Manager sign-off (Approved) is required to unlock downstream phases.`;
-        return;
-      }
-
-      // Approved! Determine downstream target step
-      btn.disabled = false;
-      btn.className = 'btn-proceed active';
-      icon.textContent = '🚀';
-
-      if (filename.includes('project-context')) {
-        text.textContent = 'Proceed to Product Brief ➔';
-        btn.title = 'Proceed to Phase 1: Analysis (Product Brief)';
-      } else if (filename.includes('brief')) {
-        text.textContent = 'Proceed to PRD ➔';
-        btn.title = 'Proceed to Phase 2: Planning (PRD)';
-      } else if (filename.includes('prd') || filename.startsWith('spec-') || filename === 'spec.md') {
-        text.textContent = 'Proceed to Solutioning ➔';
-        btn.title = 'PRD is Approved! Click to choose Architecture Spine or UX Design System';
-      } else if (filename.includes('architecture') || filename.includes('ux') || filename.includes('design-system')) {
-        text.textContent = 'Proceed to Epics & Stories ➔';
-        btn.title = 'Proceed to Phase 3C: Epics & User Stories breakdown';
-      } else if (filename.includes('epics') || filename.includes('stories')) {
-        try {
-          const res = await fetch(`${SERVER_API_HOST}/api/implementation-progress`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.progress && data.progress.nextStoryToGenerate) {
-              text.textContent = `Proceed to Story ${data.progress.nextStoryToGenerate.id} ➔`;
-              btn.title = `Start Phase 4 Implementation with Story ${data.progress.nextStoryToGenerate.id}: ${data.progress.nextStoryToGenerate.title}`;
-              return;
-            }
-          }
-        } catch (e) {
-          console.warn('Could not fetch implementation progress:', e);
-        }
-        text.textContent = 'Proceed to Story 1.1 ➔';
-        btn.title = 'Proceed to Phase 4: Implementation (Story 1.1)';
-      } else if (filename.includes('scaffold') || filename.includes('quick-dev') || filename.includes('audit')) {
-        btn.disabled = true;
-        btn.className = 'btn-proceed disabled';
-        icon.textContent = '✅';
-        text.textContent = 'All Phases Generated';
-        btn.title = 'All workflow phase deliverables have been generated on disk.';
-      } else {
-        text.textContent = 'Proceed to Next Phase ➔';
-        btn.title = 'Click to advance to the next delivery step';
-      }
-    }
-
-    function handleProceedNextStep() {
-      const btn = document.getElementById('btnProceed');
-      if (btn && btn.disabled) return;
-
-      const file = getActiveFile();
-
-      // Case: No files in workspace yet -> Initialize
-      if (!file) {
-        if (activeWorkflowMode === 'brownfield') {
-          executeStepGeneration('project_context');
-        } else {
-          executeStepGeneration('brief');
-        }
-        return;
-      }
-
-      const filename = (file.filename || '').toLowerCase();
-      const folderPath = (file.folderPath || '').toLowerCase();
-
-      if (filename.includes('story-') || folderPath.includes('4-implementation')) {
-        executeStepGeneration('story_impl');
-      } else if (filename.includes('project-context')) {
-        executeStepGeneration('brief');
-      } else if (filename.includes('brief')) {
-        executeStepGeneration('prd');
-      } else if (filename.includes('prd') || filename.startsWith('spec-') || filename === 'spec.md') {
-        openBranchModal();
-      } else if (filename.includes('architecture') || filename.includes('ux') || filename.includes('design-system')) {
-        executeStepGeneration('epics_stories');
-      } else if (filename.includes('epics') || filename.includes('stories')) {
-        executeStepGeneration('story_impl');
-      } else {
-        openBranchModal();
-      }
-    }
-
-    async function executeStepGeneration(stepKey) {
-      closeBranchModal();
-
-      const proceedBtn = document.getElementById("proceedStepBtn");
-      const origText = proceedBtn ? proceedBtn.innerHTML : "";
-      if (proceedBtn) {
-        proceedBtn.disabled = true;
-        proceedBtn.innerHTML = `⏳ Generating...`;
-      }
-
-      const agentRoles = {
-        project_context: '🔍 Mary Analyst & System Architect',
-        brief: '🔍 Mary Analyst',
-        prd: '📋 John PM',
-        architecture: '🏛️ Winston Architect',
-        ux: '🎨 Sally UX Designer',
-        epics_stories: '📊 Scrum Lead',
-        implementation_scaffold: '💻 Amelia Developer',
-        quick_dev: '💻 Amelia Developer',
-        story_impl: '💻 Amelia Developer',
-      };
-
-      const roleName = agentRoles[stepKey] || '🤖 ACL AI Agent';
-      setSyncStatus(`${roleName} is generating ${stepKey}...`, 'yellow');
-      showToast(`${roleName} is generating ${stepKey} via AI Agent...`, 'info');
-
-      try {
-        const res = await fetch('/api/generate-step', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            stepKey: stepKey,
-            mode: activeWorkflowMode,
-            projectTitle: 'Fleet 360 Delivery',
-            apiKey: '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',
-            model: 'meta/llama-3.2-11b-vision-instruct'
-          })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.success && data.file) {
-            const agentLabel = data.agentName ? `${data.agentName} ` : '';
-            showToast(`🎉 ${agentLabel}generated '${data.file.filename}' [In Review] on disk!`, 'success');
-            await syncFromLiveDisk(false);
-            if (data.file.id) {
-              loadFile(data.file.id);
-            }
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn('generate-step primary route warning:', err);
-      } finally {
-        if (proceedBtn) {
-          evaluateProceedButton();
-        }
-      }
-
-      // Robust fallback via /api/save-markdown
-      const fallbackMap = {
-        project_context: { folderPath: '0-context/acl-generate-project-context', filename: 'project-context.md', title: 'Project Context & Codebase Conventions' },
-        brief: { folderPath: '1-analysis/acl-product-brief', filename: 'brief.md', title: 'Product Brief' },
-        prd: { folderPath: '2-plan-workflows/acl-prd', filename: 'prd.md', title: 'Product Requirements Document (PRD)' },
-        architecture: { folderPath: '3-solutioning/acl-architecture', filename: 'architecture.md', title: 'Architecture Spine & Technical Specification' },
-        ux: { folderPath: '3-solutioning/acl-ux', filename: 'ux.md', title: 'UX Specification & Design System' },
-        epics_stories: { folderPath: '3-solutioning/acl-create-epics-and-stories', filename: 'epics.md', title: 'Epics & User Stories Breakdown' },
-        implementation_scaffold: { folderPath: '4-implementation/acl-dev-auto', filename: 'step-01-scaffold.md', title: 'Implementation Plan & Scaffold' },
-        quick_dev: { folderPath: '4-implementation/acl-quick-dev', filename: 'quick-dev.md', title: 'Targeted Patch Plan & Quick Implementation' }
-      };
-
-      const meta = fallbackMap[stepKey] || { folderPath: '1-analysis/acl-product-brief', filename: `${stepKey}.md`, title: stepKey };
-      const fallbackContent = `---\nstatus: In Review\nphase: Phase Deliverable\nworkflow_mode: ${activeWorkflowMode}\ncreated_at: ${new Date().toISOString()}\nreviewed_by: Pending Manager Review\n---\n\n# ${meta.title}\n\nDeliverable generated for manager review.\n`;
-
-      try {
-        await fetch('/api/save-markdown', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            folderPath: meta.folderPath,
-            filename: meta.filename,
-            content: fallbackContent,
-            status: 'In Review',
-            autoPush: false
-          })
-        });
-        showToast(`🎉 Generated '${meta.filename}' [In Review] on disk!`, 'success');
-        await syncFromLiveDisk(false);
-        const newId = `${meta.folderPath}_${meta.filename}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-        loadFile(newId);
-      } catch (err) {
-        showToast(`Failed to generate ${meta.filename}: ${err.message}`, 'danger');
-      } finally {
-        if (proceedBtn) {
-          evaluateProceedButton();
-        }
-      }
-    }
-
-    // ==========================================
-    // Branching Suggestion Modal Functions
-    // ==========================================
-    function openBranchModal() {
-      const modal = document.getElementById('branchModal');
-      const file = getActiveFile();
-      const filename = file ? file.filename : 'Upstream Deliverable';
-      const sub = document.getElementById('branchModalSubtitle');
-      if (sub) {
-        sub.innerHTML = `<strong>${filename}</strong> has been marked as <span class="status-pill approved" style="display:inline-flex; vertical-align:middle;"><span class="dot"></span>Approved</span> by your Manager. Choose which solutioning track to proceed with:`;
-      }
-      if (modal) modal.classList.add('open');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeBranchModal(e) {
-      if (e && e.target && e.target.closest && e.target.closest('.modal-card') && !e.target.closest('.modal-close-btn')) {
-        return;
-      }
-      const modal = document.getElementById('branchModal');
-      if (modal) modal.classList.remove('open');
-      document.body.style.overflow = '';
-    }
-
-    // ==========================================
-    // ACL Help Modal Functions & Checklist
-    // ==========================================
-    function openAclHelpModal() {
-      const modal = document.getElementById('aclHelpModal');
-      const modeSpan = document.getElementById('helpProjectMode');
-      if (modeSpan) {
-        modeSpan.textContent = activeWorkflowMode === 'brownfield' ? 'Brownfield' : 'Greenfield';
-      }
-      renderGateChecklist();
-      if (modal) modal.classList.add('open');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeAclHelpModal(e) {
-      if (e && e.target && e.target.closest && e.target.closest('.modal-card') && !e.target.closest('.modal-close-btn')) {
-        return;
-      }
-      const modal = document.getElementById('aclHelpModal');
-      if (modal) modal.classList.remove('open');
-      document.body.style.overflow = '';
-    }
-
-    function switchHelpTab(tabName, el) {
-      document.querySelectorAll('.help-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.help-tab-pane').forEach(p => p.classList.remove('active'));
-      if (el) el.classList.add('active');
-      const target = document.getElementById('tab-' + tabName);
-      if (target) target.classList.add('active');
-    }
-
-    function renderGateChecklist() {
-      const container = document.getElementById('gateChecklistList');
-      if (!container) return;
-
-      const pipelineStages = activeWorkflowMode === 'brownfield' ? [
-        { name: 'Phase 0: Codebase Context', match: 'project-context', path: '0-context/acl-generate-project-context/project-context.md' },
-        { name: 'Phase 1: Feature Brief', match: 'brief.md', path: '1-analysis/acl-product-brief/brief.md' },
-        { name: 'Phase 2: Feature PRD', match: 'prd.md', path: '2-plan-workflows/acl-prd/prd.md' },
-        { name: 'Phase 3A: Architecture Delta', match: 'architecture', path: '3-solutioning/acl-architecture/architecture.md' },
-        { name: 'Phase 3B: UX Delta', match: 'ux.md', path: '3-solutioning/acl-ux/ux.md' },
-        { name: 'Phase 3C: Targeted Stories', match: 'epics.md', path: '3-solutioning/acl-create-epics-and-stories/epics.md' },
-        { name: 'Phase 4: Quick Dev Patch', match: 'quick-dev.md', path: '4-implementation/acl-quick-dev/quick-dev.md' }
-      ] : [
-        { name: 'Phase 1: Product Brief', match: 'brief.md', path: '1-analysis/acl-product-brief/brief.md' },
-        { name: 'Phase 2: PRD & Scope', match: 'prd.md', path: '2-plan-workflows/acl-prd/prd.md' },
-        { name: 'Phase 3A: Architecture Spine', match: 'architecture', path: '3-solutioning/acl-architecture/architecture.md' },
-        { name: 'Phase 3B: UX Design System', match: 'ux.md', path: '3-solutioning/acl-ux/ux.md' },
-        { name: 'Phase 3C: Epics & Stories', match: 'epics.md', path: '3-solutioning/acl-create-epics-and-stories/epics.md' },
-        { name: 'Phase 4: Code Scaffold & Implementation', match: 'scaffold', path: '4-implementation/acl-dev-auto/step-01-scaffold.md' }
-      ];
-
-      let html = '';
-      pipelineStages.forEach(stage => {
-        const found = files.find(f => (f.filename || '').toLowerCase().includes(stage.match) || (f.fullPath || '').toLowerCase().includes(stage.match));
-        let statusText = 'Missing';
-        let badgeClass = 'missing';
-        let icon = '⚪';
-
-        if (found) {
-          const norm = (found.status === 'Accepted' || found.status === 'approved' || found.status === 'Approved') ? 'Approved' : (found.status || 'In Review');
-          statusText = norm;
-          if (norm === 'Approved') { badgeClass = 'approved'; icon = '🟢'; }
-          else if (norm === 'Rejected') { badgeClass = 'rejected'; icon = '🔴'; }
-          else { badgeClass = 'in-review'; icon = '🟡'; }
-        }
-
-        html += `
-          <div class="gate-row">
-            <div class="gate-row-left">
-              <span>${icon}</span>
-              <div>
-                <strong>${stage.name}</strong>
-                <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">_acl-output/${stage.path}</div>
-              </div>
-            </div>
-            <span class="gate-row-badge ${badgeClass}">${statusText}</span>
-          </div>
-        `;
-      });
-
-      container.innerHTML = html;
-    }
+    function evaluateProceedButton() {}
 
     window.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -2273,9 +2463,8 @@ async function syncFromLiveDisk(quiet = false) {
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
+        closeNavDrawer();
         closeWorkflowModal();
-        closeBranchModal();
-        closeAclHelpModal();
       } else if (e.key === '+' || e.key === '=') {
         const modal = document.getElementById('workflowModal');
         if (modal && modal.classList.contains('open')) zoomWorkflow(0.2);
@@ -2288,183 +2477,476 @@ async function syncFromLiveDisk(quiet = false) {
       }
     });
 
+    // ==========================================
+    // Navigation Drawer & View Router
+    // ==========================================
+    let activeAppView = 'studio';
+
+    function toggleNavDrawer() {
+      const drawer = document.getElementById('navDrawer');
+      const backdrop = document.getElementById('navDrawerBackdrop');
+      if (!drawer || !backdrop) return;
+      if (drawer.classList.contains('open')) {
+        closeNavDrawer();
+      } else {
+        openNavDrawer();
+      }
+    }
+
+    function openNavDrawer() {
+      const drawer = document.getElementById('navDrawer');
+      const backdrop = document.getElementById('navDrawerBackdrop');
+      if (drawer) drawer.classList.add('open');
+      if (backdrop) backdrop.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeNavDrawer() {
+      const drawer = document.getElementById('navDrawer');
+      const backdrop = document.getElementById('navDrawerBackdrop');
+      if (drawer) drawer.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    function switchAppView(view) {
+      activeAppView = view;
+      closeNavDrawer();
+
+      const studioView = document.getElementById('studioView');
+      const dashboardView = document.getElementById('dashboardView');
+      const headerTitle = document.getElementById('appHeaderTitle');
+      const navStudio = document.getElementById('navItemStudio');
+      const navDash = document.getElementById('navItemDashboard');
+      const btnSave = document.getElementById('btnSave');
+
+      if (view === 'dashboard') {
+        if (studioView) studioView.style.display = 'none';
+        if (dashboardView) dashboardView.style.display = 'block';
+        if (headerTitle) headerTitle.textContent = 'Dashboard';
+        if (navDash) navDash.classList.add('active');
+        if (navStudio) navStudio.classList.remove('active');
+        if (btnSave) btnSave.style.display = 'none';
+        renderDeliveryDashboard();
+      } else {
+        if (dashboardView) dashboardView.style.display = 'none';
+        if (studioView) studioView.style.display = 'flex';
+        if (headerTitle) headerTitle.textContent = 'Markdown Studio';
+        if (navStudio) navStudio.classList.add('active');
+        if (navDash) navDash.classList.remove('active');
+        if (btnSave) btnSave.style.display = 'flex';
+        if (activeFileId) loadFile(activeFileId);
+      }
+    }
+
+    // ==========================================
+    // Delivery Dashboard Engine (View-Only, 80/20 Weights)
+    // ==========================================
+    function parseEpicsAndStoriesFromMarkdown(markdownText) {
+      if (!markdownText) return [];
+      const lines = markdownText.split(/\r?\n/);
+      const epics = [];
+      let currentEpic = null;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Match Epic header: ## Epic 1: ... or ## EPIC-1 ... or ## Epic ...
+        const epicMatch = line.match(/^##\s+(?:Epic\s*[\d\.]*[:\-]?|EPIC-?[\d\.]*[:\-]?)\s*(.+)$/i);
+        if (epicMatch) {
+          currentEpic = {
+            title: epicMatch[1].trim(),
+            stories: []
+          };
+          epics.push(currentEpic);
+          continue;
+        }
+
+        // Match Story header or checkbox item inside epic
+        if (currentEpic) {
+          const storyMatch = line.match(/^###\s+(?:Story\s*[\d\.]*[:\-]?|STORY-?[\d\.]*[:\-]?)\s*(.+)$/i);
+          const checkboxMatch = line.match(/^-\s*\[([ xX])\]\s*(?:Story\s*[\d\.]*[:\-]?\s*)?(.+)$/i);
+
+          if (storyMatch) {
+            currentEpic.stories.push({
+              title: storyMatch[1].trim(),
+              status: 'To Do',
+              isCompleted: false
+            });
+          } else if (checkboxMatch) {
+            const isDone = checkboxMatch[1].toLowerCase() === 'x';
+            currentEpic.stories.push({
+              title: checkboxMatch[2].trim(),
+              status: isDone ? 'Approved' : 'To Do',
+              isCompleted: isDone
+            });
+          }
+        }
+      }
+
+      // Fallback: If no ## Epic headers were matched, look for stories anywhere
+      if (epics.length === 0) {
+        const fallbackStories = [];
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          const storyMatch = line.match(/^(?:###\s+Story\s*[\d\.]*[:\-]?|###\s+|-\s*\[([ xX])\]\s*Story)\s*(.+)$/i);
+          if (storyMatch) {
+            const isDone = storyMatch[1] && storyMatch[1].toLowerCase() === 'x';
+            fallbackStories.push({
+              title: storyMatch[2].trim(),
+              status: isDone ? 'Approved' : 'To Do',
+              isCompleted: isDone
+            });
+          }
+        }
+        if (fallbackStories.length > 0) {
+          epics.push({
+            title: 'Implementation Backlog',
+            stories: fallbackStories
+          });
+        }
+      }
+
+      return epics;
+    }
+
+    function renderDeliveryDashboard() {
+      const container = document.getElementById('dashboardContainerRoot');
+      if (!container) return;
+
+      // Helper to find file by pattern
+      function getDoc(pattern) {
+        return files.find(f => {
+          const fn = (f.filename || '').toLowerCase();
+          const full = (f.fullPath || '').toLowerCase();
+          if (typeof pattern === 'string') return fn.includes(pattern) || full.includes(pattern);
+          return pattern.test(fn) || pattern.test(full);
+        });
+      }
+
+      function getNormStatus(doc) {
+        if (!doc) return null;
+        const raw = (doc.status || 'In Review').trim().toLowerCase();
+        if (raw.includes('accept') || raw.includes('approved') || raw.includes('final')) return 'Approved';
+        if (raw.includes('reject')) return 'Rejected';
+        return 'In Review';
+      }
+
+      // 1. Phase 1: Analysis (brief.md) - Weight: 5%
+      const docBrief = getDoc('brief.md');
+      const statusBrief = docBrief ? getNormStatus(docBrief) : 'To Do';
+      const briefApproved = (statusBrief === 'Approved');
+      const briefContrib = briefApproved ? 5 : 0;
+
+      // 2. Phase 2A: PRD (prd.md) - Weight: 5%
+      const docPrd = getDoc('prd.md');
+      const statusPrd = docPrd ? getNormStatus(docPrd) : 'To Do';
+      const prdApproved = (statusPrd === 'Approved');
+      const prdContrib = prdApproved ? 5 : 0;
+
+      // 3. Phase 2B: UX Design (DESIGN.md / EXPERIENCE.md / ux.md) - Weight: 5%
+      const docUx = getDoc(/design\.md|experience\.md|ux\.md/);
+      const statusUx = docUx ? getNormStatus(docUx) : 'To Do';
+      const uxApproved = (statusUx === 'Approved');
+      const uxContrib = uxApproved ? 5 : 0;
+
+      // 4. Phase 3A: Architecture (ARCHITECTURE-SPINE.md / architecture.md) - Weight: 5%
+      const docArch = getDoc(/architecture-spine\.md|architecture\.md/);
+      const statusArch = docArch ? getNormStatus(docArch) : 'To Do';
+      const archApproved = (statusArch === 'Approved');
+      const archContrib = archApproved ? 5 : 0;
+
+      // 5. Phase 3B: Epics & Stories (epics.md) - Weight: 15%
+      const docEpics = getDoc('epics.md');
+      const statusEpics = docEpics ? getNormStatus(docEpics) : 'To Do';
+      const epicsApproved = (statusEpics === 'Approved');
+      const epicsContrib = epicsApproved ? 15 : 0;
+
+      // 6. Phase 4: Implementation (Weight: 65% - Dynamic)
+      let phase4Contrib = 0;
+      let parsedEpics = [];
+      let totalStories = 0;
+      let completedStories = 0;
+      let isPhase4Locked = !epicsApproved;
+
+      if (epicsApproved && docEpics && docEpics.content) {
+        parsedEpics = parseEpicsAndStoriesFromMarkdown(docEpics.content);
+        parsedEpics.forEach(ep => {
+          ep.stories.forEach(st => {
+            totalStories++;
+            if (st.isCompleted || st.status === 'Approved') completedStories++;
+          });
+        });
+
+        if (totalStories > 0) {
+          phase4Contrib = Math.round((completedStories / totalStories) * 65);
+        }
+      }
+
+      // Calculate Total Progress (100% max)
+      const totalProgress = Math.min(100, briefContrib + prdContrib + uxContrib + archContrib + epicsContrib + phase4Contrib);
+
+      // Status Badge Helper
+      function renderStatusBadge(status) {
+        const s = status || 'To Do';
+        let cls = 'to-do';
+        let icon = '⚪';
+        if (s === 'Approved') { cls = 'approved'; icon = '🟢'; }
+        else if (s === 'In Review') { cls = 'in-review'; icon = '🟡'; }
+        else if (s === 'Rejected') { cls = 'rejected'; icon = '🔴'; }
+        else { cls = 'to-do'; icon = '⚪'; return `<span class="dash-status-pill to-do"><span class="dot"></span>⚪ To Do</span>`; }
+        return `<span class="dash-status-pill ${cls}"><span class="dot"></span>${icon} ${s}</span>`;
+      }
+
+      // Summary Counts
+      const statusesList = [statusBrief, statusPrd, statusUx, statusArch, statusEpics];
+      let approvedCount = statusesList.filter(s => s === 'Approved').length;
+      let inReviewCount = statusesList.filter(s => s === 'In Review').length;
+      let rejectedCount = statusesList.filter(s => s === 'Rejected').length;
+      let toDoCount = statusesList.filter(s => s !== 'Approved' && s !== 'In Review' && s !== 'Rejected').length;
+
+      if (isPhase4Locked) {
+        toDoCount++;
+      } else if (totalStories > 0 && completedStories === totalStories) {
+        approvedCount++;
+      } else if (totalStories > 0) {
+        toDoCount += (totalStories - completedStories);
+      }
+
+      container.innerHTML = `
+        <!-- Top Dashboard Header Card -->
+        <div class="dashboard-header-card">
+          <div class="dashboard-header-top">
+            <div class="dashboard-title-group">
+              <h2><span>📊</span> Dashboard</h2>
+              <p>Real-time lifecycle telemetry, sequential gate status, and implementation tracking.</p>
+            </div>
+          </div>
+
+          <!-- 100% Progress Bar -->
+          <div class="dashboard-progress-section">
+            <div class="progress-bar-header">
+              <span>Overall Progress</span>
+              <span style="color: var(--accent-blue); font-size: 1.15rem; font-weight: 800;">${totalProgress}%</span>
+            </div>
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" style="width: ${totalProgress}%;"></div>
+            </div>
+            <div class="progress-bar-subtext">
+              <span>Project Completion Progress</span>
+              <span>${totalProgress === 100 ? '🎉 All Deliverables Complete' : `${100 - totalProgress}% Remaining`}</span>
+            </div>
+          </div>
+
+          <!-- Quick Summary Stats Grid -->
+          <div class="dashboard-stats-grid">
+            <div class="stat-card">
+              <span class="stat-card-label">Approved</span>
+              <span class="stat-card-value" style="color: #047857;">🟢 ${approvedCount}</span>
+              <span class="stat-card-sub">Manager signed-off</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-card-label">In Review</span>
+              <span class="stat-card-value" style="color: #b45309;">🟡 ${inReviewCount}</span>
+              <span class="stat-card-sub">Awaiting sign-off</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-card-label">To Do</span>
+              <span class="stat-card-value" style="color: #475569;">⚪ ${toDoCount}</span>
+              <span class="stat-card-sub">Tasks to be done</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-card-label">Rejected</span>
+              <span class="stat-card-value" style="color: #be123c;">🔴 ${rejectedCount}</span>
+              <span class="stat-card-sub">Needs revision</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sequential Phases Container -->
+        <div class="dashboard-phases-container">
+          
+          <!-- Phase 1: Analysis -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">🔍</div>
+                <div class="phase-title-text">
+                  <h3>Phase 1: Analysis & Discovery</h3>
+                  <span>Product brief, stakeholder goals, and initial problem discovery</span>
+                </div>
+              </div>
+            </div>
+            <div class="phase-card-body">
+              <div class="dashboard-artifact-row">
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">📄</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">brief.md</span>
+                    <span class="artifact-meta">Product Brief • <code>1-analysis/acl-product-brief/brief.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusBrief)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 2: Planning & UX Design -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">📋</div>
+                <div class="phase-title-text">
+                  <h3>Phase 2: Planning & UX Design</h3>
+                  <span>Functional requirements, user journeys, and visual design specifications</span>
+                </div>
+              </div>
+            </div>
+            <div class="phase-card-body">
+              <!-- PRD -->
+              <div class="dashboard-artifact-row">
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">📄</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">prd.md</span>
+                    <span class="artifact-meta">Product Requirements Document • <code>2-plan-workflows/acl-prd/prd.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusPrd)}
+              </div>
+
+              <!-- UX Design -->
+              <div class="dashboard-artifact-row">
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">🎨</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">DESIGN.md & EXPERIENCE.md</span>
+                    <span class="artifact-meta">UX Design Tokens & Interactions • <code>2-plan-workflows/acl-ux/DESIGN.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusUx)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 3: Solutioning -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">🏛️</div>
+                <div class="phase-title-text">
+                  <h3>Phase 3: Solutioning & Backlog Scoping</h3>
+                  <span>System architecture contracts, technical spines, and epics breakdown</span>
+                </div>
+              </div>
+            </div>
+            <div class="phase-card-body">
+              <!-- Architecture -->
+              <div class="dashboard-artifact-row">
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">🏛️</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">ARCHITECTURE-SPINE.md</span>
+                    <span class="artifact-meta">System Architecture Spine • <code>3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusArch)}
+              </div>
+
+              <!-- Epics & Stories Breakdown -->
+              <div class="dashboard-artifact-row">
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">📋</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">epics.md</span>
+                    <span class="artifact-meta">Epics & Stories Breakdown • <code>3-solutioning/acl-create-epics-and-stories/epics.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusEpics)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 4: Implementation (Dynamic Backlog) -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">💻</div>
+                <div class="phase-title-text">
+                  <h3>Phase 4: Implementation</h3>
+                  <span>Autonomous development, story execution, tests, and verification</span>
+                </div>
+              </div>
+            </div>
+            <div class="phase-card-body">
+              ${
+                isPhase4Locked
+                  ? `
+                  <div class="phase4-callout-card">
+                    <span class="phase4-callout-icon">⏳</span>
+                    <div class="phase4-callout-content">
+                      <h4>Epics and stories need to be created to implement</h4>
+                      <p>
+                        Implementation is currently in To Do because Phase 3B (<code>epics.md</code>) has not yet been approved.
+                        Once your manager approves the Epics & Stories breakdown in Markdown Studio, all individual epics and
+                        stories will automatically populate here with real-time status and completion tracking.
+                      </p>
+                    </div>
+                  </div>
+                  `
+                  : parsedEpics.length > 0
+                  ? `
+                  <div style="margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; color: #475569;">
+                    <span>Implementation Progress: <strong>${completedStories} / ${totalStories} Stories Completed</strong></span>
+                  </div>
+                  <div class="epics-tree-container">
+                    ${parsedEpics.map((epic, idx) => `
+                      <div class="epic-group">
+                        <div class="epic-header">
+                          <span>📦 Epic ${idx + 1}: ${epic.title}</span>
+                          <span style="font-size: 0.74rem; color: #64748b;">${epic.stories.filter(s => s.isCompleted).length} / ${epic.stories.length} Done</span>
+                        </div>
+                        <div class="stories-list">
+                          ${epic.stories.map(story => `
+                            <div class="story-item">
+                              <div class="story-item-left">
+                                <span>${story.isCompleted ? '✅' : '🔹'}</span>
+                                <span style="font-weight: 600; color: #1e293b;">${story.title}</span>
+                              </div>
+                              ${renderStatusBadge(story.status)}
+                            </div>
+                          `).join('')}
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                  `
+                  : `
+                  <div class="phase4-callout-card" style="background: #f0fdf4; border-color: #bbf7d0;">
+                    <span class="phase4-callout-icon" style="color: #16a34a;">✔</span>
+                    <div class="phase4-callout-content">
+                      <h4 style="color: #15803d;">Phase 3B Approved — Ready for Story Dispatch</h4>
+                      <p style="color: #166534;">
+                        <code>epics.md</code> is Approved! As implementation stories are executed and checked off, they will appear here dynamically.
+                      </p>
+                    </div>
+                  </div>
+                  `
+              }
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1rem;">
+          To edit documents or record official manager sign-offs, switch to <strong>Markdown Studio</strong> from the ☰ menu.
+        </div>
+      `;
+    }
+
     window.addEventListener("DOMContentLoaded", init);
   </script>
-
-  <!-- Branching Suggestion Modal -->
-  <div class="modal-backdrop" id="branchModal" onclick="closeBranchModal(event)">
-    <div class="modal-card branch-card" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <div class="modal-title-area">
-          <span class="modal-badge-green">🟢 Gate Unlocked</span>
-          <h2 id="branchModalTitle">Choose Next Solutioning Path</h2>
-        </div>
-        <button class="modal-close-btn" onclick="closeBranchModal()">✕</button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-subtitle" id="branchModalSubtitle">
-          Your upstream deliverable is Approved. Select which specialized path to generate next:
-        </p>
-
-        <div class="branch-options-grid" id="branchOptionsContainer">
-          <!-- Option 1: Architecture Spine -->
-          <div class="branch-option-card" onclick="executeStepGeneration('architecture')">
-            <div class="branch-card-header">
-              <span class="branch-icon">🏛️</span>
-              <div>
-                <h3>Architecture Spine</h3>
-                <span class="agent-tag">Winston Architect</span>
-              </div>
-            </div>
-            <p class="branch-desc">
-              Define component boundaries, data models, API contracts, tech stack decisions, and integration points.
-            </p>
-            <ul class="branch-points">
-              <li>✔ Technical foundation & API schema contracts</li>
-              <li>✔ State store & database structures</li>
-              <li>✔ System component boundaries</li>
-            </ul>
-            <button class="btn-branch-action" onclick="event.stopPropagation(); executeStepGeneration('architecture')">
-              Proceed with Architecture ➔
-            </button>
-          </div>
-
-          <!-- Option 2: UX Design System -->
-          <div class="branch-option-card" onclick="executeStepGeneration('ux')">
-            <div class="branch-card-header">
-              <span class="branch-icon">🎨</span>
-              <div>
-                <h3>UX & Design System</h3>
-                <span class="agent-tag">Sally UX Designer</span>
-              </div>
-            </div>
-            <p class="branch-desc">
-              Define user flows, interactive component states, design tokens, layout hierarchy, and Figma specs.
-            </p>
-            <ul class="branch-points">
-              <li>✔ User journeys & interaction patterns</li>
-              <li>✔ UI design tokens (typography, colors)</li>
-              <li>✔ Component state specifications</li>
-            </ul>
-            <button class="btn-branch-action btn-branch-ux" onclick="event.stopPropagation(); executeStepGeneration('ux')">
-              Proceed with UX Design ➔
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ACL Help & Workflow Guide Modal -->
-  <div class="modal-backdrop" id="aclHelpModal" onclick="closeAclHelpModal(event)">
-    <div class="modal-card help-card" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <div class="modal-title-area">
-          <span class="modal-badge-indigo">💡 VelocityONE Delivery Engine</span>
-          <h2>ACL-ADLC Workflow Guide & Assistant</h2>
-        </div>
-        <button class="modal-close-btn" onclick="closeAclHelpModal()">✕</button>
-      </div>
-
-      <!-- Navigation Tabs -->
-      <div class="help-tabs">
-        <button class="help-tab active" onclick="switchHelpTab('status', this)">🚦 Gate Status & Checklist</button>
-        <button class="help-tab" onclick="switchHelpTab('roadmap', this)">🧭 Delivery Roadmap</button>
-        <button class="help-tab" onclick="switchHelpTab('roles', this)">👥 Agent Roles & Invariants</button>
-        <button class="help-tab" onclick="switchHelpTab('faq', this)">❓ FAQs & Troubleshooting</button>
-      </div>
-
-      <div class="modal-body help-body">
-        <!-- Tab 1: Gate Status & Artifacts Checklist -->
-        <div class="help-tab-pane active" id="tab-status">
-          <div class="help-section-card">
-            <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">📍 Current Project Gate Status (<span id="helpProjectMode">Greenfield</span>)</h3>
-            <p style="margin-bottom: 12px; font-size: 0.84rem; color: var(--text-secondary);">
-              The table below dynamically monitors all pipeline artifacts on disk in <code>_acl-output/</code> and checks manager approvals.
-            </p>
-            <div class="gate-checklist" id="gateChecklistList">
-              <!-- Rendered dynamically -->
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab 2: Delivery Roadmap -->
-        <div class="help-tab-pane" id="tab-roadmap">
-          <div class="roadmap-grid">
-            <div class="roadmap-col">
-              <h4>🌱 Greenfield Workflow (From Scratch)</h4>
-              <ol class="roadmap-steps">
-                <li><strong>Phase 1: Analysis</strong> ➔ <code>brief.md</code> (Product Brief via Figma / Specs)</li>
-                <li><strong>Phase 2: Planning</strong> ➔ <code>prd.md</code> (PRD & Acceptance Criteria)</li>
-                <li><strong>Phase 3A: Solutioning</strong> ➔ <code>ARCHITECTURE-SPINE.md</code> (Architecture Spine)</li>
-                <li><strong>Phase 3B: Solutioning</strong> ➔ <code>ux.md</code> (UX Design System & Flows)</li>
-                <li><strong>Phase 3C: Solutioning</strong> ➔ <code>epics.md</code> (Epics & Stories Breakdown)</li>
-                <li><strong>Phase 4: Implementation</strong> ➔ Code Generation & Verification</li>
-              </ol>
-            </div>
-            <div class="roadmap-col">
-              <h4>🍂 Brownfield Workflow (Existing Codebase)</h4>
-              <ol class="roadmap-steps">
-                <li><strong>Phase 0: Discovery</strong> ➔ <code>project-context.md</code> (Codebase Conventions)</li>
-                <li><strong>Phase 1: Analysis</strong> ➔ <code>brief.md</code> (Feature Scope & Requirements)</li>
-                <li><strong>Phase 2: Planning</strong> ➔ <code>prd.md</code> (Feature Delta PRD)</li>
-                <li><strong>Phase 3: Solutioning</strong> ➔ Integration Architecture Spine & UX Deltas</li>
-                <li><strong>Phase 4: Implementation</strong> ➔ <code>quick-dev.md</code> (Targeted Patches)</li>
-              </ol>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab 3: Agent Roles & Invariants -->
-        <div class="help-tab-pane" id="tab-roles">
-          <div class="roles-grid">
-            <div class="role-card">
-              <div class="role-card-title">🔍 Mary Analyst</div>
-              <p>Specializes in elicitation, market research, Product Briefs, and PRFAQ formulation.</p>
-            </div>
-            <div class="role-card">
-              <div class="role-card-title">📋 John PM</div>
-              <p>Translates product briefs into rigorous PRDs, user stories, and acceptance test criteria.</p>
-            </div>
-            <div class="role-card">
-              <div class="role-card-title">🏛️ Winston Architect</div>
-              <p>Constructs architecture spines, data schemas, API contracts, and technology stack standards.</p>
-            </div>
-            <div class="role-card">
-              <div class="role-card-title">🎨 Sally UX Designer</div>
-              <p>Translates design specifications into design tokens, interaction flows, and responsive UI wireframes.</p>
-            </div>
-            <div class="role-card">
-              <div class="role-card-title">💻 Amelia Developer</div>
-              <p>Executes precision code implementation with full unit, integration, and regression testing.</p>
-            </div>
-          </div>
-          <div class="invariant-banner">
-            <strong>🚦 Non-Negotiable Sequential Gate Invariant:</strong>
-            Downstream deliverables CANNOT be generated until ALL upstream prerequisite documents are marked as <code>status: Approved</code> by the Manager.
-          </div>
-        </div>
-
-        <!-- Tab 4: FAQs -->
-        <div class="help-tab-pane" id="tab-faq">
-          <div class="faq-list">
-            <div class="faq-item">
-              <h4>Q: Why is the 'Proceed to Next Step' button disabled?</h4>
-              <p>The button is locked whenever the current active file has <code>status: In Review</code> or <code>status: Rejected</code>. Once the manager changes the status to <code>Approved</code> and saves/updates, the button immediately unlocks.</p>
-            </div>
-            <div class="faq-item">
-              <h4>Q: How does VS Code synchronization work?</h4>
-              <p>When you click 'Proceed to Next Step' or edit in Markdown Studio, changes are written directly to disk on your computer. VS Code instantly detects disk modifications and updates your editor in real time.</p>
-            </div>
-            <div class="faq-item">
-              <h4>Q: How do I choose between Architecture and UX?</h4>
-              <p>When your PRD is approved, clicking Proceed opens the suggestion modal. If your next priority is API schemas and database contracts, choose Architecture Spine. If your focus is screen layouts and design tokens, choose UX Design System.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Workflow Presentation Modal -->
   <div class="workflow-modal-backdrop" id="workflowModal" onclick="closeWorkflowModal(event)">

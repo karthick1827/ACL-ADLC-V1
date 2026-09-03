@@ -22,6 +22,7 @@ function getDiskMarkdownFiles() {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       if (
+        entry.name.startsWith('.') ||
         entry.name === 'node_modules' ||
         entry.name === '.git' ||
         entry.name === 'dist' ||
@@ -40,7 +41,20 @@ function getDiskMarkdownFiles() {
         entry.isFile() &&
         entry.name.endsWith('.md') &&
         !entry.name.startsWith('.') &&
-        !['addendum.md', 'sources.md', 'review-triage.md', 'patch-plan.md', 'research.md'].includes(entry.name.toLowerCase())
+        ![
+          'skill.md',
+          'agents.md',
+          'readme.md',
+          'changelog.md',
+          'claude.md',
+          'contributing.md',
+          'security.md',
+          'addendum.md',
+          'sources.md',
+          'review-triage.md',
+          'patch-plan.md',
+          'research.md',
+        ].includes(entry.name.toLowerCase())
       ) {
         if (seenPaths.has(full)) continue;
         seenPaths.add(full);
@@ -71,17 +85,8 @@ function getDiskMarkdownFiles() {
     }
   }
 
+  // Scan exclusively _acl-output/
   scan(ACL_OUTPUT_DIR, '');
-
-  // Also scan root phase folders if they exist
-  const rootPhaseDirs = ['0-context', '1-analysis', '2-plan-workflows', '3-solutioning', '4-implementation', 'planning-artifacts'];
-  for (const phase of rootPhaseDirs) {
-    const rootPhasePath = path.join(PROJECT_ROOT, phase);
-    if (fs.existsSync(rootPhasePath)) {
-      scan(rootPhasePath, phase);
-    }
-  }
-
   return list;
 }
 
