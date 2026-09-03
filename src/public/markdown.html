@@ -1632,7 +1632,7 @@
     </nav>
     <div class="nav-drawer-footer">
       <span>ACL-ADLC Delivery System</span>
-      <span style="font-weight: 700;">v6.11.7</span>
+      <span id="drawerVersionLabel" style="font-weight: 700;">v6.11.7</span>
     </div>
   </aside>
 
@@ -1803,11 +1803,49 @@
       });
     }
 
-async function syncFromLiveDisk(quiet = false) {
+    async function updateDrawerFrameworkVersion(version) {
+      const label = document.getElementById('drawerVersionLabel');
+      if (!label) return;
+      if (version && typeof version === 'string') {
+        const clean = version.trim().replace(/^[^0-9]*/, '');
+        if (clean) {
+          label.textContent = `v${clean}`;
+          return;
+        }
+      }
+      try {
+        const candidates = ['/package.json', '/node_modules/acl-adlc/package.json'];
+        for (const candidate of candidates) {
+          try {
+            const res = await fetch(candidate);
+            if (res.ok) {
+              const pkg = await res.json();
+              if (pkg && pkg.name === 'acl-adlc' && pkg.version) {
+                label.textContent = `v${pkg.version}`;
+                return;
+              }
+              const depVer = pkg?.dependencies?.['acl-adlc'] || pkg?.devDependencies?.['acl-adlc'];
+              if (depVer) {
+                const clean = String(depVer).replace(/^[^0-9]*/, '');
+                if (clean) {
+                  label.textContent = `v${clean}`;
+                  return;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      } catch (err) {}
+    }
+
+    async function syncFromLiveDisk(quiet = false) {
       try {
         const res = await fetch("/api/list-markdown-files");
         if (res.ok) {
           const data = await res.json();
+          if (data && (data.frameworkVersion || data.version)) {
+            updateDrawerFrameworkVersion(data.frameworkVersion || data.version);
+          }
           if (data && Array.isArray(data.files)) {
             const ignoredNames = new Set([
               'skill.md',
@@ -1916,6 +1954,7 @@ async function syncFromLiveDisk(quiet = false) {
     }
 
     async function init() {
+      updateDrawerFrameworkVersion();
       updateWorkflowModeUI();
       const synced = await syncFromLiveDisk(true);
 
