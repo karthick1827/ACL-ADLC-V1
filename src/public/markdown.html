@@ -2592,7 +2592,7 @@
     // ==========================================
     // Delivery Dashboard Engine (View-Only, 80/20 Weights)
     // ==========================================
-    function parseEpicsAndStoriesFromMarkdown(markdownText) {
+    function parseEpicsAndStoriesFromMarkdown(markdownText, allFiles = []) {
       if (!markdownText) return [];
       const lines = markdownText.split(/\r?\n/);
       const epics = [];
@@ -2601,11 +2601,15 @@
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
-        // Match Epic header: ## Epic 1: ... or ## EPIC-1 ... or ## Epic ...
-        const epicMatch = line.match(/^##\s+(?:Epic\s*[\d\.]*[:\-]?|EPIC-?[\d\.]*[:\-]?)\s*(.+)$/i);
+        // Match Epic header: ## Epic 1: ... or ## EPIC-1 ...
+        // Must require a number to prevent matching "## Epic List", "## Epics Overview", etc.
+        const epicMatch = line.match(/^##\s+(?:Epic\s*(\d+)[:\-\s]*|EPIC-(\d+)[:\-\s]*)(.+)$/i);
         if (epicMatch) {
+          const epicNum = epicMatch[1] || epicMatch[2];
+          const rawTitle = epicMatch[3].trim().replace(/^[:\-]\s*/, '');
           currentEpic = {
-            title: epicMatch[1].trim(),
+            num: epicNum,
+            title: rawTitle,
             stories: []
           };
           epics.push(currentEpic);
@@ -2614,21 +2618,57 @@
 
         // Match Story header or checkbox item inside epic
         if (currentEpic) {
-          const storyMatch = line.match(/^###\s+(?:Story\s*[\d\.]*[:\-]?|STORY-?[\d\.]*[:\-]?)\s*(.+)$/i);
-          const checkboxMatch = line.match(/^-\s*\[([ xX])\]\s*(?:Story\s*[\d\.]*[:\-]?\s*)?(.+)$/i);
+          const storyHeaderMatch = line.match(/^###\s+(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(.+)$/i);
+          const checkboxMatch = line.match(/^-\s*\[([ xX])\]\s*(?:Story\s*([\d\.]+)[:\-\s]*)?(.+)$/i);
 
-          if (storyMatch) {
-            currentEpic.stories.push({
-              title: storyMatch[1].trim(),
-              status: 'To Do',
-              isCompleted: false
-            });
+          let sNum = null;
+          let sTitle = null;
+          let isCheckboxDone = false;
+
+          if (storyHeaderMatch) {
+            sNum = storyHeaderMatch[1] || storyHeaderMatch[2];
+            sTitle = storyHeaderMatch[3].trim().replace(/^[:\-]\s*/, '');
           } else if (checkboxMatch) {
-            const isDone = checkboxMatch[1].toLowerCase() === 'x';
+            isCheckboxDone = checkboxMatch[1].toLowerCase() === 'x';
+            sNum = checkboxMatch[2];
+            sTitle = checkboxMatch[3].trim().replace(/^[:\-]\s*/, '');
+          }
+
+          if (sTitle) {
+            let status = isCheckboxDone ? 'Approved' : 'To Do';
+            let isCompleted = isCheckboxDone;
+
+            // Cross-reference with live files in _acl-output
+            if (sNum && Array.isArray(allFiles) && allFiles.length > 0) {
+              const numSlug = sNum.replace(/\./g, '-');
+              const matchFile = allFiles.find(f => {
+                const fn = (f.filename || '').toLowerCase();
+                return fn.includes(`spec-${numSlug}`) ||
+                       fn.includes(`story-${numSlug}`) ||
+                       fn.includes(`-${numSlug}-`) ||
+                       fn.startsWith(`${numSlug}-`);
+              });
+
+              if (matchFile) {
+                const raw = (matchFile.status || '').trim().toLowerCase();
+                if (raw.includes('accept') || raw.includes('approved') || raw.includes('final')) {
+                  status = 'Approved';
+                  isCompleted = true;
+                } else if (raw.includes('reject')) {
+                  status = 'Rejected';
+                  isCompleted = false;
+                } else {
+                  status = 'In Review';
+                  isCompleted = false;
+                }
+              }
+            }
+
             currentEpic.stories.push({
-              title: checkboxMatch[2].trim(),
-              status: isDone ? 'Approved' : 'To Do',
-              isCompleted: isDone
+              num: sNum,
+              title: sTitle,
+              status: status,
+              isCompleted: isCompleted
             });
           }
         }
@@ -2639,11 +2679,12 @@
         const fallbackStories = [];
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i].trim();
-          const storyMatch = line.match(/^(?:###\s+Story\s*[\d\.]*[:\-]?|###\s+|-\s*\[([ xX])\]\s*Story)\s*(.+)$/i);
+          const storyMatch = line.match(/^(?:###\s+Story\s*([\d\.]*)[:\-]?|###\s+|-\s*\[([ xX])\]\s*Story)\s*(.+)$/i);
           if (storyMatch) {
-            const isDone = storyMatch[1] && storyMatch[1].toLowerCase() === 'x';
+            const isDone = storyMatch[2] && storyMatch[2].toLowerCase() === 'x';
             fallbackStories.push({
-              title: storyMatch[2].trim(),
+              num: storyMatch[1] || null,
+              title: storyMatch[3].trim(),
               status: isDone ? 'Approved' : 'To Do',
               isCompleted: isDone
             });
@@ -2651,6 +2692,7 @@
         }
         if (fallbackStories.length > 0) {
           epics.push({
+            num: '1',
             title: 'Implementation Backlog',
             stories: fallbackStories
           });
@@ -2720,7 +2762,7 @@
       let isPhase4Locked = !epicsApproved;
 
       if (epicsApproved && docEpics && docEpics.content) {
-        parsedEpics = parseEpicsAndStoriesFromMarkdown(docEpics.content);
+        parsedEpics = parseEpicsAndStoriesFromMarkdown(docEpics.content, files);
         parsedEpics.forEach(ep => {
           ep.stories.forEach(st => {
             totalStories++;
@@ -2757,10 +2799,15 @@
 
       if (isPhase4Locked) {
         toDoCount++;
-      } else if (totalStories > 0 && completedStories === totalStories) {
-        approvedCount++;
-      } else if (totalStories > 0) {
-        toDoCount += (totalStories - completedStories);
+      } else if (parsedEpics.length > 0) {
+        parsedEpics.forEach(ep => {
+          ep.stories.forEach(st => {
+            if (st.status === 'Approved') approvedCount++;
+            else if (st.status === 'In Review') inReviewCount++;
+            else if (st.status === 'Rejected') rejectedCount++;
+            else toDoCount++;
+          });
+        });
       }
 
       container.innerHTML = `
@@ -2953,15 +3000,15 @@
                     ${parsedEpics.map((epic, idx) => `
                       <div class="epic-group">
                         <div class="epic-header">
-                          <span>📦 Epic ${idx + 1}: ${epic.title}</span>
+                          <span>📦 Epic ${epic.num || idx + 1}: ${epic.title}</span>
                           <span style="font-size: 0.74rem; color: #64748b;">${epic.stories.filter(s => s.isCompleted).length} / ${epic.stories.length} Done</span>
                         </div>
                         <div class="stories-list">
                           ${epic.stories.map(story => `
                             <div class="story-item">
                               <div class="story-item-left">
-                                <span>${story.isCompleted ? '✅' : '🔹'}</span>
-                                <span style="font-weight: 600; color: #1e293b;">${story.title}</span>
+                                <span>${story.isCompleted ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' ? '🔴' : '🔹'}</span>
+                                <span style="font-weight: 600; color: #1e293b;">${story.num ? `Story ${story.num}: ` : ''}${story.title}</span>
                               </div>
                               ${renderStatusBadge(story.status)}
                             </div>
