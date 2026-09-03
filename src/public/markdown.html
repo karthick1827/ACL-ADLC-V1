@@ -1251,6 +1251,10 @@
       padding: 1.75rem 2rem 3rem 2rem;
       display: none;
     }
+    body.view-dashboard #btnSave,
+    body.view-dashboard #syncStatus {
+      display: none !important;
+    }
     .dashboard-container {
       max-width: 1200px;
       margin: 0 auto;
@@ -2556,10 +2560,13 @@
       const dashboardView = document.getElementById('dashboardView');
       const headerTitle = document.getElementById('appHeaderTitle');
       const navStudio = document.getElementById('navItemStudio');
+      const navDash = document.getElementById('navItemDashboard');
       const btnSave = document.getElementById('btnSave');
       const syncStatus = document.getElementById('syncStatus');
 
       if (view === 'dashboard') {
+        document.body.classList.add('view-dashboard');
+        document.body.classList.remove('view-studio');
         if (studioView) studioView.style.display = 'none';
         if (dashboardView) dashboardView.style.display = 'block';
         if (headerTitle) headerTitle.textContent = 'Dashboard';
@@ -2569,6 +2576,8 @@
         if (syncStatus) syncStatus.style.display = 'none';
         renderDeliveryDashboard();
       } else {
+        document.body.classList.remove('view-dashboard');
+        document.body.classList.add('view-studio');
         if (dashboardView) dashboardView.style.display = 'none';
         if (studioView) studioView.style.display = 'flex';
         if (headerTitle) headerTitle.textContent = 'Markdown Studio';
