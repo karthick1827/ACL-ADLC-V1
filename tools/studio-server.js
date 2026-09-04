@@ -1261,11 +1261,13 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === '/api/list-markdown-files') {
     const files = getDiskMarkdownFiles();
-    let frameworkVersion = '6.11.11';
+    let frameworkVersion = '6.11.12';
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
       if (pkg && pkg.version) frameworkVersion = pkg.version;
-    } catch (e) {}
+    } catch {
+      // Use fallback version
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, files: files, frameworkVersion: frameworkVersion, version: frameworkVersion }));
     return;
