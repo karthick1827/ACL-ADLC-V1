@@ -21,6 +21,7 @@ function getDiskMarkdownFiles() {
     if (!fs.existsSync(dir)) return;
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
+      const lower = entry.name.toLowerCase();
       if (
         entry.name.startsWith('.') ||
         entry.name === 'node_modules' ||
@@ -30,7 +31,9 @@ function getDiskMarkdownFiles() {
         entry.name === 'markdown.html' ||
         entry.name === 'src' ||
         entry.name === 'tools' ||
-        entry.name === 'docs'
+        entry.name === 'docs' ||
+        entry.name === 'tests' ||
+        lower.includes('memlog')
       )
         continue;
       const full = path.join(dir, entry.name);
@@ -41,6 +44,8 @@ function getDiskMarkdownFiles() {
         entry.isFile() &&
         entry.name.endsWith('.md') &&
         !entry.name.startsWith('.') &&
+        !lower.includes('memlog') &&
+        !lower.startsWith('readiness-report') &&
         ![
           'skill.md',
           'agents.md',
@@ -54,7 +59,9 @@ function getDiskMarkdownFiles() {
           'review-triage.md',
           'patch-plan.md',
           'research.md',
-        ].includes(entry.name.toLowerCase())
+          'test-summary.md',
+          'sprint-status.md',
+        ].includes(lower)
       ) {
         if (seenPaths.has(full)) continue;
         seenPaths.add(full);
@@ -87,6 +94,7 @@ function getDiskMarkdownFiles() {
 
   // Scan exclusively _acl-output/
   scan(ACL_OUTPUT_DIR, '');
+  list.sort((a, b) => a.fullPath.localeCompare(b.fullPath, undefined, { numeric: true, sensitivity: 'base' }));
   return list;
 }
 
@@ -110,17 +118,23 @@ function readUpstreamArtifacts() {
     const lowerPath = file.fullPath.toLowerCase();
     const lowerName = file.filename.toLowerCase();
 
-    if ((lowerPath.includes('brief') || lowerName.includes('brief')) && !artifacts.brief) {
+    if ((lowerName === 'brief.md' || lowerName.includes('brief')) && !artifacts.brief) {
       artifacts.brief = { relPath: file.fullPath, content: file.content };
-    } else if ((lowerPath.includes('prd') || lowerName.includes('prd')) && !artifacts.prd) {
+    } else if ((lowerName === 'prd.md' || lowerName.startsWith('prd')) && !artifacts.prd) {
       artifacts.prd = { relPath: file.fullPath, content: file.content };
-    } else if ((lowerPath.includes('architecture') || lowerName.includes('architecture')) && !artifacts.architecture) {
+    } else if (
+      (lowerName === 'architecture-spine.md' || lowerName === 'architecture.md' || lowerName.includes('architecture')) &&
+      !artifacts.architecture
+    ) {
       artifacts.architecture = { relPath: file.fullPath, content: file.content };
-    } else if ((lowerPath.includes('ux') || lowerName.includes('ux') || lowerPath.includes('design')) && !artifacts.ux) {
+    } else if (
+      (lowerName === 'design.md' || lowerName === 'experience.md' || lowerName.includes('design') || lowerName.includes('ux')) &&
+      !artifacts.ux
+    ) {
       artifacts.ux = { relPath: file.fullPath, content: file.content };
-    } else if ((lowerPath.includes('epic') || lowerName.includes('epic')) && !artifacts.epics) {
+    } else if (lowerName === 'epics.md' && !artifacts.epics) {
       artifacts.epics = { relPath: file.fullPath, content: file.content };
-    } else if ((lowerPath.includes('context') || lowerName.includes('context')) && !artifacts.projectContext) {
+    } else if (lowerName.includes('context') && !artifacts.projectContext) {
       artifacts.projectContext = { relPath: file.fullPath, content: file.content };
     }
   }

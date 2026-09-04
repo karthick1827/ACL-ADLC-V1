@@ -1986,7 +1986,7 @@
           </div>
 
           <div class="filter-grid">
-            <select id="sortSelect" class="select-control" onchange="renderFileTree()" title="Sort Files">
+            <select id="sortSelect" class="select-control" onchange="handleSortChange()" title="Sort Files">
               <option value="alpha-asc">🔤 Name (A → Z)</option>
               <option value="alpha-desc">🔤 Name (Z → A)</option>
               <option value="date-desc">🕒 Date (Newest)</option>
@@ -2119,6 +2119,39 @@
         } catch (err) {}
       }
 
+      function isChildFile(filename, folderPath = '') {
+        if (!filename) return true;
+        const lower = filename.toLowerCase();
+        const lowerFolder = (folderPath || '').toLowerCase();
+        if (lower.startsWith('.')) return true;
+        if (lower.includes('memlog')) return true;
+        if (lower.startsWith('readiness-report')) return true;
+        if (lowerFolder.includes('/tests') || lowerFolder.endsWith('tests') || lowerFolder === 'tests') return true;
+
+        const EXCLUDED_CHILDREN = new Set([
+          'addendum.md',
+          'sources.md',
+          'review-triage.md',
+          'patch-plan.md',
+          'research.md',
+          'test-summary.md',
+          'memlog.md',
+          '.memlog.md',
+          'skill.md',
+          'agents.md',
+          'readme.md',
+          'changelog.md',
+          'claude.md',
+          'security.md',
+          'contributing.md',
+          'sprint-status.yaml',
+          'sprint-status.yml',
+          'sprint-status.md',
+        ]);
+
+        return EXCLUDED_CHILDREN.has(lower);
+      }
+
       async function syncFromLiveDisk(quiet = false) {
         try {
           const res = await fetch('/api/list-markdown-files');
@@ -2128,21 +2161,7 @@
               updateDrawerFrameworkVersion(data.frameworkVersion || data.version);
             }
             if (data && Array.isArray(data.files)) {
-              const ignoredNames = new Set([
-                'skill.md',
-                'agents.md',
-                'readme.md',
-                'changelog.md',
-                'claude.md',
-                'security.md',
-                'contributing.md',
-                'addendum.md',
-                'sources.md',
-                'review-triage.md',
-                'patch-plan.md',
-                'research.md',
-              ]);
-              const filteredFiles = data.files.filter((f) => !ignoredNames.has((f.filename || '').toLowerCase()));
+              const filteredFiles = data.files.filter((f) => !isChildFile(f.filename, f.folderPath));
 
               if (filteredFiles.length === 0) {
                 files = [];
@@ -2180,16 +2199,12 @@
                 try {
                   localStorage.setItem('acl_adlc_project_markdown_files', JSON.stringify(files));
                 } catch (e) {}
+                if (!activeFileId || !files.some((f) => f.id === activeFileId && !isChildFile(f.filename, f.folderPath))) {
+                  activeFileId = getInitialActiveFileId(files);
+                }
                 renderFileTree();
-                if (activeFileId && files.some((f) => f.id === activeFileId)) {
-                  const active = getActiveFile();
-                  if (active) {
-                    document.getElementById('markdownTextarea').value = active.content;
-                    document.getElementById('statusSelect').value = active.status;
-                    renderPreview();
-                  }
-                } else if (files.length > 0) {
-                  loadFile(files[0].id);
+                if (activeFileId) {
+                  loadFile(activeFileId);
                 }
                 if (activeAppView === 'dashboard' || activeAppView === 'dashboard-summarized') {
                   renderDeliveryDashboard();
@@ -2236,27 +2251,40 @@
       }
 
       async function init() {
+        try {
+          const cached = localStorage.getItem('acl_adlc_project_markdown_files');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+              const sanitized = parsed.filter((f) => !isChildFile(f.filename, f.folderPath));
+              localStorage.setItem('acl_adlc_project_markdown_files', JSON.stringify(sanitized));
+            }
+          }
+          const savedActive = localStorage.getItem('acl_active_file_id');
+          if (savedActive && (savedActive.toLowerCase().includes('memlog') || savedActive.startsWith('.'))) {
+            localStorage.removeItem('acl_active_file_id');
+            activeFileId = null;
+          }
+        } catch (e) {}
+
+        try {
+          const savedSort = localStorage.getItem('acl_file_tree_sort');
+          if (savedSort && document.getElementById('sortSelect')) {
+            document.getElementById('sortSelect').value = savedSort;
+          }
+        } catch (e) {}
         updateDrawerFrameworkVersion();
         updateWorkflowModeUI();
         const synced = await syncFromLiveDisk(true);
 
         if (!synced && files.length === 0) {
-          const ignoredNames = new Set([
-            'skill.md',
-            'agents.md',
-            'readme.md',
-            'changelog.md',
-            'claude.md',
-            'security.md',
-            'contributing.md',
-          ]);
           try {
             const cached = localStorage.getItem('acl_adlc_project_markdown_files');
             if (cached) {
               const parsed = JSON.parse(cached);
               if (Array.isArray(parsed) && parsed.length > 0) {
                 files = parsed
-                  .filter((f) => !ignoredNames.has((f.filename || '').toLowerCase()))
+                  .filter((f) => !isChildFile(f.filename, f.folderPath))
                   .map((f) => ({
                     ...f,
                     status: f.status === 'Accepted' || f.status === 'approved' ? 'Approved' : f.status || 'In Review',
@@ -2266,9 +2294,13 @@
           } catch (e) {}
 
           if (files.length > 0) {
-            activeFileId = files[0].id;
+            if (!activeFileId || !files.some((f) => f.id === activeFileId && !isChildFile(f.filename, f.folderPath))) {
+              activeFileId = getInitialActiveFileId(files);
+            }
             renderFileTree();
-            loadFile(activeFileId);
+            if (activeFileId) {
+              loadFile(activeFileId);
+            }
           } else {
             renderFileTree();
             loadEmptyState();
@@ -2391,23 +2423,78 @@
         file.content = updatedContent;
 
         await saveCurrentFile();
+
+        // Update status pill on active file in sidebar
+        const root = document.getElementById('fileTreeRoot');
+        if (root) {
+          const activeItem = root.querySelector(`.file-item[data-file-id="${file.id}"]`);
+          if (activeItem) {
+            const pill = activeItem.querySelector('.status-pill');
+            if (pill) {
+              const normStatus = newStatus === 'Accepted' || newStatus === 'approved' ? 'Approved' : newStatus;
+              pill.className = `status-pill ${normStatus.toLowerCase().replace(/\s+/g, '-')}`;
+              pill.innerHTML = `<span class="dot"></span>${normStatus}`;
+            }
+          }
+        }
+      }
+
+      function handleSortChange() {
+        const sel = document.getElementById('sortSelect');
+        if (sel) {
+          try {
+            localStorage.setItem('acl_file_tree_sort', sel.value);
+          } catch (e) {}
+        }
+        activeFileId = getInitialActiveFileId(files);
+        renderFileTree();
+        if (activeFileId) {
+          loadFile(activeFileId);
+        }
+      }
+
+      function sortFilesList(fileList) {
+        const sortSelect = document.getElementById('sortSelect');
+        const sortType = (sortSelect && sortSelect.value) || 'alpha-asc';
+        return [...fileList].sort((a, b) => {
+          if (sortType === 'alpha-asc') {
+            return (a.filename || '').localeCompare(b.filename || '', undefined, { numeric: true, sensitivity: 'base' });
+          }
+          if (sortType === 'alpha-desc') {
+            return (b.filename || '').localeCompare(a.filename || '', undefined, { numeric: true, sensitivity: 'base' });
+          }
+          if (sortType === 'date-desc') {
+            return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+          }
+          if (sortType === 'date-asc') {
+            return new Date(a.updatedAt || a.createdAt) - new Date(b.updatedAt || b.createdAt);
+          }
+          return 0;
+        });
+      }
+
+      function getInitialActiveFileId(fileList) {
+        if (!fileList || fileList.length === 0) return null;
+        const validFiles = (fileList || []).filter((f) => f && !isChildFile(f.filename, f.folderPath));
+        if (validFiles.length === 0) return null;
+
+        const sortedFiles = sortFilesList(validFiles);
+        return sortedFiles[0] ? sortedFiles[0].id : null;
       }
 
       function renderFileTree() {
         const root = document.getElementById('fileTreeRoot');
         const searchQuery = (document.getElementById('searchInput').value || '').toLowerCase();
-        const sortType = document.getElementById('sortSelect').value;
         const filterStatus = document.getElementById('filterStatusSelect').value;
 
         root.innerHTML = '';
 
-        const EXCLUDED_CHILDREN = new Set(['addendum.md', 'sources.md', 'review-triage.md', 'patch-plan.md', 'research.md']);
-
         let filtered = files.filter((file) => {
-          if (!file.filename || file.filename.startsWith('.') || EXCLUDED_CHILDREN.has(file.filename.toLowerCase())) {
+          if (isChildFile(file.filename, file.folderPath)) {
             return false;
           }
-          const matchesSearch = file.filename.toLowerCase().includes(searchQuery) || file.folderPath.toLowerCase().includes(searchQuery);
+          const matchesSearch =
+            file.filename.toLowerCase().includes(searchQuery) || (file.folderPath || '').toLowerCase().includes(searchQuery);
           const currentNormStatus = file.status === 'Accepted' ? 'Approved' : file.status;
           const matchesStatus = filterStatus === 'all' || currentNormStatus === filterStatus || file.status === filterStatus;
           return matchesSearch && matchesStatus;
@@ -2419,22 +2506,36 @@
           return;
         }
 
-        filtered.sort((a, b) => {
-          if (sortType === 'alpha-asc') return a.filename.localeCompare(b.filename);
-          if (sortType === 'alpha-desc') return b.filename.localeCompare(a.filename);
-          if (sortType === 'date-desc') return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
-          if (sortType === 'date-asc') return new Date(a.updatedAt || a.createdAt) - new Date(b.updatedAt || b.createdAt);
-          return 0;
-        });
+        // Sort FILES directly (filter and sort applies to files, not folders)
+        filtered = sortFilesList(filtered);
 
+        // Group into folders based on sorted files order
         const groups = {};
+        const folderOrder = [];
         filtered.forEach((file) => {
           const pathKey = file.folderPath || 'root';
-          if (!groups[pathKey]) groups[pathKey] = [];
+          if (!groups[pathKey]) {
+            groups[pathKey] = [];
+            folderOrder.push(pathKey);
+          }
           groups[pathKey].push(file);
         });
 
-        Object.keys(groups).forEach((folderPath) => {
+        // The first file in the sorted list is the primary default
+        if (!activeFileId || !filtered.some((f) => f.id === activeFileId)) {
+          activeFileId = filtered[0].id;
+        }
+
+        // The target open folder is the folder that contains the active file
+        let targetOpenFolder = folderOrder.length > 0 ? folderOrder[0] : null;
+        if (activeFileId) {
+          const activeFile = filtered.find((f) => f.id === activeFileId);
+          if (activeFile) {
+            targetOpenFolder = activeFile.folderPath || 'root';
+          }
+        }
+
+        folderOrder.forEach((folderPath) => {
           const folderDiv = document.createElement('div');
           folderDiv.className = 'folder-item';
 
@@ -2454,26 +2555,39 @@
             `Folder: ${folderPath}\nLocation: _acl-output/${folderPath}\nContains: ${fileCountText}\nLast Updated: ${formattedFolderTime}`,
           );
 
+          const isOpen = searchQuery !== '' ? true : folderPath === targetOpenFolder;
+
           headerDiv.innerHTML = `
           <div class="folder-title-left">
-            <span class="folder-chevron">▼</span>
+            <span class="folder-chevron ${isOpen ? '' : 'collapsed'}">▼</span>
             <span>📁 ${folderPath}</span>
           </div>
-          <span class="folder-badge">${groups[folderPath].length}</span>
+          <span class="folder-badge">${folderFiles.length}</span>
         `;
 
           const filesDiv = document.createElement('div');
-          filesDiv.className = 'folder-files-list';
+          filesDiv.className = `folder-files-list ${isOpen ? '' : 'hidden'}`;
 
           headerDiv.addEventListener('click', () => {
-            const isHidden = filesDiv.classList.toggle('hidden');
-            const chevron = headerDiv.querySelector('.folder-chevron');
-            if (isHidden) chevron.classList.add('collapsed');
-            else chevron.classList.remove('collapsed');
+            const isCurrentlyHidden = filesDiv.classList.contains('hidden');
+            // Accordion: collapse all other folders in root
+            root.querySelectorAll('.folder-item').forEach((item) => {
+              const list = item.querySelector('.folder-files-list');
+              const chv = item.querySelector('.folder-chevron');
+              if (list) list.classList.add('hidden');
+              if (chv) chv.classList.add('collapsed');
+            });
+
+            if (isCurrentlyHidden) {
+              filesDiv.classList.remove('hidden');
+              const chv = headerDiv.querySelector('.folder-chevron');
+              if (chv) chv.classList.remove('collapsed');
+            }
           });
 
-          groups[folderPath].forEach((file) => {
+          folderFiles.forEach((file) => {
             const fileDiv = document.createElement('div');
+            fileDiv.dataset.fileId = file.id;
             fileDiv.className = `file-item ${file.id === activeFileId ? 'active' : ''}`;
             fileDiv.onclick = () => loadFile(file.id);
 
@@ -2512,12 +2626,19 @@
       }
 
       function loadFile(id) {
-        activeFileId = id;
-        const file = getActiveFile();
-        if (!file) {
-          loadEmptyState();
-          return;
+        let file = files.find((f) => f.id === id);
+        if (!file || isChildFile(file.filename, file.folderPath)) {
+          const fallbackId = getInitialActiveFileId(files);
+          if (fallbackId && fallbackId !== id) {
+            loadFile(fallbackId);
+            return;
+          }
+          if (!file) {
+            loadEmptyState();
+            return;
+          }
         }
+        activeFileId = file.id;
 
         document.getElementById('breadcrumbPathText').textContent = `${file.folderPath} / ${file.filename}`;
         const statusSelect = document.getElementById('statusSelect');
@@ -2529,13 +2650,42 @@
         textarea.value = file.content;
 
         renderPreview();
-        renderFileTree();
         isDirty = false;
         evaluateProceedButton();
+
+        // Highlight selected file in left sidebar
+        const root = document.getElementById('fileTreeRoot');
+        if (root) {
+          root.querySelectorAll('.file-item').forEach((item) => {
+            if (item.dataset.fileId === id) {
+              item.classList.add('active');
+              const parentList = item.closest('.folder-files-list');
+              if (parentList && parentList.classList.contains('hidden')) {
+                parentList.classList.remove('hidden');
+                const parentHeader = parentList.previousElementSibling;
+                if (parentHeader) {
+                  const chv = parentHeader.querySelector('.folder-chevron');
+                  if (chv) chv.classList.remove('collapsed');
+                }
+              }
+            } else {
+              item.classList.remove('active');
+            }
+          });
+        }
       }
 
       function getActiveFile() {
-        return files.find((f) => f.id === activeFileId);
+        const file = files.find((f) => f.id === activeFileId);
+        if (file && !isChildFile(file.filename, file.folderPath)) {
+          return file;
+        }
+        const fallbackId = getInitialActiveFileId(files);
+        if (fallbackId) {
+          activeFileId = fallbackId;
+          return files.find((f) => f.id === fallbackId) || null;
+        }
+        return null;
       }
 
       function renderPreview() {

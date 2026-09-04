@@ -789,15 +789,33 @@ function aclMarkdownSaverPlugin() {
             const mdFiles = [];
             const scanCandidates = ['_acl-output', '_acl_output', 'acl-output'];
 
+            const EXCLUDED_CHILD_NAMES = new Set([
+              'skill.md', 'agents.md', 'readme.md', 'changelog.md', 'claude.md',
+              'contributing.md', 'security.md', 'addendum.md', 'sources.md',
+              'review-triage.md', 'patch-plan.md', 'research.md', 'test-summary.md',
+              'sprint-status.md', 'memlog.md', '.memlog.md'
+            ]);
+
             function collect(currentDir, relPrefix) {
               if (!fs.existsSync(currentDir)) return;
               const entries = fs.readdirSync(currentDir, { withFileTypes: true });
               for (const entry of entries) {
                 const full = path.join(currentDir, entry.name);
                 const rel = relPrefix ? relPrefix + '/' + entry.name : entry.name;
-                if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git') {
+                const lower = entry.name.toLowerCase();
+                if (entry.isDirectory()) {
+                  if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'tests' || lower.includes('memlog')) {
+                    continue;
+                  }
                   collect(full, rel);
-                } else if (entry.isFile() && entry.name.endsWith('.md')) {
+                } else if (
+                  entry.isFile() &&
+                  entry.name.endsWith('.md') &&
+                  !entry.name.startsWith('.') &&
+                  !lower.includes('memlog') &&
+                  !lower.startsWith('readiness-report') &&
+                  !EXCLUDED_CHILD_NAMES.has(lower)
+                ) {
                   const content = fs.readFileSync(full, 'utf8');
                   const stat = fs.statSync(full);
                   let status = 'In Review';
@@ -914,17 +932,41 @@ function aclMarkdownSaverPlugin() {
 
   async _collectMdRecursive(currentDir, relativePrefix, list) {
     try {
+      const EXCLUDED_CHILD_NAMES = new Set([
+        'skill.md',
+        'agents.md',
+        'readme.md',
+        'changelog.md',
+        'claude.md',
+        'contributing.md',
+        'security.md',
+        'addendum.md',
+        'sources.md',
+        'review-triage.md',
+        'patch-plan.md',
+        'research.md',
+        'test-summary.md',
+        'sprint-status.md',
+        'memlog.md',
+        '.memlog.md',
+      ]);
       const entries = await fs.readdir(currentDir, { withFileTypes: true });
       for (const entry of entries) {
         const fullPath = path.join(currentDir, entry.name);
         const relPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
-        if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git') {
+        const lower = entry.name.toLowerCase();
+        if (entry.isDirectory()) {
+          if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'tests' || lower.includes('memlog')) {
+            continue;
+          }
           await this._collectMdRecursive(fullPath, relPath, list);
         } else if (
           entry.isFile() &&
           entry.name.endsWith('.md') &&
           !entry.name.startsWith('.') &&
-          !['addendum.md', 'sources.md', 'review-triage.md', 'patch-plan.md', 'research.md'].includes(entry.name.toLowerCase())
+          !lower.includes('memlog') &&
+          !lower.startsWith('readiness-report') &&
+          !EXCLUDED_CHILD_NAMES.has(lower)
         ) {
           const content = await fs.readFile(fullPath, 'utf8');
           const stat = await fs.stat(fullPath);

@@ -40,11 +40,37 @@ const GATES = {
   },
 };
 
+function findArtifactFile(baseName) {
+  if (!fs.existsSync(ACL_OUTPUT_DIR)) return null;
+  const targetName = path.basename(baseName).toLowerCase();
+  let found = null;
+  function walk(dir) {
+    if (found || !fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name.toLowerCase().includes('memlog')) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile() && entry.name.toLowerCase() === targetName) {
+        found = full;
+        return;
+      }
+    }
+  }
+  walk(ACL_OUTPUT_DIR);
+  return found;
+}
+
 function getArtifactStatus(relativePath, altPath) {
   let fullPath = path.join(ACL_OUTPUT_DIR, relativePath);
   if (!fs.existsSync(fullPath) && altPath) {
     const altFull = path.join(ACL_OUTPUT_DIR, altPath);
     if (fs.existsSync(altFull)) fullPath = altFull;
+  }
+  if (!fs.existsSync(fullPath)) {
+    const dynamicFind = findArtifactFile(relativePath) || (altPath ? findArtifactFile(altPath) : null);
+    if (dynamicFind) fullPath = dynamicFind;
   }
 
   if (!fs.existsSync(fullPath)) {
