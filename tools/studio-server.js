@@ -4,8 +4,7 @@ const path = require('node:path');
 const { execSync } = require('node:child_process');
 
 const PORT = 3333;
-const SAMPLE_DIR = path.resolve('C:/Users/karthick.natarajan/sample');
-const PROJECT_ROOT = process.env.ACL_PROJECT_ROOT || (fs.existsSync(SAMPLE_DIR) ? SAMPLE_DIR : process.cwd());
+const PROJECT_ROOT = process.env.ACL_PROJECT_ROOT || process.cwd();
 const ACL_OUTPUT_DIR = path.join(PROJECT_ROOT, '_acl-output');
 
 // Recursive scanner for .md files on disk
@@ -990,42 +989,18 @@ function resolveDeliverableFolder(stepKey, options = {}) {
       return { folderPath: '0-context/acl-generate-project-context', filename: 'project-context.md' };
     }
     case 'brief': {
-      const sampleBriefDir = path.join(ACL_OUTPUT_DIR, 'planning-artifacts', 'briefs');
-      if (fs.existsSync(sampleBriefDir)) {
-        const subdirs = fs.readdirSync(sampleBriefDir, { withFileTypes: true }).filter((d) => d.isDirectory());
-        if (subdirs.length > 0) return { folderPath: `planning-artifacts/briefs/${subdirs[0].name}`, filename: 'brief.md' };
-      }
       return { folderPath: '1-analysis/acl-product-brief', filename: 'brief.md' };
     }
     case 'prd': {
-      const samplePrdDir = path.join(ACL_OUTPUT_DIR, 'planning-artifacts', 'prds');
-      if (fs.existsSync(samplePrdDir)) {
-        const subdirs = fs.readdirSync(samplePrdDir, { withFileTypes: true }).filter((d) => d.isDirectory());
-        if (subdirs.length > 0) return { folderPath: `planning-artifacts/prds/${subdirs[0].name}`, filename: 'prd.md' };
-      }
       return { folderPath: '2-plan-workflows/acl-prd', filename: 'prd.md' };
     }
     case 'architecture': {
-      const sampleArchDir = path.join(ACL_OUTPUT_DIR, 'planning-artifacts', 'architecture');
-      if (fs.existsSync(sampleArchDir)) {
-        const subdirs = fs.readdirSync(sampleArchDir, { withFileTypes: true }).filter((d) => d.isDirectory());
-        if (subdirs.length > 0) return { folderPath: `planning-artifacts/architecture/${subdirs[0].name}`, filename: 'architecture.md' };
-      }
-      return { folderPath: '3-solutioning/acl-architecture', filename: 'architecture.md' };
+      return { folderPath: '3-solutioning/acl-architecture', filename: 'ARCHITECTURE-SPINE.md' };
     }
     case 'ux': {
-      const sampleUxDir = path.join(ACL_OUTPUT_DIR, 'planning-artifacts', 'ux');
-      if (fs.existsSync(sampleUxDir)) {
-        const subdirs = fs.readdirSync(sampleUxDir, { withFileTypes: true }).filter((d) => d.isDirectory());
-        if (subdirs.length > 0) return { folderPath: `planning-artifacts/ux/${subdirs[0].name}`, filename: 'ux.md' };
-      }
       return { folderPath: '3-solutioning/acl-ux', filename: 'ux.md' };
     }
     case 'epics_stories': {
-      const sampleEpicsDir = path.join(ACL_OUTPUT_DIR, 'planning-artifacts', 'epics');
-      if (fs.existsSync(sampleEpicsDir)) {
-        return { folderPath: 'planning-artifacts/epics', filename: 'epics.md' };
-      }
       return { folderPath: '3-solutioning/acl-create-epics-and-stories', filename: 'epics.md' };
     }
     case 'story_impl': {
@@ -1368,8 +1343,42 @@ const server = http.createServer((req, res) => {
         if (!fs.existsSync(ACL_OUTPUT_DIR)) {
           fs.mkdirSync(ACL_OUTPUT_DIR, { recursive: true });
         }
-        const baseDir = ACL_OUTPUT_DIR;
-        const targetDir = folderPath && folderPath !== 'root' ? path.join(baseDir, folderPath) : baseDir;
+        let cleanFolder = (folderPath || '').replaceAll('\\', '/').trim();
+        cleanFolder = cleanFolder.replace(/^(_acl-output|_acl_output|acl-output)\/?/i, '');
+
+        // Route standard artifacts to their canonical phase folders if saved from root
+        if (!cleanFolder || cleanFolder === 'root' || cleanFolder === '.') {
+          const lowerName = (filename || '').toLowerCase();
+          switch (lowerName) {
+            case 'project-context.md': {
+              cleanFolder = '0-context/acl-generate-project-context';
+              break;
+            }
+            case 'brief.md': {
+              cleanFolder = '1-analysis/acl-product-brief';
+              break;
+            }
+            case 'prd.md': {
+              cleanFolder = '2-plan-workflows/acl-prd';
+              break;
+            }
+            case 'architecture-spine.md':
+            case 'architecture.md': {
+              cleanFolder = '3-solutioning/acl-architecture';
+              break;
+            }
+            case 'epics.md': {
+              cleanFolder = '3-solutioning/acl-create-epics-and-stories';
+              break;
+            }
+            default: {
+              cleanFolder = '';
+              break;
+            }
+          }
+        }
+
+        const targetDir = cleanFolder ? path.join(baseDir, cleanFolder) : baseDir;
         fs.mkdirSync(targetDir, { recursive: true });
 
         const targetFile = path.join(targetDir, filename);

@@ -842,8 +842,24 @@ function aclMarkdownSaverPlugin() {
               collect(path.join(projectRoot, f), f);
             }
 
+            // Deduplicate files: prefer canonical numbered phase directories over root/duplicate paths
+            const seenFiles = new Map();
+            for (const item of mdFiles) {
+              const key = item.filename.toLowerCase();
+              if (!seenFiles.has(key)) {
+                seenFiles.set(key, item);
+              } else {
+                const existing = seenFiles.get(key);
+                if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && item.folderPath.match(/[0-4]-/))) {
+                  seenFiles.set(key, item);
+                }
+              }
+            }
+            const uniqueFiles = Array.from(seenFiles.values());
+            uniqueFiles.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ files: mdFiles }));
+            res.end(JSON.stringify({ files: uniqueFiles }));
           } catch (err) {
             res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
@@ -864,7 +880,19 @@ function aclMarkdownSaverPlugin() {
               const fs = require('node:fs');
               const path = require('node:path');
               const { exec } = require('node:child_process');
-              const targetDir = path.resolve(process.cwd(), folderPath || '');
+              let cleanFolder = (folderPath || '').replace(/\\/g, '/').trim();
+              if (!cleanFolder.startsWith('_acl-output') && !cleanFolder.startsWith('_acl_output') && !cleanFolder.startsWith('acl-output')) {
+                cleanFolder = cleanFolder && cleanFolder !== 'root' ? path.join('_acl-output', cleanFolder) : '_acl-output';
+              }
+              if (cleanFolder === '_acl-output' || cleanFolder === 'root' || cleanFolder === '.') {
+                const lowerName = (filename || '').toLowerCase();
+                if (lowerName === 'project-context.md') cleanFolder = '_acl-output/0-context/acl-generate-project-context';
+                else if (lowerName === 'brief.md') cleanFolder = '_acl-output/1-analysis/acl-product-brief';
+                else if (lowerName === 'prd.md') cleanFolder = '_acl-output/2-plan-workflows/acl-prd';
+                else if (lowerName === 'architecture-spine.md' || lowerName === 'architecture.md') cleanFolder = '_acl-output/3-solutioning/acl-architecture';
+                else if (lowerName === 'epics.md') cleanFolder = '_acl-output/3-solutioning/acl-create-epics-and-stories';
+              }
+              const targetDir = path.resolve(process.cwd(), cleanFolder);
               if (!fs.existsSync(targetDir)) {
                 fs.mkdirSync(targetDir, { recursive: true });
               }

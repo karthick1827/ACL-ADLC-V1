@@ -2161,7 +2161,22 @@
               updateDrawerFrameworkVersion(data.frameworkVersion || data.version);
             }
             if (data && Array.isArray(data.files)) {
-              const filteredFiles = data.files.filter((f) => !isChildFile(f.filename, f.folderPath));
+              let filteredFiles = data.files.filter((f) => !isChildFile(f.filename, f.folderPath));
+
+              // Deduplicate files: prefer canonical numbered phase directories over root/duplicate paths
+              const seenMap = new Map();
+              for (const f of filteredFiles) {
+                const key = f.filename.toLowerCase();
+                if (!seenMap.has(key)) {
+                  seenMap.set(key, f);
+                } else {
+                  const existing = seenMap.get(key);
+                  if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && f.folderPath.match(/[0-4]-/))) {
+                    seenMap.set(key, f);
+                  }
+                }
+              }
+              filteredFiles = Array.from(seenMap.values());
 
               if (filteredFiles.length === 0) {
                 files = [];
