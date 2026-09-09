@@ -65,7 +65,7 @@ Please choose which Tier you want to proceed with:
       ⏳ Code implementation is strictly LOCKED until Manager approves in Markdown Studio.
 
   [2] Tier 2 — Major Architectural Overhaul
-      🏛️ Full sequential governance (PRD -> Architecture Spine -> Epics).
+      🏛️ Full sequential governance (Product Brief -> PRD -> Architecture Spine -> Epics).
 
 👉 Reply with 1 or 2 to proceed:
 ========================================================================
@@ -118,9 +118,23 @@ Please choose which Tier you want to proceed with:
      - If `status: In Review`, `status: Rejected`, or missing: The AI Agent **REMAINS BLOCKED** and refuses to write code.
 
 #### 🔴 Tier 2: Major Architectural Overhauls
-- **Scope**: Complete framework upgrades, database schema rewrites, or replacing global state/auth paradigms.
-- **Rule**:
-  - Full sequential gate applies (PRD + Architecture Spine + Epics required in `_acl-output/`).
+- **Scope**: Complete framework upgrades, database schema rewrites, replacing global state/auth paradigms, or major cross-cutting capabilities.
+- **Sequential Pipeline**:
+  1. **Phase 1 (Product Brief)**: The AI Agent **FIRST** creates `_acl-output/1-analysis/acl-product-brief/brief.md` with frontmatter:
+     ```yaml
+     ---
+     title: "Product Brief: <Feature/Overhaul Name>"
+     project_type: brownfield
+     tier: Tier 2 (Major Overhaul)
+     status: In Review
+     created: <YYYY-MM-DD>
+     ---
+     ```
+     **Immediate Gate Lock**: The AI Agent **MUST IMMEDIATELY HALT** and output the Gate Lock banner for `brief.md`. Downstream deliverables (PRD, Architecture Spine, Epics) and application code are strictly locked until `brief.md` is approved by the Manager in Markdown Studio.
+  2. **Phase 2 (PRD)**: Once `brief.md` has `status: Approved`, the AI creates `_acl-output/2-plan-workflows/acl-prd/prd.md` (`status: In Review`) and halts for approval.
+  3. **Phase 3A (Architecture Spine)**: Once PRD has `status: Approved`, the AI creates `_acl-output/3-solutioning/acl-architecture/architecture-spine.md` (`status: In Review`) and halts for approval.
+  4. **Phase 3B (Epics & Stories)**: Once Architecture has `status: Approved`, the AI creates `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md` (`status: In Review`) and halts for approval.
+  5. **Phase 4 (Implementation)**: Strictly locked until all upstream deliverables are approved.
 
 ---
 
