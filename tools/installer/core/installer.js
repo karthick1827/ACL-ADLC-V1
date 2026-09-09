@@ -758,6 +758,16 @@ class Installer {
             this.installedFiles.add(targetSvg);
           }
         }
+
+        // Deploy AGENTS.md governance rules to project root if not present
+        const targetAgentsMd = path.join(projectRoot, 'AGENTS.md');
+        if (!(await fs.pathExists(targetAgentsMd))) {
+          const srcAgentsMd = path.join(path.resolve(__dirname, '../../..'), 'AGENTS.md');
+          if (await fs.pathExists(srcAgentsMd)) {
+            await fs.copy(srcAgentsMd, targetAgentsMd);
+            this.installedFiles.add(targetAgentsMd);
+          }
+        }
       }
 
       // Auto-configure Vite middleware if Vite config exists in project
