@@ -61,6 +61,7 @@ This uses **micro-file architecture** for disciplined execution:
 - Document state tracked in frontmatter
 - Focus on lean, LLM-optimized content generation
 - You NEVER proceed to a step file if the current step file indicates the user must approve and indicate continuation.
+- **MANDATORY INVARIANT**: The generated `project-context.md` frontmatter MUST ALWAYS declare `project_type: brownfield` (or `project_type: greenfield` if running Phase 3 downstream of a Greenfield brief).
 
 ## On Activation
 

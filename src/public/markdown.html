@@ -1424,6 +1424,34 @@
         color: #64748b;
         margin-top: 0.25rem;
       }
+      .project-type-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.15rem 0.65rem;
+        border-radius: 9999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        vertical-align: middle;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        user-select: none;
+        line-height: 1.35;
+      }
+      .project-type-badge:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      }
+      .project-type-badge.brownfield {
+        background: #fef3c7;
+        color: #78350f;
+        border: 1px solid #d97706;
+      }
+      .project-type-badge.greenfield {
+        background: #dcfce7;
+        color: #166534;
+        border: 1px solid #86efac;
+      }
       .dashboard-badge-viewonly {
         display: inline-flex;
         align-items: center;
@@ -1855,6 +1883,29 @@
         color: #3b82f6;
         font-weight: bold;
       }
+
+
+      .spec-ac-item {
+        font-size: 0.86rem;
+        line-height: 1.5;
+        color: #334155;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.35rem 0;
+        border-bottom: 1px solid #f1f5f9;
+      }
+      .spec-ac-item:last-child {
+        border-bottom: none;
+      }
+      .ac-checkbox-icon {
+        font-size: 0.95rem;
+        line-height: 1.2;
+        flex-shrink: 0;
+      }
+      .ac-text {
+        flex: 1;
+      }
     </style>
   </head>
   <body>
@@ -1907,7 +1958,7 @@
       </nav>
       <div class="nav-drawer-footer">
         <span>ACL-ADLC</span>
-        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.14</span>
+        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.13</span>
       </div>
     </aside>
 
@@ -2152,13 +2203,19 @@
         return EXCLUDED_CHILDREN.has(lower);
       }
 
+      let isSyncing = false;
       async function syncFromLiveDisk(quiet = false) {
+        if (isSyncing) return false;
+        isSyncing = true;
         try {
-          const res = await fetch('/api/list-markdown-files');
+          const res = await fetch('/api/list-markdown-files?t=' + Date.now(), { cache: 'no-store' });
           if (res.ok) {
             const data = await res.json();
             if (data && (data.frameworkVersion || data.version)) {
               updateDrawerFrameworkVersion(data.frameworkVersion || data.version);
+            }
+            if (data && data.activeTier) {
+              window.__serverActiveTier = String(data.activeTier);
             }
             if (data && Array.isArray(data.files)) {
               let filteredFiles = data.files.filter((f) => !isChildFile(f.filename, f.folderPath));
@@ -2194,6 +2251,7 @@
                     id: f.id,
                     content: f.content,
                     status: f.status,
+                    tier: f.tier,
                     updatedAt: f.updatedAt,
                   })),
                 ) !==
@@ -2202,6 +2260,7 @@
                     id: f.id,
                     content: f.content,
                     status: f.status,
+                    tier: f.tier,
                     updatedAt: f.updatedAt,
                   })),
                 );
@@ -2218,7 +2277,7 @@
                   activeFileId = getInitialActiveFileId(files);
                 }
                 renderFileTree();
-                if (activeFileId) {
+                if (activeFileId && !isDirty) {
                   loadFile(activeFileId);
                 }
                 if (activeAppView === 'dashboard' || activeAppView === 'dashboard-summarized') {
@@ -2235,6 +2294,9 @@
             }
           }
         } catch (e) {}
+        finally {
+          isSyncing = false;
+        }
         evaluateProceedButton();
         return false;
       }
@@ -2323,6 +2385,24 @@
         }
 
         evaluateProceedButton();
+
+        // Live Auto-Sync: Poll disk periodically and listen to window focus/visibility (Zero manual refresh)
+        if (!window.__acl_sync_interval_started) {
+          window.__acl_sync_interval_started = true;
+          setInterval(() => {
+            syncFromLiveDisk(true);
+          }, 1500);
+
+          window.addEventListener('focus', () => {
+            syncFromLiveDisk(true);
+          });
+
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+              syncFromLiveDisk(true);
+            }
+          });
+        }
       }
 
       async function saveCurrentFile() {
@@ -3106,41 +3186,96 @@
             continue;
           }
 
-          // Match Story header or checkbox item inside epic
+          // Match Story header, checkbox item, bold bullet item, or plain bullet item inside epic
           if (currentEpic) {
-            const storyHeaderMatch = line.match(/^###\s+(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(.+)$/i);
+            const storyHeaderMatch = line.match(/^(?:###|####)\s*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(?:\[([ xX])\]\s*)?(.+)$/i);
             const checkboxMatch = line.match(/^-\s*\[([ xX])\]\s*(?:Story\s*([\d\.]+)[:\-\s]*)?(.+)$/i);
+            const bulletBoldMatch = line.match(/^(?:-\s*)?\*\*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(.+?)\*\*(.*)$/i);
+            const bulletPlainMatch = line.match(/^-\s*(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(.+)$/i);
 
             let sNum = null;
             let sTitle = null;
             let isCheckboxDone = false;
 
             if (storyHeaderMatch) {
-              sNum = storyHeaderMatch[1] || storyHeaderMatch[2];
-              sTitle = storyHeaderMatch[3].trim().replace(/^[:\-]\s*/, '');
+              const cb1 = storyHeaderMatch[1];
+              const cb2 = storyHeaderMatch[4];
+              sNum = storyHeaderMatch[2] || storyHeaderMatch[3];
+              const rawRest = (storyHeaderMatch[5] || '').trim().replace(/^[:\-]\s*/, '');
+              const endCb = rawRest.match(/^\[([ xX])\]\s*(.+)$/i);
+              if (endCb) {
+                isCheckboxDone = endCb[1].toLowerCase() === 'x';
+                sTitle = endCb[2].trim().replace(/^[:\-]\s*/, '');
+              } else {
+                isCheckboxDone = (cb1 && cb1.toLowerCase() === 'x') || (cb2 && cb2.toLowerCase() === 'x');
+                sTitle = rawRest;
+              }
             } else if (checkboxMatch) {
               isCheckboxDone = checkboxMatch[1].toLowerCase() === 'x';
               sNum = checkboxMatch[2];
               sTitle = checkboxMatch[3].trim().replace(/^[:\-]\s*/, '');
+            } else if (bulletBoldMatch) {
+              const cb1 = bulletBoldMatch[1];
+              sNum = bulletBoldMatch[2] || bulletBoldMatch[3];
+              const rest = (bulletBoldMatch[4] + (bulletBoldMatch[5] || '')).trim();
+              isCheckboxDone = cb1 && cb1.toLowerCase() === 'x';
+              sTitle = rest.replace(/^[:\-]\s*/, '');
+            } else if (bulletPlainMatch) {
+              sNum = bulletPlainMatch[1] || bulletPlainMatch[2];
+              sTitle = bulletPlainMatch[3].trim().replace(/^[:\-]\s*/, '');
             }
 
             if (sTitle) {
+              if (/[\(\[](?:done|completed)[\)\]]$/i.test(sTitle)) {
+                isCheckboxDone = true;
+                sTitle = sTitle.replace(/[\(\[](?:done|completed)[\)\]]$/i, '').trim();
+              }
+
               let status = isCheckboxDone ? 'Approved' : 'To Do';
               let isCompleted = isCheckboxDone;
               let matchFile = null;
 
               // Cross-reference with live files in _acl-output
-              if (sNum && Array.isArray(allFiles) && allFiles.length > 0) {
-                const numSlug = sNum.replace(/\./g, '-');
+              if (Array.isArray(allFiles) && allFiles.length > 0) {
+                const numSlug = sNum ? sNum.replace(/\./g, '-') : '';
+                const dotSlug = sNum || '';
                 matchFile = allFiles.find((f) => {
                   const fn = (f.filename || '').toLowerCase();
+                  const fp = (f.fullPath || f.folderPath || f.path || '').toLowerCase();
                   return (
-                    fn.includes(`spec-${numSlug}`) ||
-                    fn.includes(`story-${numSlug}`) ||
-                    fn.includes(`-${numSlug}-`) ||
-                    fn.startsWith(`${numSlug}-`)
+                    numSlug && (
+                      fn.includes(`spec-${numSlug}`) ||
+                      fn.includes(`spec-${dotSlug}`) ||
+                      fn.includes(`story-${numSlug}`) ||
+                      fn.includes(`story-${dotSlug}`) ||
+                      fn.includes(`-${numSlug}-`) ||
+                      fn.includes(`-${dotSlug}-`) ||
+                      fn.startsWith(`${numSlug}-`) ||
+                      fn.startsWith(`${dotSlug}-`) ||
+                      fp.includes(`story-${numSlug}`) ||
+                      fp.includes(`story-${dotSlug}`) ||
+                      fp.includes(`spec-${numSlug}`) ||
+                      fp.includes(`spec-${dotSlug}`)
+                    )
                   );
                 });
+
+                // If no single story file matched, check if an approved implementation spec in 4-implementation references epics.md and has completed tasks
+                if (!matchFile && !isCompleted) {
+                  const approvedSpec = allFiles.find((f) => {
+                    const fn = (f.filename || '').toLowerCase();
+                    const fp = (f.fullPath || f.folderPath || f.path || '').toLowerCase();
+                    if (!fn.startsWith('spec-') && !fp.includes('4-implementation')) return false;
+                    const raw = (f.status || '').trim().toLowerCase();
+                    const isAppr = raw.includes('accept') || raw.includes('approved') || raw.includes('final');
+                    if (!isAppr) return false;
+                    const fc = (f.content || '').toLowerCase();
+                    return fc.includes('epics.md') && (fc.includes('- [x]') || fc.includes('- [X]'));
+                  });
+                  if (approvedSpec) {
+                    matchFile = approvedSpec;
+                  }
+                }
 
                 if (matchFile) {
                   const raw = (matchFile.status || '').trim().toLowerCase();
@@ -3171,15 +3306,19 @@
                 let mInAC = false;
                 for (const ml of mLines) {
                   const tml = ml.trim();
-                  if (tml.match(/\*\*Acceptance Criteria:?\*\*/i) || tml.match(/^#+\s*Acceptance Criteria/i)) {
+                  if (tml.match(/(?:\*\*|\*|#+\s*)Acceptance Criteria:?(?:\*\*|\*)?/i)) {
                     mInAC = true;
+                    const afterAc = tml.replace(/^.*Acceptance Criteria:?(?:\*\*|\*)?\s*/i, '').trim();
+                    if (afterAc.length > 0) {
+                      currentStory.acceptanceCriteria.push(afterAc);
+                    }
                     continue;
                   }
-                  if (mInAC && (tml.startsWith('---') || tml.startsWith('##'))) {
+                  if (mInAC && (tml.startsWith('---') || tml.startsWith('##') || tml.match(/^-\s*\*\*/))) {
                     break;
                   }
                   if (mInAC && tml.length > 0) {
-                    currentStory.acceptanceCriteria.push(tml);
+                    currentStory.acceptanceCriteria.push(tml.replace(/^\s*[\*\-]\s*/, ''));
                   }
                 }
               }
@@ -3191,15 +3330,19 @@
 
             // Gather Acceptance Criteria for currentStory from epics.md
             if (currentStory) {
-              if (line.match(/\*\*Acceptance Criteria:?\*\*/i) || line.match(/^#+\s*Acceptance Criteria/i)) {
+              if (line.match(/(?:\*\*|\*|#+\s*)Acceptance Criteria:?(?:\*\*|\*)?/i)) {
                 inAC = true;
+                const afterAc = line.replace(/^.*Acceptance Criteria:?(?:\*\*|\*)?\s*/i, '').trim();
+                if (afterAc.length > 0) {
+                  currentStory.acceptanceCriteria.push(afterAc);
+                }
                 continue;
               }
-              if (line.startsWith('---') || line.startsWith('##') || line.startsWith('###')) {
+              if (line.startsWith('---') || line.startsWith('##') || line.startsWith('###') || line.match(/^-\s*\*\*/)) {
                 inAC = false;
               }
               if (inAC && line.length > 0) {
-                currentStory.acceptanceCriteria.push(line);
+                currentStory.acceptanceCriteria.push(line.replace(/^\s*[\*\-]\s*/, ''));
               }
             }
           }
@@ -3260,59 +3403,376 @@
         });
       };
 
+      function getProjectClassification() {
+        const fileList = Array.isArray(files) ? files : [];
+        const hasProjectContext = fileList.some((f) => {
+          const fn = (f.filename || '').toLowerCase();
+          const full = (f.fullPath || f.path || f.folderPath || '').toLowerCase();
+          const pt = (f.projectType || '').toLowerCase();
+          return fn === 'project-context.md' || fn.includes('project-context') || full.includes('project-context') || pt === 'brownfield';
+        });
+        if (hasProjectContext || activeWorkflowMode === 'brownfield') {
+          return {
+            type: 'brownfield',
+            label: 'Brownfield',
+            icon: '🍂',
+            title: 'Brownfield Delivery Workflow',
+          };
+        }
+        return {
+          type: 'greenfield',
+          label: 'Greenfield',
+          icon: '🌱',
+          title: 'Greenfield Delivery Workflow',
+        };
+      }
+
+      function isBrownfieldMode() {
+        const proj = getProjectClassification();
+        return proj.type === 'brownfield' || activeWorkflowMode === 'brownfield';
+      }
+
+      function getActiveBrownfieldTier() {
+        if (window.__serverActiveTier) return window.__serverActiveTier;
+        const fileWithTier = (files || []).find((f) => {
+          if (f.tier) return true;
+          if (f.content) {
+            return /^tier:\s*([^\n\r]+)/im.test(f.content);
+          }
+          return false;
+        });
+        if (fileWithTier) {
+          const raw = fileWithTier.tier || (fileWithTier.content.match(/^tier:\s*([^\n\r]+)/im)?.[1] || '');
+          const clean = raw.toLowerCase();
+          if (clean.includes('2') || clean.includes('major') || clean.includes('enterprise') || clean.includes('architecture')) return '2';
+          if (clean.includes('1') || clean.includes('spec') || clean.includes('self-contained')) return '1';
+        }
+        const hasTier2Docs = (files || []).some((f) => {
+          const fn = (f.filename || '').toLowerCase();
+          const folder = (f.folderPath || '').toLowerCase();
+          return fn === 'epics.md' || fn === 'architecture-spine.md' || fn === 'prd.md' || folder.includes('3-solutioning') || folder.includes('2-plan-workflows') || folder.includes('1-analysis');
+        });
+        if (hasTier2Docs) return '2';
+        const hasSpecDocs = (files || []).some((f) => {
+          const fn = (f.filename || '').toLowerCase();
+          return fn.startsWith('spec-') || fn.includes('spec');
+        });
+        if (hasSpecDocs) return '1';
+        return '1';
+      }
+
+
+      window.openDocInStudio = function (fileId) {
+        if (!fileId) return;
+        loadFile(fileId);
+        switchAppView('studio');
+      };
+
+      function getDoc(pattern) {
+        return (files || []).find((f) => {
+          const fn = (f.filename || '').toLowerCase();
+          const full = ((f.folderPath || '') + '/' + (f.filename || '')).toLowerCase();
+          if (typeof pattern === 'string') return fn.includes(pattern) || full.includes(pattern);
+          return pattern.test(fn) || pattern.test(full);
+        });
+      }
+
+      function getSpecDocs() {
+        return (files || []).filter((f) => {
+          const fn = (f.filename || '').toLowerCase();
+          const folder = (f.folderPath || '').toLowerCase();
+          const isCandidate =
+            (fn.startsWith('spec-') || fn.includes('spec') || folder.includes('4-implementation') || folder.includes('spec')) &&
+            fn.endsWith('.md') &&
+            !fn.includes('brief') &&
+            !fn.includes('prd') &&
+            !fn.includes('spine') &&
+            !fn.includes('epics') &&
+            !fn.includes('project-context');
+          if (!isCandidate) return false;
+
+          // Exclude Tier 2 specs: Tier 2 features are implemented through Phase 4 Epics and Stories
+          if (f.tier === '2' || f.tier === 2) return false;
+          const content = f.content || '';
+          if (/tier:\s*['"]?.*(?:2|major|enterprise|architecture)/i.test(content)) return false;
+          if (/epics\.md/i.test(content) || /architecture-spine/i.test(content)) return false;
+
+          // Only Tier 1 standalone / self-contained specs are included
+          if (f.tier === '1' || f.tier === 1) return true;
+          if (/tier:\s*['"]?.*(?:1|self-contained|standalone)/i.test(content)) return true;
+          if (/self[- ]contained/i.test(content) || /standalone/i.test(content)) return true;
+
+          // Fallback: If epics.md exists in project (Tier 2 active), exclude unbadged specs from standalone
+          const hasEpicsInProject = (files || []).some((file) => (file.filename || '').toLowerCase().includes('epics.md'));
+          if (hasEpicsInProject) {
+            return false;
+          }
+
+          return true;
+        });
+      }
+
+      function getNormStatus(doc) {
+        if (!doc) return 'To Do';
+        const raw = (doc.status || 'In Review').trim().toLowerCase();
+        if (raw.includes('accept') || raw.includes('approved') || raw.includes('final')) return 'Approved';
+        if (raw.includes('reject') || raw.includes('action')) return 'Need Action';
+        return 'In Review';
+      }
+
+      function renderStatusBadge(status) {
+        const s = status || 'To Do';
+        let cls = 'to-do';
+        let icon = '⚪';
+        let label = s;
+        if (s === 'Approved' || s === 'Not Required') {
+          cls = 'approved';
+          icon = s === 'Not Required' ? '🔹' : '🟢';
+          label = s === 'Not Required' ? 'Not Required' : 'Approved';
+        } else if (s === 'In Review') {
+          cls = 'in-review';
+          icon = '🟡';
+          label = 'In Review';
+        } else if (s === 'Rejected' || s === 'Need Action') {
+          cls = 'rejected';
+          icon = '🔴';
+          label = 'Need Action';
+        } else {
+          cls = 'to-do';
+          icon = '⚪';
+          label = 'To Do';
+        }
+        return `<span class="dash-status-pill ${cls}"><span class="dot"></span>${icon} ${label}</span>`;
+      }
+
+      function formatAcLine(text) {
+        if (!text) return '';
+        return text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(
+            /`([^`]+)`/g,
+            '<code style="background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; font-family: monospace; font-size: 0.72rem; color: #475569;">$1</code>',
+          );
+      }
+
+      function parseAcceptanceCriteriaFromSpec(markdownText) {
+        if (!markdownText) return [];
+        const lines = markdownText.split(/\r?\n/);
+        const items = [];
+        let inAcSection = false;
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const trimmed = line.trim();
+
+          if (trimmed.match(/^##+\s+Acceptance\s+Criteria/i)) {
+            inAcSection = true;
+            continue;
+          }
+
+          if (inAcSection && trimmed.match(/^##+\s+[^\s]/)) {
+            break;
+          }
+
+          if (inAcSection) {
+            const checkMatch = trimmed.match(/^[-*]\s*\[([ xX])\]\s*(.*)$/);
+            if (checkMatch) {
+              items.push({
+                isCompleted: checkMatch[1].toLowerCase() === 'x',
+                text: checkMatch[2].trim(),
+                raw: trimmed,
+              });
+            } else {
+              const bulletMatch = trimmed.match(/^[-*]\s+(.*)$/);
+              if (bulletMatch && bulletMatch[1].trim()) {
+                items.push({
+                  isCompleted: false,
+                  text: bulletMatch[1].trim(),
+                  raw: trimmed,
+                });
+              }
+            }
+          }
+        }
+        return items;
+      }
+
+      window.toggleSpecAccordion = function (elementId) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        const body = el.querySelector('.story-ac-body');
+        if (el.classList.contains('open')) {
+          el.classList.remove('open');
+          if (body) body.style.display = 'none';
+        } else {
+          el.classList.add('open');
+          if (body) body.style.display = 'block';
+        }
+      };
+
+      function renderProjectBadge() {
+        const proj = getProjectClassification();
+        return `<span class="project-type-badge ${proj.type}" onclick="openWorkflowModal('${proj.type}', event)" title="Click to view ${proj.title}"><span class="badge-icon">${proj.icon}</span> ${proj.label}</span>`;
+      }
+
       function renderDeliveryDashboard() {
         const container = document.getElementById('dashboardContainerRoot');
         if (!container) return;
 
-        // Helper to find file by pattern
-        function getDoc(pattern) {
-          return files.find((f) => {
-            const fn = (f.filename || '').toLowerCase();
-            const full = (f.fullPath || '').toLowerCase();
-            if (typeof pattern === 'string') return fn.includes(pattern) || full.includes(pattern);
-            return pattern.test(fn) || pattern.test(full);
-          });
+        const isBrownfield = isBrownfieldMode();
+        const currentTier = getActiveBrownfieldTier();
+
+        // Brownfield Tier 1 Mode: Only Project Context and Spec Implementation (No progress bar, no stats)
+        if (isBrownfield && currentTier === '1') {
+          const docContext = getDoc(/project-context/);
+          const statusContext = docContext ? getNormStatus(docContext) : 'To Do';
+          const specDocs = getSpecDocs();
+
+          container.innerHTML = `
+          <!-- Top Dashboard Header Card (Tier 1: No progress bar, no stats) -->
+          <div class="dashboard-header-card">
+            <div class="dashboard-header-top">
+              <div class="dashboard-title-group">
+                <h2><span>📊</span> Summarized Dashboard <span style="font-weight: 500; color: #94a3b8; margin: 0 0.15rem;">-</span> ${renderProjectBadge()}</h2>
+                <p>Real-time lifecycle telemetry, sequential gate status, and implementation tracking.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sequential Phases Container (Only 2 Phase Cards) -->
+          <div class="dashboard-phases-container">
+            <!-- Phase Card 1: Project Context -->
+            <div class="phase-card">
+              <div class="phase-card-header">
+                <div class="phase-title-left">
+                  <div class="phase-icon-badge">📄</div>
+                  <div class="phase-title-text">
+                    <h3>Project Context</h3>
+                    <span>System rules, framework standards, and developer guidelines</span>
+                  </div>
+                </div>
+              </div>
+              <div class="phase-card-body">
+                <div class="dashboard-artifact-row" ${docContext ? `onclick="openDocInStudio('${docContext.id}')" style="cursor: pointer;"` : ''}>
+                  <div class="artifact-row-left">
+                    <span class="artifact-icon">📄</span>
+                    <div class="artifact-info">
+                      <span class="artifact-filename">${docContext ? docContext.filename : 'project-context.md'}</span>
+                      <span class="artifact-meta">Project Context • <code>${docContext ? (docContext.folderPath + '/' + docContext.filename) : '_acl-output/0-context/acl-generate-project-context/project-context.md'}</code></span>
+                    </div>
+                  </div>
+                  ${renderStatusBadge(statusContext)}
+                </div>
+              </div>
+            </div>
+
+            <!-- Phase Card 2: Spec Implementation -->
+            <div class="phase-card">
+              <div class="phase-card-header">
+                <div class="phase-title-left">
+                  <div class="phase-icon-badge">⚡</div>
+                  <div class="phase-title-text">
+                    <h3>Spec Implementation</h3>
+                    <span>Self-contained feature specifications and technical deliverables</span>
+                  </div>
+                </div>
+              </div>
+              <div class="phase-card-body">
+                ${
+                  specDocs.length > 0
+                    ? specDocs
+                        .map(
+                          (doc) => `
+                    <div class="dashboard-artifact-row" onclick="openDocInStudio('${doc.id}')" style="cursor: pointer;">
+                      <div class="artifact-row-left">
+                        <span class="artifact-icon">📄</span>
+                        <div class="artifact-info">
+                          <span class="artifact-filename">${doc.filename}</span>
+                          <span class="artifact-meta">Feature Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
+                        </div>
+                      </div>
+                      ${renderStatusBadge(getNormStatus(doc))}
+                    </div>
+                  `,
+                        )
+                        .join('')
+                    : `
+                    <div class="dashboard-artifact-row">
+                      <div class="artifact-row-left">
+                        <span class="artifact-icon">📄</span>
+                        <div class="artifact-info">
+                          <span class="artifact-filename">spec-*.md</span>
+                          <span class="artifact-meta">No spec file generated yet in <code>_acl-output/4-implementation/</code></span>
+                        </div>
+                      </div>
+                      ${renderStatusBadge('To Do')}
+                    </div>
+                  `
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1rem;">
+            To edit documents or record official manager sign-offs, switch to <strong>Markdown Studio</strong> from the ☰ menu.
+          </div>
+          `;
+          return;
         }
 
-        function getNormStatus(doc) {
-          if (!doc) return null;
-          const raw = (doc.status || 'In Review').trim().toLowerCase();
-          if (raw.includes('accept') || raw.includes('approved') || raw.includes('final')) return 'Approved';
-          if (raw.includes('reject')) return 'Rejected';
-          return 'In Review';
-        }
+        // Tier 2 (Brownfield) or Greenfield: Full dashboard
+        const isBrownfieldTier2 = isBrownfield && currentTier === '2';
 
-        // 1. Phase 1: Analysis (brief.md) - Weight: 5%
+        // Phase 0 (Brownfield Tier 2 only): Project Context
+        const docContext = getDoc(/project-context/);
+        const statusContext = docContext ? getNormStatus(docContext) : 'To Do';
+        const contextApproved = statusContext === 'Approved';
+        const contextContrib = isBrownfieldTier2 && contextApproved ? 5 : 0;
+
+        // Phase 1: Analysis (brief.md) - Weight: 5%
         const docBrief = getDoc('brief.md');
         const statusBrief = docBrief ? getNormStatus(docBrief) : 'To Do';
         const briefApproved = statusBrief === 'Approved';
         const briefContrib = briefApproved ? 5 : 0;
 
-        // 2. Phase 2A: PRD (prd.md) - Weight: 5%
+        // Phase 2A: PRD (prd.md) - Weight: 5% (or 10% if no standalone UX doc)
         const docPrd = getDoc('prd.md');
         const statusPrd = docPrd ? getNormStatus(docPrd) : 'To Do';
         const prdApproved = statusPrd === 'Approved';
-        const prdContrib = prdApproved ? 5 : 0;
 
-        // 3. Phase 2B: UX Design (DESIGN.md / EXPERIENCE.md / ux.md) - Weight: 5%
+        // Phase 2B: UX Design (DESIGN.md / EXPERIENCE.md / ux.md) - Weight: 5%
         const docUx = getDoc(/design\.md|experience\.md|ux\.md/);
+        const hasUxDoc = Boolean(docUx);
         const statusUx = docUx ? getNormStatus(docUx) : 'To Do';
         const uxApproved = statusUx === 'Approved';
         const uxContrib = uxApproved ? 5 : 0;
+        const prdContrib = prdApproved ? (hasUxDoc ? 5 : (isBrownfieldTier2 ? 5 : 10)) : 0;
 
-        // 4. Phase 3A: Architecture (ARCHITECTURE-SPINE.md / architecture.md) - Weight: 5%
+        // Phase 3A: Architecture (ARCHITECTURE-SPINE.md / architecture.md) - Weight: 5%
         const docArch = getDoc(/architecture-spine\.md|architecture\.md/);
         const statusArch = docArch ? getNormStatus(docArch) : 'To Do';
         const archApproved = statusArch === 'Approved';
         const archContrib = archApproved ? 5 : 0;
 
-        // 5. Phase 3B: Epics & Stories (epics.md) - Weight: 15%
+        // Phase 3B: Epics & Stories (epics.md) - Weight: 10% (Tier 2) or 15% (Greenfield)
         const docEpics = getDoc('epics.md');
         const statusEpics = docEpics ? getNormStatus(docEpics) : 'To Do';
         const epicsApproved = statusEpics === 'Approved';
-        const epicsContrib = epicsApproved ? 15 : 0;
+        const epicsContrib = epicsApproved ? (isBrownfieldTier2 ? 10 : 15) : 0;
 
-        // 6. Phase 4: Implementation (Weight: 65% - Dynamic)
+        // Standalone Specs (Tier 1 specs present alongside Tier 2)
+        const specDocs = getSpecDocs();
+        const hasStandaloneSpecs = isBrownfieldTier2 && specDocs.length > 0;
+        const approvedSpecDocsCount = specDocs.filter((d) => getNormStatus(d) === 'Approved').length;
+        const allSpecsApproved = specDocs.length > 0 && approvedSpecDocsCount === specDocs.length;
+        const specContrib = hasStandaloneSpecs ? Math.round((approvedSpecDocsCount / specDocs.length) * 15) : 0;
+        const phase4Weight = hasStandaloneSpecs ? 50 : 65;
+
+        // Phase 4: Implementation (Weight: 50% if standalone specs exist, 65% otherwise)
         let phase4Contrib = 0;
         let parsedEpics = [];
         let totalStories = 0;
@@ -3329,73 +3789,42 @@
           });
 
           if (totalStories > 0) {
-            phase4Contrib = Math.round((completedStories / totalStories) * 65);
+            phase4Contrib = Math.round((completedStories / totalStories) * phase4Weight);
           }
         }
 
         // Calculate Total Progress (100% max)
-        const totalProgress = Math.min(100, briefContrib + prdContrib + uxContrib + archContrib + epicsContrib + phase4Contrib);
+        const totalProgress = Math.min(100, contextContrib + briefContrib + prdContrib + uxContrib + archContrib + epicsContrib + specContrib + phase4Contrib);
 
-        // Status Badge Helper
-        function renderStatusBadge(status) {
-          const s = status || 'To Do';
-          let cls = 'to-do';
-          let icon = '⚪';
-          if (s === 'Approved') {
-            cls = 'approved';
-            icon = '🟢';
-          } else if (s === 'In Review') {
-            cls = 'in-review';
-            icon = '🟡';
-          } else if (s === 'Rejected') {
-            cls = 'rejected';
-            icon = '🔴';
-          } else {
-            cls = 'to-do';
-            icon = '⚪';
-            return `<span class="dash-status-pill to-do"><span class="dot"></span>⚪ To Do</span>`;
-          }
-          return `<span class="dash-status-pill ${cls}"><span class="dot"></span>${icon} ${s}</span>`;
-        }
-
-        // Summary Counts
-        // 1. Phases Count (X/4)
+        // Summary Counts (6 phases if standalone specs exist in Tier 2, 5 for standard Tier 2, 4 for Greenfield)
         let completedPhasesCount = 0;
+        const totalPhasesCount = isBrownfieldTier2 ? (hasStandaloneSpecs ? 6 : 5) : 4;
+        if (isBrownfieldTier2 && statusContext === 'Approved') completedPhasesCount++;
         if (statusBrief === 'Approved') completedPhasesCount++;
-        if (statusPrd === 'Approved' && statusUx === 'Approved') completedPhasesCount++;
+        if (statusPrd === 'Approved' && (!hasUxDoc || statusUx === 'Approved')) completedPhasesCount++;
         if (statusArch === 'Approved' && statusEpics === 'Approved') completedPhasesCount++;
         if (totalStories > 0 && completedStories === totalStories) completedPhasesCount++;
+        if (hasStandaloneSpecs && allSpecsApproved) completedPhasesCount++;
 
-        // 2. To Do Count (all unapproved lifecycle documents + uncompleted stories)
-        let toDoCount = 0;
-        if (statusBrief !== 'Approved' && statusBrief !== 'Rejected') toDoCount++;
-        if (statusPrd !== 'Approved' && statusPrd !== 'Rejected') toDoCount++;
-        if (statusUx !== 'Approved' && statusUx !== 'Rejected') toDoCount++;
-        if (statusArch !== 'Approved' && statusArch !== 'Rejected') toDoCount++;
-        if (statusEpics !== 'Approved' && statusEpics !== 'Rejected') toDoCount++;
+        let needActionCount = 0;
+        if (isBrownfieldTier2 && (statusContext === 'Rejected' || statusContext === 'Need Action')) needActionCount++;
+        if (statusBrief === 'Rejected' || statusBrief === 'Need Action') needActionCount++;
+        if (statusPrd === 'Rejected' || statusPrd === 'Need Action') needActionCount++;
+        if (statusUx === 'Rejected' || statusUx === 'Need Action') needActionCount++;
+        if (statusArch === 'Rejected' || statusArch === 'Need Action') needActionCount++;
+        if (statusEpics === 'Rejected' || statusEpics === 'Need Action') needActionCount++;
 
-        if (isPhase4Locked) {
-          toDoCount++;
-        } else if (parsedEpics.length > 0) {
-          parsedEpics.forEach((ep) => {
-            ep.stories.forEach((st) => {
-              if (st.status !== 'Approved' && st.status !== 'Rejected') toDoCount++;
-            });
+        if (hasStandaloneSpecs) {
+          specDocs.forEach((d) => {
+            const s = getNormStatus(d);
+            if (s === 'Rejected' || s === 'Need Action') needActionCount++;
           });
         }
-
-        // 3. Need Action Count (all rejected documents + rejected stories)
-        let needActionCount = 0;
-        if (statusBrief === 'Rejected') needActionCount++;
-        if (statusPrd === 'Rejected') needActionCount++;
-        if (statusUx === 'Rejected') needActionCount++;
-        if (statusArch === 'Rejected') needActionCount++;
-        if (statusEpics === 'Rejected') needActionCount++;
 
         if (parsedEpics.length > 0) {
           parsedEpics.forEach((ep) => {
             ep.stories.forEach((st) => {
-              if (st.status === 'Rejected') needActionCount++;
+              if (st.status === 'Rejected' || st.status === 'Need Action') needActionCount++;
             });
           });
         }
@@ -3405,7 +3834,7 @@
         <div class="dashboard-header-card">
           <div class="dashboard-header-top">
             <div class="dashboard-title-group">
-              <h2><span>📊</span> Summarized Dashboard</h2>
+              <h2><span>📊</span> Summarized Dashboard <span style="font-weight: 500; color: #94a3b8; margin: 0 0.15rem;">-</span> ${renderProjectBadge()}</h2>
               <p>Real-time lifecycle telemetry, sequential gate status, and implementation tracking.</p>
             </div>
           </div>
@@ -3430,7 +3859,7 @@
             <div class="stat-card">
               <div class="stat-card-label">Phases</div>
               <div class="stat-card-value-col">
-                <span class="stat-number" style="color: #047857;">${completedPhasesCount}/4</span>
+                <span class="stat-number" style="color: #047857;">${completedPhasesCount}/${totalPhasesCount}</span>
                 <span class="stat-unit">Completed</span>
               </div>
             </div>
@@ -3438,7 +3867,7 @@
               <div class="stat-card-label">Action</div>
               <div class="stat-card-value-col">
                 <span class="stat-number" style="color: #be123c;">${needActionCount}</span>
-                <span class="stat-unit">Action Required</span>
+                <span class="stat-unit">${needActionCount === 1 ? 'action required' : 'actions required'}</span>
               </div>
             </div>
           </div>
@@ -3447,6 +3876,37 @@
         <!-- Sequential Phases Container -->
         <div class="dashboard-phases-container">
           
+          ${
+            isBrownfieldTier2
+              ? `
+          <!-- Project Context (Brownfield Tier 2) -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">📄</div>
+                <div class="phase-title-text">
+                  <h3>Project Context</h3>
+                  <span>System rules, framework standards, and developer guidelines</span>
+                </div>
+              </div>
+            </div>
+            <div class="phase-card-body">
+              <div class="dashboard-artifact-row" ${docContext ? `onclick="openDocInStudio('${docContext.id}')" style="cursor: pointer;"` : ''}>
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">📄</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">${docContext ? docContext.filename : 'project-context.md'}</span>
+                    <span class="artifact-meta">Project Context • <code>${docContext ? (docContext.folderPath + '/' + docContext.filename) : '_acl-output/0-context/acl-generate-project-context/project-context.md'}</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusContext)}
+              </div>
+            </div>
+          </div>
+          `
+              : ''
+          }
+
           <!-- Phase 1: Analysis -->
           <div class="phase-card">
             <div class="phase-card-header">
@@ -3459,7 +3919,7 @@
               </div>
             </div>
             <div class="phase-card-body">
-              <div class="dashboard-artifact-row">
+              <div class="dashboard-artifact-row" ${docBrief ? `onclick="openDocInStudio('${docBrief.id}')" style="cursor: pointer;"` : ''}>
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📄</span>
                   <div class="artifact-info">
@@ -3485,7 +3945,7 @@
             </div>
             <div class="phase-card-body">
               <!-- PRD -->
-              <div class="dashboard-artifact-row">
+              <div class="dashboard-artifact-row" ${docPrd ? `onclick="openDocInStudio('${docPrd.id}')" style="cursor: pointer;"` : ''}>
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📄</span>
                   <div class="artifact-info">
@@ -3497,15 +3957,15 @@
               </div>
 
               <!-- UX Design -->
-              <div class="dashboard-artifact-row">
+              <div class="dashboard-artifact-row" ${docUx ? `onclick="openDocInStudio('${docUx.id}')" style="cursor: pointer;"` : ''}>
                 <div class="artifact-row-left">
                   <span class="artifact-icon">🎨</span>
                   <div class="artifact-info">
                     <span class="artifact-filename">DESIGN.md & EXPERIENCE.md</span>
-                    <span class="artifact-meta">UX Design Tokens & Interactions • <code>2-plan-workflows/acl-ux/DESIGN.md</code></span>
+                    <span class="artifact-meta">${hasUxDoc ? 'UX Design Tokens & Interactions • <code>2-plan-workflows/acl-ux/DESIGN.md</code>' : 'UX Design Specs • <em>Covered in PRD</em>'}</span>
                   </div>
                 </div>
-                ${renderStatusBadge(statusUx)}
+                ${renderStatusBadge(hasUxDoc ? statusUx : 'Not Required')}
               </div>
             </div>
           </div>
@@ -3523,7 +3983,7 @@
             </div>
             <div class="phase-card-body">
               <!-- Architecture -->
-              <div class="dashboard-artifact-row">
+              <div class="dashboard-artifact-row" ${docArch ? `onclick="openDocInStudio('${docArch.id}')" style="cursor: pointer;"` : ''}>
                 <div class="artifact-row-left">
                   <span class="artifact-icon">🏛️</span>
                   <div class="artifact-info">
@@ -3535,7 +3995,7 @@
               </div>
 
               <!-- Epics & Stories Breakdown -->
-              <div class="dashboard-artifact-row">
+              <div class="dashboard-artifact-row" ${docEpics ? `onclick="openDocInStudio('${docEpics.id}')" style="cursor: pointer;"` : ''}>
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📋</span>
                   <div class="artifact-info">
@@ -3600,7 +4060,7 @@
                               (story) => `
                             <div class="story-item">
                               <div class="story-item-left">
-                                <span>${story.isCompleted ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' ? '🔴' : '🔹'}</span>
+                                <span>${story.isCompleted ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' || story.status === 'Need Action' ? '🔴' : '🔹'}</span>
                                 <span style="font-weight: 600; color: #1e293b;">${story.num ? `Story ${story.num}: ` : ''}${formatStoryTitle(story.title)}</span>
                               </div>
                               ${renderStatusBadge(story.status)}
@@ -3627,9 +4087,45 @@
                   </div>
                   `
               }
-            </div>
           </div>
 
+          ${
+            hasStandaloneSpecs
+              ? `
+          <!-- Standalone Spec Implementation (Below Phase 4) -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">⚡</div>
+                <div class="phase-title-text">
+                  <h3>Standalone Spec Implementation</h3>
+                  <span>Self-contained feature specifications and technical deliverables</span>
+                </div>
+              </div>
+              <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
+            </div>
+            <div class="phase-card-body">
+              ${specDocs
+                .map(
+                  (doc) => `
+                <div class="dashboard-artifact-row" onclick="openDocInStudio('${doc.id}')" style="cursor: pointer;">
+                  <div class="artifact-row-left">
+                    <span class="artifact-icon">📄</span>
+                    <div class="artifact-info">
+                      <span class="artifact-filename">${doc.filename}</span>
+                      <span class="artifact-meta">Standalone Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
+                    </div>
+                  </div>
+                  ${renderStatusBadge(getNormStatus(doc))}
+                </div>
+              `
+                )
+                .join('')}
+            </div>
+          </div>
+          `
+              : ''
+          }
         </div>
 
         <!-- Footer -->
@@ -3643,37 +4139,84 @@
         const container = document.getElementById('dashboardContainerRoot');
         if (!container) return;
 
-        function getDoc(pattern) {
-          return files.find((f) => {
-            const fn = (f.filename || '').toLowerCase();
-            const full = (f.fullPath || '').toLowerCase();
-            if (typeof pattern === 'string') return fn.includes(pattern) || full.includes(pattern);
-            return pattern.test(fn) || pattern.test(full);
-          });
+        const isBrownfield = isBrownfieldMode();
+        const currentTier = getActiveBrownfieldTier();
+
+        // Brownfield Tier 1 Mode: Only Spec Implementation phase card (No progress bar, no stats)
+        if (isBrownfield && currentTier === '1') {
+          const specDocs = getSpecDocs();
+
+          container.innerHTML = `
+          <!-- Top Scrum Master Header Card (Tier 1: No progress bar, no stats) -->
+          <div class="dashboard-header-card">
+            <div class="dashboard-header-top">
+              <div class="dashboard-title-group">
+                <h2><span>🏃</span> Scrum Master Dashboard <span style="font-weight: 500; color: #94a3b8; margin: 0 0.15rem;">-</span> ${renderProjectBadge()}</h2>
+                <p>Sprint deliverables, spec review status, and execution tracking.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sequential Phases Container (Only Spec Implementation) -->
+          <div class="dashboard-phases-container">
+            <div class="phase-card">
+              <div class="phase-card-header">
+                <div class="phase-title-left">
+                  <div class="phase-icon-badge">⚡</div>
+                  <div class="phase-title-text">
+                    <h3>Spec Implementation</h3>
+                    <span>Self-contained feature specifications and sprint deliverable tracking</span>
+                  </div>
+                </div>
+              </div>
+              <div class="phase-card-body">
+                ${
+                  specDocs.length > 0
+                    ? specDocs
+                        .map(
+                          (doc) => `
+                    <div class="dashboard-artifact-row" onclick="openDocInStudio('${doc.id}')" style="cursor: pointer;">
+                      <div class="artifact-row-left">
+                        <span class="artifact-icon">📄</span>
+                        <div class="artifact-info">
+                          <span class="artifact-filename">${doc.filename}</span>
+                          <span class="artifact-meta">Sprint Spec Deliverable • <code>${doc.folderPath}/${doc.filename}</code></span>
+                        </div>
+                      </div>
+                      ${renderStatusBadge(getNormStatus(doc))}
+                    </div>
+                  `,
+                        )
+                        .join('')
+                    : `
+                    <div class="dashboard-artifact-row">
+                      <div class="artifact-row-left">
+                        <span class="artifact-icon">📄</span>
+                        <div class="artifact-info">
+                          <span class="artifact-filename">spec-*.md</span>
+                          <span class="artifact-meta">No spec deliverable yet in <code>_acl-output/4-implementation/</code></span>
+                        </div>
+                      </div>
+                      ${renderStatusBadge('To Do')}
+                    </div>
+                  `
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1rem;">
+            To edit documents or record official manager sign-offs, switch to <strong>Markdown Studio</strong> from the ☰ menu.
+          </div>
+          `;
+          return;
         }
 
-        function renderStatusBadge(status) {
-          const s = status || 'To Do';
-          let cls = 'to-do';
-          let icon = '⚪';
-          if (s === 'Approved') {
-            cls = 'approved';
-            icon = '🟢';
-          } else if (s === 'In Review') {
-            cls = 'in-review';
-            icon = '🟡';
-          } else if (s === 'Rejected') {
-            cls = 'rejected';
-            icon = '🔴';
-          } else {
-            cls = 'to-do';
-            icon = '⚪';
-            return `<span class="dash-status-pill to-do"><span class="dot"></span>⚪ To Do</span>`;
-          }
-          return `<span class="dash-status-pill ${cls}"><span class="dot"></span>${icon} ${s}</span>`;
-        }
-
+        // Tier 2 (Brownfield) or Greenfield: Full Scrum Master dashboard
         const docEpics = getDoc(/epics\.md$/);
+        const specDocs = isBrownfield ? getSpecDocs() : [];
+        const approvedSpecsCount = specDocs.filter((d) => getNormStatus(d) === 'Approved').length;
         let parsedEpics = [];
         let totalStories = 0;
         let completedStories = 0;
@@ -3698,7 +4241,14 @@
           });
         }
 
-        const implementationProgress = totalStories > 0 ? Math.round((completedStories / totalStories) * 100) : 0;
+        let implementationProgress = 0;
+        if (totalStories > 0 && specDocs.length > 0) {
+          implementationProgress = Math.round(((completedStories / totalStories) * 0.7 + (approvedSpecsCount / specDocs.length) * 0.3) * 100);
+        } else if (totalStories > 0) {
+          implementationProgress = Math.round((completedStories / totalStories) * 100);
+        } else if (specDocs.length > 0) {
+          implementationProgress = Math.round((approvedSpecsCount / specDocs.length) * 100);
+        }
 
         if (!docEpics || parsedEpics.length === 0) {
           container.innerHTML = `
@@ -3706,7 +4256,7 @@
           <div class="dashboard-header-card">
             <div class="dashboard-header-top">
               <div class="dashboard-title-group">
-                <h2><span>🏃</span> Scrum Master Dashboard</h2>
+                <h2><span>🏃</span> Scrum Master Dashboard <span style="font-weight: 500; color: #94a3b8; margin: 0 0.15rem;">-</span> ${renderProjectBadge()}</h2>
                 <p>Epic-to-story delivery tracking, sprint progress, and task completion metrics.</p>
               </div>
             </div>
@@ -3724,6 +4274,46 @@
             </div>
           </div>
 
+          ${
+            specDocs.length > 0
+              ? `
+          <!-- Standalone Spec Implementation (Below Backlog notice) -->
+          <div class="dashboard-phases-container" style="margin-top: 1rem;">
+            <div class="phase-card">
+              <div class="phase-card-header">
+                <div class="phase-title-left">
+                  <div class="phase-icon-badge">⚡</div>
+                  <div class="phase-title-text">
+                    <h3>Standalone Spec Implementation</h3>
+                    <span>Self-contained feature specifications and sprint deliverable tracking</span>
+                  </div>
+                </div>
+                <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
+              </div>
+              <div class="phase-card-body">
+                ${specDocs
+                  .map(
+                    (doc) => `
+                  <div class="dashboard-artifact-row" onclick="openDocInStudio('${doc.id}')" style="cursor: pointer;">
+                    <div class="artifact-row-left">
+                      <span class="artifact-icon">📄</span>
+                      <div class="artifact-info">
+                        <span class="artifact-filename">${doc.filename}</span>
+                        <span class="artifact-meta">Sprint Spec Deliverable • <code>${doc.folderPath}/${doc.filename}</code></span>
+                      </div>
+                    </div>
+                    ${renderStatusBadge(getNormStatus(doc))}
+                  </div>
+                `
+                  )
+                  .join('')}
+              </div>
+            </div>
+          </div>
+          `
+              : ''
+          }
+
           <!-- Footer -->
           <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1.5rem;">
             To create or edit documents, switch to <strong>Markdown Studio</strong> from the ☰ menu.
@@ -3737,7 +4327,7 @@
         <div class="dashboard-header-card">
           <div class="dashboard-header-top">
             <div class="dashboard-title-group">
-              <h2><span>🏃</span> Scrum Master Dashboard</h2>
+              <h2><span>🏃</span> Scrum Master Dashboard <span style="font-weight: 500; color: #94a3b8; margin: 0 0.15rem;">-</span> ${renderProjectBadge()}</h2>
               <p>Epic-to-story delivery tracking, sprint progress, and task completion metrics.</p>
             </div>
           </div>
@@ -3752,12 +4342,12 @@
               <div class="progress-bar-fill" style="width: ${implementationProgress}%;"></div>
             </div>
             <div class="progress-bar-subtext">
-              <span>Total Stories Progress</span>
-              <span>${completedStories} of ${totalStories} Stories Completed</span>
+              <span>Total Deliverables Progress</span>
+              <span>${completedStories} of ${totalStories} Stories${specDocs.length > 0 ? ` • ${approvedSpecsCount} of ${specDocs.length} Standalone Specs Approved` : ' Completed'}</span>
             </div>
           </div>
 
-          <!-- Quick Summary Stats Grid (2 Cards: Epics & Stories) -->
+          <!-- Quick Summary Stats Grid (Epics, Stories, and Standalone Specs if present) -->
           <div class="dashboard-stats-grid">
             <div class="stat-card">
               <div class="stat-card-label">Epics</div>
@@ -3773,6 +4363,19 @@
                 <span class="stat-unit">Completed</span>
               </div>
             </div>
+            ${
+              specDocs.length > 0
+                ? `
+            <div class="stat-card">
+              <div class="stat-card-label">Specs</div>
+              <div class="stat-card-value-col">
+                <span class="stat-number" style="color: #0891b2;">${approvedSpecsCount}/${specDocs.length}</span>
+                <span class="stat-unit">Approved</span>
+              </div>
+            </div>
+            `
+                : ''
+            }
           </div>
         </div>
 
@@ -3812,7 +4415,7 @@
                           (story) => `
                         <div class="story-item">
                           <div class="story-item-left">
-                            <span>${story.isCompleted || story.status === 'Approved' ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' ? '🔴' : '🔹'}</span>
+                            <span>${story.isCompleted || story.status === 'Approved' ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' || story.status === 'Need Action' ? '🔴' : '🔹'}</span>
                             <span style="font-weight: 600; color: #1e293b;">${story.num ? `Story ${story.num}: ` : ''}${formatStoryTitle(story.title)}</span>
                           </div>
                           ${renderStatusBadge(story.status)}
@@ -3828,6 +4431,44 @@
               </div>
             </div>
           </div>
+
+          ${
+            specDocs.length > 0
+              ? `
+          <!-- Standalone Spec Implementation (Below Implementation Backlog) -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">⚡</div>
+                <div class="phase-title-text">
+                  <h3>Standalone Spec Implementation</h3>
+                  <span>Self-contained feature specifications and sprint deliverable tracking</span>
+                </div>
+              </div>
+              <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
+            </div>
+            <div class="phase-card-body">
+              ${specDocs
+                .map(
+                  (doc) => `
+                <div class="dashboard-artifact-row" onclick="openDocInStudio('${doc.id}')" style="cursor: pointer;">
+                  <div class="artifact-row-left">
+                    <span class="artifact-icon">📄</span>
+                    <div class="artifact-info">
+                      <span class="artifact-filename">${doc.filename}</span>
+                      <span class="artifact-meta">Sprint Spec Deliverable • <code>${doc.folderPath}/${doc.filename}</code></span>
+                    </div>
+                  </div>
+                  ${renderStatusBadge(getNormStatus(doc))}
+                </div>
+              `
+                )
+                .join('')}
+            </div>
+          </div>
+          `
+              : ''
+          }
         </div>
 
         <!-- Footer -->
@@ -3858,50 +4499,110 @@
         const container = document.getElementById('dashboardContainerRoot');
         if (!container) return;
 
-        function getDoc(pattern) {
-          return files.find((f) => {
-            const fn = (f.filename || '').toLowerCase();
-            const full = (f.fullPath || '').toLowerCase();
-            if (typeof pattern === 'string') return fn.includes(pattern) || full.includes(pattern);
-            return pattern.test(fn) || pattern.test(full);
-          });
+        const isBrownfield = isBrownfieldMode();
+        const currentTier = getActiveBrownfieldTier();
+
+        // Brownfield Tier 1 Mode: Clickable Spec File Accordion (reveals acceptance criteria directly, no separate header, no 0/8 badge)
+        if (isBrownfield && currentTier === '1') {
+          const specDocs = getSpecDocs();
+
+          container.innerHTML = `
+          <!-- Top Developer Header Card (Tier 1: No progress bar, no stats) -->
+          <div class="dashboard-header-card">
+            <div class="dashboard-header-top">
+              <div class="dashboard-title-group">
+                <h2><span>💻</span> Developer Dashboard <span style="font-weight: 500; color: #94a3b8; margin: 0 0.15rem;">-</span> ${renderProjectBadge()}</h2>
+                <p>Engineering telemetry, acceptance criteria checklist, and implementation specifications.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sequential Phases Container (Spec file row is the clickable accordion header) -->
+          <div class="dashboard-phases-container">
+            <div class="phase-card">
+              <div class="phase-card-header">
+                <div class="phase-title-left">
+                  <div class="phase-icon-badge">⚡</div>
+                  <div class="phase-title-text">
+                    <h3>Spec Implementation</h3>
+                    <span>Technical contracts, developer specifications, and acceptance criteria</span>
+                  </div>
+                </div>
+              </div>
+              <div class="phase-card-body">
+                ${
+                  specDocs.length > 0
+                    ? specDocs
+                        .map((doc, idx) => {
+                          const acItems = parseAcceptanceCriteriaFromSpec(doc.content);
+                          const accId = `specDevItem_${idx}`;
+                          return `
+                    <div class="story-accordion-item open" id="${accId}">
+                      <!-- Clickable Spec File Row: Toggles acceptance criteria directly -->
+                      <div class="story-accordion-header" onclick="toggleSpecAccordion('${accId}')" style="cursor: pointer; padding: 0.75rem 1rem;">
+                        <div class="story-item-left" style="display: flex; align-items: center; gap: 0.6rem;">
+                          <span class="story-chevron">▶</span>
+                          <span class="artifact-icon" style="font-size: 1.15rem;">📄</span>
+                          <div class="artifact-info">
+                            <span class="artifact-filename" style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${doc.filename}</span>
+                            <span class="artifact-meta" style="font-size: 0.76rem; color: #64748b;">Implementation Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
+                          </div>
+                        </div>
+                        ${renderStatusBadge(getNormStatus(doc))}
+                      </div>
+
+                      <!-- Acceptance criteria checklist revealed directly under spec file -->
+                      <div class="story-ac-body" style="display: block; padding: 0.75rem 1.25rem 1rem 2.4rem;">
+                        <div class="story-ac-card" style="border-left: 3px solid #3b82f6;">
+                          ${
+                            acItems.length > 0
+                              ? acItems
+                                  .map(
+                                    (ac) => `
+                            <div class="spec-ac-item">
+                              <span class="ac-checkbox-icon">${ac.isCompleted ? '✅' : '⚪'}</span>
+                              <span class="ac-text">${formatAcLine(ac.text)}</span>
+                            </div>
+                          `,
+                                  )
+                                  .join('')
+                              : `<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No acceptance criteria items found under '## Acceptance Criteria' in this spec.</div>`
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                        })
+                        .join('')
+                    : `
+                    <div class="dashboard-artifact-row">
+                      <div class="artifact-row-left">
+                        <span class="artifact-icon">📄</span>
+                        <div class="artifact-info">
+                          <span class="artifact-filename">spec-*.md</span>
+                          <span class="artifact-meta">No spec file generated yet in <code>_acl-output/4-implementation/</code></span>
+                        </div>
+                      </div>
+                      ${renderStatusBadge('To Do')}
+                    </div>
+                  `
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1rem;">
+            To edit documents or record official manager sign-offs, switch to <strong>Markdown Studio</strong> from the ☰ menu.
+          </div>
+          `;
+          return;
         }
 
-        function renderStatusBadge(status) {
-          const s = status || 'To Do';
-          let cls = 'to-do';
-          let icon = '⚪';
-          if (s === 'Approved') {
-            cls = 'approved';
-            icon = '🟢';
-          } else if (s === 'In Review') {
-            cls = 'in-review';
-            icon = '🟡';
-          } else if (s === 'Rejected') {
-            cls = 'rejected';
-            icon = '🔴';
-          } else {
-            cls = 'to-do';
-            icon = '⚪';
-            return `<span class="dash-status-pill to-do"><span class="dot"></span>⚪ To Do</span>`;
-          }
-          return `<span class="dash-status-pill ${cls}"><span class="dot"></span>${icon} ${s}</span>`;
-        }
-
-        function formatAcLine(text) {
-          if (!text) return '';
-          return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(
-              /`([^`]+)`/g,
-              '<code style="background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; font-family: monospace; font-size: 0.72rem; color: #475569;">$1</code>',
-            );
-        }
-
+        // Tier 2 (Brownfield) or Greenfield: Full Developer dashboard
         const docEpics = getDoc(/epics\.md$/);
+        const specDocs = isBrownfield ? getSpecDocs() : [];
+        const approvedSpecsCount = specDocs.filter((d) => getNormStatus(d) === 'Approved').length;
         let parsedEpics = [];
         let totalStories = 0;
         let completedStories = 0;
@@ -3926,7 +4627,14 @@
           });
         }
 
-        const implementationProgress = totalStories > 0 ? Math.round((completedStories / totalStories) * 100) : 0;
+        let implementationProgress = 0;
+        if (totalStories > 0 && specDocs.length > 0) {
+          implementationProgress = Math.round(((completedStories / totalStories) * 0.7 + (approvedSpecsCount / specDocs.length) * 0.3) * 100);
+        } else if (totalStories > 0) {
+          implementationProgress = Math.round((completedStories / totalStories) * 100);
+        } else if (specDocs.length > 0) {
+          implementationProgress = Math.round((approvedSpecsCount / specDocs.length) * 100);
+        }
 
         if (!docEpics || parsedEpics.length === 0) {
           container.innerHTML = `
@@ -3934,7 +4642,7 @@
           <div class="dashboard-header-card">
             <div class="dashboard-header-top">
               <div class="dashboard-title-group">
-                <h2><span>💻</span> Developer Dashboard</h2>
+                <h2><span>💻</span> Developer Dashboard <span style="font-weight: 500; color: #94a3b8; margin: 0 0.15rem;">-</span> ${renderProjectBadge()}</h2>
                 <p>Engineering telemetry, user story acceptance criteria, and implementation specifications.</p>
               </div>
             </div>
@@ -3952,6 +4660,72 @@
             </div>
           </div>
 
+          ${
+            specDocs.length > 0
+              ? `
+          <!-- Standalone Spec Implementation (Below Backlog notice) -->
+          <div class="dashboard-phases-container" style="margin-top: 1rem;">
+            <div class="phase-card">
+              <div class="phase-card-header">
+                <div class="phase-title-left">
+                  <div class="phase-icon-badge">⚡</div>
+                  <div class="phase-title-text">
+                    <h3>Standalone Spec Implementation</h3>
+                    <span>Technical contracts, standalone specifications, and acceptance criteria</span>
+                  </div>
+                </div>
+                <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
+              </div>
+              <div class="phase-card-body">
+                ${specDocs
+                  .map((doc, idx) => {
+                    const acItems = parseAcceptanceCriteriaFromSpec(doc.content);
+                    const accId = `specDevItem_zero_${idx}`;
+                    return `
+                  <div class="story-accordion-item open" id="${accId}">
+                    <!-- Clickable Spec File Row: Toggles acceptance criteria directly -->
+                    <div class="story-accordion-header" onclick="toggleSpecAccordion('${accId}')" style="cursor: pointer; padding: 0.75rem 1rem;">
+                      <div class="story-item-left" style="display: flex; align-items: center; gap: 0.6rem;">
+                        <span class="story-chevron">▶</span>
+                        <span class="artifact-icon" style="font-size: 1.15rem;">📄</span>
+                        <div class="artifact-info">
+                          <span class="artifact-filename" style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${doc.filename}</span>
+                          <span class="artifact-meta" style="font-size: 0.76rem; color: #64748b;">Implementation Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
+                        </div>
+                      </div>
+                      ${renderStatusBadge(getNormStatus(doc))}
+                    </div>
+
+                    <!-- Acceptance criteria checklist revealed directly under spec file -->
+                    <div class="story-ac-body" style="display: block; padding: 0.75rem 1.25rem 1rem 2.4rem;">
+                      <div class="story-ac-card" style="border-left: 3px solid #3b82f6;">
+                        ${
+                          acItems.length > 0
+                            ? acItems
+                                .map(
+                                  (ac) => `
+                          <div class="spec-ac-item">
+                            <span class="ac-checkbox-icon">${ac.isCompleted ? '✅' : '⚪'}</span>
+                            <span class="ac-text">${formatAcLine(ac.text)}</span>
+                          </div>
+                        `
+                                )
+                                .join('')
+                            : `<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No acceptance criteria items found under '## Acceptance Criteria' in this spec.</div>`
+                        }
+                      </div>
+                    </div>
+                  </div>
+                `;
+                  })
+                  .join('')}
+              </div>
+            </div>
+          </div>
+          `
+              : ''
+          }
+
           <!-- Footer -->
           <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1.5rem;">
             To create or edit documents, switch to <strong>Markdown Studio</strong> from the ☰ menu.
@@ -3965,7 +4739,7 @@
         <div class="dashboard-header-card">
           <div class="dashboard-header-top">
             <div class="dashboard-title-group">
-              <h2><span>💻</span> Developer Dashboard</h2>
+              <h2><span>💻</span> Developer Dashboard <span style="font-weight: 500; color: #94a3b8; margin: 0 0.15rem;">-</span> ${renderProjectBadge()}</h2>
               <p>Engineering telemetry, user story acceptance criteria, and implementation specifications.</p>
             </div>
           </div>
@@ -3980,12 +4754,12 @@
               <div class="progress-bar-fill" style="width: ${implementationProgress}%;"></div>
             </div>
             <div class="progress-bar-subtext">
-              <span>Total Stories Progress</span>
-              <span>${completedStories} of ${totalStories} Stories Completed</span>
+              <span>Total Deliverables Progress</span>
+              <span>${completedStories} of ${totalStories} Stories${specDocs.length > 0 ? ` • ${approvedSpecsCount} of ${specDocs.length} Standalone Specs Approved` : ' Completed'}</span>
             </div>
           </div>
 
-          <!-- Quick Summary Stats Grid (2 Cards: Epics & Stories) -->
+          <!-- Quick Summary Stats Grid (Epics, Stories, and Standalone Specs if present) -->
           <div class="dashboard-stats-grid">
             <div class="stat-card">
               <div class="stat-card-label">Epics</div>
@@ -4001,6 +4775,19 @@
                 <span class="stat-unit">Completed</span>
               </div>
             </div>
+            ${
+              specDocs.length > 0
+                ? `
+            <div class="stat-card">
+              <div class="stat-card-label">Specs</div>
+              <div class="stat-card-value-col">
+                <span class="stat-number" style="color: #0891b2;">${approvedSpecsCount}/${specDocs.length}</span>
+                <span class="stat-unit">Approved</span>
+              </div>
+            </div>
+            `
+                : ''
+            }
           </div>
         </div>
 
@@ -4045,7 +4832,7 @@
                             <div class="story-accordion-header" onclick="toggleStoryAccordion('${sKey}')">
                               <div class="story-item-left">
                                 <span class="story-chevron">▶</span>
-                                <span>${story.isCompleted || story.status === 'Approved' ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' ? '🔴' : '🔹'}</span>
+                                <span>${story.isCompleted || story.status === 'Approved' ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' || story.status === 'Need Action' ? '🔴' : '🔹'}</span>
                                 <span style="font-weight: 600; color: #1e293b;">${story.num ? `Story ${story.num}: ` : ''}${formatStoryTitle(story.title)}</span>
                               </div>
                               ${renderStatusBadge(story.status)}
@@ -4081,6 +4868,70 @@
               </div>
             </div>
           </div>
+
+          ${
+            specDocs.length > 0
+              ? `
+          <!-- Standalone Spec Implementation (Below Implementation Backlog) -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">⚡</div>
+                <div class="phase-title-text">
+                  <h3>Standalone Spec Implementation</h3>
+                  <span>Technical contracts, standalone specifications, and acceptance criteria</span>
+                </div>
+              </div>
+              <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
+            </div>
+            <div class="phase-card-body">
+              ${specDocs
+                .map((doc, idx) => {
+                  const acItems = parseAcceptanceCriteriaFromSpec(doc.content);
+                  const accId = `specDevItem_tier2_${idx}`;
+                  return `
+                <div class="story-accordion-item open" id="${accId}">
+                  <!-- Clickable Spec File Row: Toggles acceptance criteria directly -->
+                  <div class="story-accordion-header" onclick="toggleSpecAccordion('${accId}')" style="cursor: pointer; padding: 0.75rem 1rem;">
+                    <div class="story-item-left" style="display: flex; align-items: center; gap: 0.6rem;">
+                      <span class="story-chevron">▶</span>
+                      <span class="artifact-icon" style="font-size: 1.15rem;">📄</span>
+                      <div class="artifact-info">
+                        <span class="artifact-filename" style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${doc.filename}</span>
+                        <span class="artifact-meta" style="font-size: 0.76rem; color: #64748b;">Implementation Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
+                      </div>
+                    </div>
+                    ${renderStatusBadge(getNormStatus(doc))}
+                  </div>
+
+                  <!-- Acceptance criteria checklist revealed directly under spec file -->
+                  <div class="story-ac-body" style="display: block; padding: 0.75rem 1.25rem 1rem 2.4rem;">
+                    <div class="story-ac-card" style="border-left: 3px solid #3b82f6;">
+                      ${
+                        acItems.length > 0
+                          ? acItems
+                              .map(
+                                (ac) => `
+                        <div class="spec-ac-item">
+                          <span class="ac-checkbox-icon">${ac.isCompleted ? '✅' : '⚪'}</span>
+                          <span class="ac-text">${formatAcLine(ac.text)}</span>
+                        </div>
+                      `
+                              )
+                              .join('')
+                          : `<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No acceptance criteria items found under '## Acceptance Criteria' in this spec.</div>`
+                      }
+                    </div>
+                  </div>
+                </div>
+              `;
+                })
+                .join('')}
+            </div>
+          </div>
+          `
+              : ''
+          }
         </div>
 
         <!-- Footer -->

@@ -5,6 +5,13 @@ A flexible starting structure for the executive product brief. Adapt aggressivel
 ## Default Structure
 
 ```markdown
+---
+title: "Product Brief: {Product Name}"
+project_type: greenfield # or brownfield if created in Brownfield Tier 2
+status: In Review
+created: "{YYYY-MM-DD}"
+---
+
 # Product Brief: {Product Name}
 
 ## Executive Summary

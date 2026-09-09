@@ -75,6 +75,32 @@ function getDiskMarkdownFiles() {
           else if (raw.includes('reject')) status = 'Rejected';
           else status = 'In Review';
         }
+
+        let projectType = null;
+        const typeMatch = content.match(/project_type:\s*([^\n\r]+)/i);
+        if (typeMatch && typeMatch[1]) {
+          projectType = typeMatch[1].trim().toLowerCase().replaceAll(/['"]/g, '');
+        }
+
+        let tier = null;
+        const tierMatch = content.match(/tier:\s*([^\n\r]+)/i);
+        if (tierMatch && tierMatch[1]) {
+          const rawTier = tierMatch[1].trim().toLowerCase();
+          if (rawTier.includes('1') || rawTier.includes('spec') || rawTier.includes('self-contained')) {
+            tier = '1';
+          } else if (
+            rawTier.includes('2') ||
+            rawTier.includes('major') ||
+            rawTier.includes('enterprise') ||
+            rawTier.includes('architecture')
+          ) {
+            tier = '2';
+          }
+        }
+        if (!tier && (/epics\.md/i.test(content) || /architecture-spine/i.test(content))) {
+          tier = '2';
+        }
+
         const folderPath = path.dirname(rel).replaceAll('\\', '/');
         list.push({
           id: rel.replaceAll(/[^a-zA-Z0-9_-]/g, '_'),
@@ -82,6 +108,8 @@ function getDiskMarkdownFiles() {
           filename: entry.name,
           fullPath: rel,
           status: status,
+          projectType: projectType,
+          tier: tier,
           createdAt: stat.birthtime.toISOString(),
           updatedAt: stat.mtime.toISOString(),
           content: content,
@@ -1250,15 +1278,50 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === '/api/list-markdown-files') {
     const files = getDiskMarkdownFiles();
-    let frameworkVersion = '6.11.14';
+    let frameworkVersion = '6.11.15';
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
       if (pkg && pkg.version) frameworkVersion = pkg.version;
     } catch {
       // Use fallback version
     }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, files: files, frameworkVersion: frameworkVersion, version: frameworkVersion }));
+
+    let activeTier = null;
+    for (const cand of ['_acl-output/.tier', '_acl-output/tier.json', '.tier']) {
+      const tp = path.join(PROJECT_ROOT, cand);
+      if (fs.existsSync(tp)) {
+        try {
+          const raw = fs.readFileSync(tp, 'utf8').trim().toLowerCase();
+          if (raw.includes('2')) activeTier = '2';
+          else if (raw.includes('1')) activeTier = '1';
+          break;
+        } catch {
+          // Ignore read error
+        }
+      }
+    }
+    if (!activeTier) {
+      if (files.some((f) => (f.filename || '').toLowerCase().includes('epics.md') || (f.filename || '').toLowerCase().includes('spine'))) {
+        activeTier = '2';
+      } else {
+        const fileWithTier = files.find((f) => f.tier);
+        if (fileWithTier) activeTier = fileWithTier.tier;
+      }
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    });
+    res.end(
+      JSON.stringify({
+        success: true,
+        files: files,
+        activeTier: activeTier,
+        frameworkVersion: frameworkVersion,
+        version: frameworkVersion,
+      }),
+    );
     return;
   }
 
