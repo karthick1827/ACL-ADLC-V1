@@ -124,7 +124,9 @@ Based on discovery, create or update the context document:
 #### A. Fresh Document Setup (if no existing context)
 
 Copy template from `../project-context-template.md` to `{output_folder}/project-context.md`
-Initialize frontmatter fields.
+Initialize frontmatter fields:
+- Set `project_type: brownfield` (or `project_type: greenfield` if running Phase 3 downstream of a Greenfield brief).
+- Set `status: In Review` to enter the Markdown Studio review queue for Manager sign-off.
 
 #### B. Existing Document Update
 

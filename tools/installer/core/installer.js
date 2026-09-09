@@ -886,7 +886,7 @@ function aclMarkdownSaverPlugin() {
               }
               if (cleanFolder === '_acl-output' || cleanFolder === 'root' || cleanFolder === '.') {
                 const lowerName = (filename || '').toLowerCase();
-                if (lowerName === 'project-context.md') cleanFolder = '_acl-output/0-context/acl-generate-project-context';
+                if (lowerName === 'project-context.md') cleanFolder = '_acl-output';
                 else if (lowerName === 'brief.md') cleanFolder = '_acl-output/1-analysis/acl-product-brief';
                 else if (lowerName === 'prd.md') cleanFolder = '_acl-output/2-plan-workflows/acl-prd';
                 else if (lowerName === 'architecture-spine.md' || lowerName === 'architecture.md') cleanFolder = '_acl-output/3-solutioning/acl-architecture';

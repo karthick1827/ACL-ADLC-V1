@@ -121,8 +121,12 @@ function getDiskMarkdownFiles() {
 
   // Scan exclusively _acl-output/
   scan(ACL_OUTPUT_DIR, '');
-  list.sort((a, b) => a.fullPath.localeCompare(b.fullPath, undefined, { numeric: true, sensitivity: 'base' }));
-  return list;
+  const hasRootContext = list.some((item) => item.filename.toLowerCase() === 'project-context.md' && item.folderPath === 'root');
+  const filteredList = hasRootContext
+    ? list.filter((item) => !(item.filename.toLowerCase() === 'project-context.md' && item.folderPath !== 'root'))
+    : list;
+  filteredList.sort((a, b) => a.fullPath.localeCompare(b.fullPath, undefined, { numeric: true, sensitivity: 'base' }));
+  return filteredList;
 }
 
 // ============================================================================
@@ -372,13 +376,16 @@ function generateDeliverableTemplate(stepKey, mode = 'greenfield', defaultTitle 
 
   switch (stepKey) {
     case 'project_context': {
+      const projectType = isBrownfield ? 'brownfield' : 'greenfield';
       return {
-        folderPath: '0-context/acl-generate-project-context',
+        folderPath: 'root',
         filename: 'project-context.md',
-        phaseName: 'Phase 0: Context Discovery',
+        phaseName: 'Project Context',
         content: `---
+project_name: '${projectTitle}'
+project_type: ${projectType}
 status: In Review
-phase: Phase 0 - Codebase Context Discovery
+phase: Context Discovery
 workflow_mode: ${modeLabel}
 created_at: ${nowIso}
 reviewed_by: Pending Manager Review
@@ -413,6 +420,7 @@ reviewed_by: Pending Manager Review
     }
 
     case 'brief': {
+      const projectType = isBrownfield ? 'brownfield' : 'greenfield';
       const figmaSection =
         allFigmaLinks.length > 0
           ? allFigmaLinks.map((l) => `- [Figma Design Reference](${l})`).join('\n')
@@ -423,6 +431,8 @@ reviewed_by: Pending Manager Review
         filename: 'brief.md',
         phaseName: 'Phase 1: Analysis (Product Brief)',
         content: `---
+title: "Product Brief: ${projectTitle}"
+project_type: ${projectType}
 status: In Review
 phase: Phase 1 - Analysis (Product Brief)
 workflow_mode: ${modeLabel}
@@ -1014,7 +1024,7 @@ function readSkillInstructions(stepKey) {
 function resolveDeliverableFolder(stepKey, options = {}) {
   switch (stepKey) {
     case 'project_context': {
-      return { folderPath: '0-context/acl-generate-project-context', filename: 'project-context.md' };
+      return { folderPath: 'root', filename: 'project-context.md' };
     }
     case 'brief': {
       return { folderPath: '1-analysis/acl-product-brief', filename: 'brief.md' };
@@ -1181,6 +1191,7 @@ CRITICAL RULES:
 2. Produce a thorough, complete, enterprise-grade specification without skipping sections or using placeholders.
 3. Output proper markdown starting directly with YAML frontmatter:
 ---
+project_type: ${(mode || 'greenfield').toLowerCase() === 'brownfield' ? 'brownfield' : 'greenfield'}
 status: In Review
 phase: ${stepKey}
 workflow_mode: ${mode || 'greenfield'}
@@ -1236,11 +1247,15 @@ reviewed_by: Pending Manager Review
         .trim();
     }
 
+    const resolvedProjectType = (mode || '').toLowerCase() === 'brownfield' ? 'brownfield' : 'greenfield';
     if (cleanContent.startsWith('---')) {
       cleanContent = cleanContent.replace(/status:\s*[^\r\n]+/i, 'status: In Review');
+      if (!/project_type:\s*[^\r\n]+/i.test(cleanContent)) {
+        cleanContent = cleanContent.replace(/^---\r?\n/, `---\nproject_type: ${resolvedProjectType}\n`);
+      }
     } else {
       cleanContent =
-        `---\nstatus: In Review\nphase: ${stepKey}\nworkflow_mode: ${mode || 'greenfield'}\ncreated_at: ${new Date().toISOString()}\nreviewed_by: Pending Manager Review\n---\n\n` +
+        `---\nproject_type: ${resolvedProjectType}\nstatus: In Review\nphase: ${stepKey}\nworkflow_mode: ${mode || 'greenfield'}\ncreated_at: ${new Date().toISOString()}\nreviewed_by: Pending Manager Review\n---\n\n` +
         cleanContent;
     }
 
@@ -1409,14 +1424,13 @@ const server = http.createServer((req, res) => {
         let cleanFolder = (folderPath || '').replaceAll('\\', '/').trim();
         cleanFolder = cleanFolder.replace(/^(_acl-output|_acl_output|acl-output)\/?/i, '');
 
-        // Route standard artifacts to their canonical phase folders if saved from root
-        if (!cleanFolder || cleanFolder === 'root' || cleanFolder === '.') {
-          const lowerName = (filename || '').toLowerCase();
+        // Normalize project-context.md always to root of _acl-output
+        const lowerName = (filename || '').toLowerCase();
+        if (lowerName === 'project-context.md') {
+          cleanFolder = '';
+        } else if (!cleanFolder || cleanFolder === 'root' || cleanFolder === '.') {
+          // Route standard artifacts to their canonical phase folders if saved from root
           switch (lowerName) {
-            case 'project-context.md': {
-              cleanFolder = '0-context/acl-generate-project-context';
-              break;
-            }
             case 'brief.md': {
               cleanFolder = '1-analysis/acl-product-brief';
               break;
@@ -1447,6 +1461,22 @@ const server = http.createServer((req, res) => {
         const targetFile = path.join(targetDir, filename);
         fs.writeFileSync(targetFile, content, 'utf8');
         console.log(`[Studio Server] Saved live to disk: ${targetFile}`);
+
+        // If saving project-context.md at root, clean up any legacy nested duplicate
+        if (lowerName === 'project-context.md') {
+          const legacyNestedFile = path.join(baseDir, '0-context', 'acl-generate-project-context', 'project-context.md');
+          if (fs.existsSync(legacyNestedFile)) {
+            try {
+              fs.unlinkSync(legacyNestedFile);
+              const legacyDir = path.dirname(legacyNestedFile);
+              if (fs.readdirSync(legacyDir).length === 0) fs.rmdirSync(legacyDir);
+              const parentLegacyDir = path.dirname(legacyDir);
+              if (fs.readdirSync(parentLegacyDir).length === 0) fs.rmdirSync(parentLegacyDir);
+            } catch {
+              // Ignore cleanup error
+            }
+          }
+        }
 
         let gitPushed = false;
         if (autoPush) {
