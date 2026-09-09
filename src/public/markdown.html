@@ -1884,7 +1884,6 @@
         font-weight: bold;
       }
 
-
       .spec-ac-item {
         font-size: 0.86rem;
         line-height: 1.5;
@@ -2119,6 +2118,7 @@
       let activeFileId = null;
       let isDirty = false;
       let currentMode = 'preview';
+      let openFolders = new Set();
 
       // Phase Gate Definitions
       function formatFileDateTime(isoString) {
@@ -2221,6 +2221,7 @@
               let filteredFiles = data.files.filter((f) => !isChildFile(f.filename, f.folderPath));
 
               // Deduplicate files: prefer canonical numbered phase directories over root/duplicate paths
+              // EXCEPTION: project-context.md MUST always prefer root over nested directories!
               const seenMap = new Map();
               for (const f of filteredFiles) {
                 const key = f.filename.toLowerCase();
@@ -2228,7 +2229,11 @@
                   seenMap.set(key, f);
                 } else {
                   const existing = seenMap.get(key);
-                  if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && f.folderPath.match(/[0-4]-/))) {
+                  if (key === 'project-context.md') {
+                    if (f.folderPath === 'root' || !f.folderPath.includes('0-context')) {
+                      seenMap.set(key, f);
+                    }
+                  } else if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && f.folderPath.match(/[0-4]-/))) {
                     seenMap.set(key, f);
                   }
                 }
@@ -2245,31 +2250,38 @@
                 setSyncStatus('Synced with VS code and Github (0 files in _acl-output)', 'green');
                 return true;
               }
-              const hasChanged =
-                JSON.stringify(
-                  filteredFiles.map((f) => ({
-                    id: f.id,
-                    content: f.content,
-                    status: f.status,
-                    tier: f.tier,
-                    updatedAt: f.updatedAt,
-                  })),
-                ) !==
-                JSON.stringify(
-                  files.map((f) => ({
-                    id: f.id,
-                    content: f.content,
-                    status: f.status,
-                    tier: f.tier,
-                    updatedAt: f.updatedAt,
-                  })),
-                );
+
+              const normIncoming = filteredFiles.map((f) => ({
+                ...f,
+                status:
+                  f.status === 'Accepted' || f.status === 'approved' || f.status === 'Approved' ? 'Approved' : f.status || 'In Review',
+              }));
+
+              const prevFingerprint = JSON.stringify(
+                files.map((f) => ({
+                  id: f.id,
+                  filename: f.filename,
+                  folderPath: f.folderPath,
+                  content: f.content,
+                  status: f.status,
+                  tier: f.tier,
+                })),
+              );
+              const nextFingerprint = JSON.stringify(
+                normIncoming.map((f) => ({
+                  id: f.id,
+                  filename: f.filename,
+                  folderPath: f.folderPath,
+                  content: f.content,
+                  status: f.status,
+                  tier: f.tier,
+                })),
+              );
+              const hasChanged = prevFingerprint !== nextFingerprint;
 
               if (hasChanged || files.length === 0) {
-                files = filteredFiles.map((f) => ({
-                  ...f,
-                  status: f.status === 'Accepted' || f.status === 'approved' ? 'Approved' : f.status || 'In Review',
-                }));
+                const prevActiveFile = files.find((f) => f.id === activeFileId);
+                files = normIncoming;
                 try {
                   localStorage.setItem('acl_adlc_project_markdown_files', JSON.stringify(files));
                 } catch (e) {}
@@ -2277,7 +2289,9 @@
                   activeFileId = getInitialActiveFileId(files);
                 }
                 renderFileTree();
-                if (activeFileId && !isDirty) {
+                const currentActiveFile = files.find((f) => f.id === activeFileId);
+                const activeContentChanged = !prevActiveFile || (currentActiveFile && prevActiveFile.content !== currentActiveFile.content);
+                if (activeFileId && !isDirty && activeContentChanged) {
                   loadFile(activeFileId);
                 }
                 if (activeAppView === 'dashboard' || activeAppView === 'dashboard-summarized') {
@@ -2293,8 +2307,8 @@
               return true;
             }
           }
-        } catch (e) {}
-        finally {
+        } catch (e) {
+        } finally {
           isSyncing = false;
         }
         evaluateProceedButton();
@@ -2629,6 +2643,9 @@
             targetOpenFolder = activeFile.folderPath || 'root';
           }
         }
+        if (openFolders.size === 0 && targetOpenFolder) {
+          openFolders.add(targetOpenFolder);
+        }
 
         folderOrder.forEach((folderPath) => {
           const folderDiv = document.createElement('div');
@@ -2650,7 +2667,7 @@
             `Folder: ${folderPath}\nLocation: _acl-output/${folderPath}\nContains: ${fileCountText}\nLast Updated: ${formattedFolderTime}`,
           );
 
-          const isOpen = searchQuery !== '' ? true : folderPath === targetOpenFolder;
+          const isOpen = searchQuery !== '' ? true : openFolders.has(folderPath);
 
           headerDiv.innerHTML = `
           <div class="folder-title-left">
@@ -2665,18 +2682,16 @@
 
           headerDiv.addEventListener('click', () => {
             const isCurrentlyHidden = filesDiv.classList.contains('hidden');
-            // Accordion: collapse all other folders in root
-            root.querySelectorAll('.folder-item').forEach((item) => {
-              const list = item.querySelector('.folder-files-list');
-              const chv = item.querySelector('.folder-chevron');
-              if (list) list.classList.add('hidden');
-              if (chv) chv.classList.add('collapsed');
-            });
-
             if (isCurrentlyHidden) {
               filesDiv.classList.remove('hidden');
               const chv = headerDiv.querySelector('.folder-chevron');
               if (chv) chv.classList.remove('collapsed');
+              openFolders.add(folderPath);
+            } else {
+              filesDiv.classList.add('hidden');
+              const chv = headerDiv.querySelector('.folder-chevron');
+              if (chv) chv.classList.add('collapsed');
+              openFolders.delete(folderPath);
             }
           });
 
@@ -2734,6 +2749,7 @@
           }
         }
         activeFileId = file.id;
+        openFolders.add(file.folderPath || 'root');
 
         document.getElementById('breadcrumbPathText').textContent = `${file.folderPath} / ${file.filename}`;
         const statusSelect = document.getElementById('statusSelect');
@@ -3188,9 +3204,13 @@
 
           // Match Story header, checkbox item, bold bullet item, or plain bullet item inside epic
           if (currentEpic) {
-            const storyHeaderMatch = line.match(/^(?:###|####)\s*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(?:\[([ xX])\]\s*)?(.+)$/i);
+            const storyHeaderMatch = line.match(
+              /^(?:###|####)\s*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(?:\[([ xX])\]\s*)?(.+)$/i,
+            );
             const checkboxMatch = line.match(/^-\s*\[([ xX])\]\s*(?:Story\s*([\d\.]+)[:\-\s]*)?(.+)$/i);
-            const bulletBoldMatch = line.match(/^(?:-\s*)?\*\*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(.+?)\*\*(.*)$/i);
+            const bulletBoldMatch = line.match(
+              /^(?:-\s*)?\*\*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(.+?)\*\*(.*)$/i,
+            );
             const bulletPlainMatch = line.match(/^-\s*(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(.+)$/i);
 
             let sNum = null;
@@ -3243,8 +3263,8 @@
                   const fn = (f.filename || '').toLowerCase();
                   const fp = (f.fullPath || f.folderPath || f.path || '').toLowerCase();
                   return (
-                    numSlug && (
-                      fn.includes(`spec-${numSlug}`) ||
+                    numSlug &&
+                    (fn.includes(`spec-${numSlug}`) ||
                       fn.includes(`spec-${dotSlug}`) ||
                       fn.includes(`story-${numSlug}`) ||
                       fn.includes(`story-${dotSlug}`) ||
@@ -3255,8 +3275,7 @@
                       fp.includes(`story-${numSlug}`) ||
                       fp.includes(`story-${dotSlug}`) ||
                       fp.includes(`spec-${numSlug}`) ||
-                      fp.includes(`spec-${dotSlug}`)
-                    )
+                      fp.includes(`spec-${dotSlug}`))
                   );
                 });
 
@@ -3384,7 +3403,10 @@
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
-          .replace(/`([^`]+)`/g, '<code style="background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; font-family: monospace; font-size: 0.85em; color: #475569;">$1</code>');
+          .replace(
+            /`([^`]+)`/g,
+            '<code style="background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; font-family: monospace; font-size: 0.85em; color: #475569;">$1</code>',
+          );
       }
 
       window.toggleEpicAccordion = function (index) {
@@ -3442,7 +3464,7 @@
           return false;
         });
         if (fileWithTier) {
-          const raw = fileWithTier.tier || (fileWithTier.content.match(/^tier:\s*([^\n\r]+)/im)?.[1] || '');
+          const raw = fileWithTier.tier || fileWithTier.content.match(/^tier:\s*([^\n\r]+)/im)?.[1] || '';
           const clean = raw.toLowerCase();
           if (clean.includes('2') || clean.includes('major') || clean.includes('enterprise') || clean.includes('architecture')) return '2';
           if (clean.includes('1') || clean.includes('spec') || clean.includes('self-contained')) return '1';
@@ -3450,7 +3472,14 @@
         const hasTier2Docs = (files || []).some((f) => {
           const fn = (f.filename || '').toLowerCase();
           const folder = (f.folderPath || '').toLowerCase();
-          return fn === 'epics.md' || fn === 'architecture-spine.md' || fn === 'prd.md' || folder.includes('3-solutioning') || folder.includes('2-plan-workflows') || folder.includes('1-analysis');
+          return (
+            fn === 'epics.md' ||
+            fn === 'architecture-spine.md' ||
+            fn === 'prd.md' ||
+            folder.includes('3-solutioning') ||
+            folder.includes('2-plan-workflows') ||
+            folder.includes('1-analysis')
+          );
         });
         if (hasTier2Docs) return '2';
         const hasSpecDocs = (files || []).some((f) => {
@@ -3460,7 +3489,6 @@
         if (hasSpecDocs) return '1';
         return '1';
       }
-
 
       window.openDocInStudio = function (fileId) {
         if (!fileId) return;
@@ -3661,7 +3689,7 @@
                     <span class="artifact-icon">📄</span>
                     <div class="artifact-info">
                       <span class="artifact-filename">${docContext ? docContext.filename : 'project-context.md'}</span>
-                      <span class="artifact-meta">Project Context • <code>${docContext ? (docContext.folderPath + '/' + docContext.filename) : '_acl-output/project-context.md'}</code></span>
+                      <span class="artifact-meta">Project Context • <code>${docContext ? (docContext.folderPath === 'root' || !docContext.folderPath ? '_acl-output/' + docContext.filename : docContext.folderPath + '/' + docContext.filename) : '_acl-output/project-context.md'}</code></span>
                     </div>
                   </div>
                   ${renderStatusBadge(statusContext)}
@@ -3750,7 +3778,7 @@
         const statusUx = docUx ? getNormStatus(docUx) : 'To Do';
         const uxApproved = statusUx === 'Approved';
         const uxContrib = uxApproved ? 5 : 0;
-        const prdContrib = prdApproved ? (hasUxDoc ? 5 : (isBrownfieldTier2 ? 5 : 10)) : 0;
+        const prdContrib = prdApproved ? (hasUxDoc ? 5 : isBrownfieldTier2 ? 5 : 10) : 0;
 
         // Phase 3A: Architecture (ARCHITECTURE-SPINE.md / architecture.md) - Weight: 5%
         const docArch = getDoc(/architecture-spine\.md|architecture\.md/);
@@ -3794,7 +3822,10 @@
         }
 
         // Calculate Total Progress (100% max)
-        const totalProgress = Math.min(100, contextContrib + briefContrib + prdContrib + uxContrib + archContrib + epicsContrib + specContrib + phase4Contrib);
+        const totalProgress = Math.min(
+          100,
+          contextContrib + briefContrib + prdContrib + uxContrib + archContrib + epicsContrib + specContrib + phase4Contrib,
+        );
 
         // Summary Counts (6 phases if standalone specs exist in Tier 2, 5 for standard Tier 2, 4 for Greenfield)
         let completedPhasesCount = 0;
@@ -3896,7 +3927,7 @@
                   <span class="artifact-icon">📄</span>
                   <div class="artifact-info">
                     <span class="artifact-filename">${docContext ? docContext.filename : 'project-context.md'}</span>
-                    <span class="artifact-meta">Project Context • <code>${docContext ? (docContext.folderPath + '/' + docContext.filename) : '_acl-output/project-context.md'}</code></span>
+                    <span class="artifact-meta">Project Context • <code>${docContext ? (docContext.folderPath === 'root' || !docContext.folderPath ? '_acl-output/' + docContext.filename : docContext.folderPath + '/' + docContext.filename) : '_acl-output/project-context.md'}</code></span>
                   </div>
                 </div>
                 ${renderStatusBadge(statusContext)}
@@ -4118,7 +4149,7 @@
                   </div>
                   ${renderStatusBadge(getNormStatus(doc))}
                 </div>
-              `
+              `,
                 )
                 .join('')}
             </div>
@@ -4243,7 +4274,9 @@
 
         let implementationProgress = 0;
         if (totalStories > 0 && specDocs.length > 0) {
-          implementationProgress = Math.round(((completedStories / totalStories) * 0.7 + (approvedSpecsCount / specDocs.length) * 0.3) * 100);
+          implementationProgress = Math.round(
+            ((completedStories / totalStories) * 0.7 + (approvedSpecsCount / specDocs.length) * 0.3) * 100,
+          );
         } else if (totalStories > 0) {
           implementationProgress = Math.round((completedStories / totalStories) * 100);
         } else if (specDocs.length > 0) {
@@ -4304,7 +4337,7 @@
                     </div>
                     ${renderStatusBadge(getNormStatus(doc))}
                   </div>
-                `
+                `,
                   )
                   .join('')}
               </div>
@@ -4461,7 +4494,7 @@
                   </div>
                   ${renderStatusBadge(getNormStatus(doc))}
                 </div>
-              `
+              `,
                 )
                 .join('')}
             </div>
@@ -4629,7 +4662,9 @@
 
         let implementationProgress = 0;
         if (totalStories > 0 && specDocs.length > 0) {
-          implementationProgress = Math.round(((completedStories / totalStories) * 0.7 + (approvedSpecsCount / specDocs.length) * 0.3) * 100);
+          implementationProgress = Math.round(
+            ((completedStories / totalStories) * 0.7 + (approvedSpecsCount / specDocs.length) * 0.3) * 100,
+          );
         } else if (totalStories > 0) {
           implementationProgress = Math.round((completedStories / totalStories) * 100);
         } else if (specDocs.length > 0) {
@@ -4708,7 +4743,7 @@
                             <span class="ac-checkbox-icon">${ac.isCompleted ? '✅' : '⚪'}</span>
                             <span class="ac-text">${formatAcLine(ac.text)}</span>
                           </div>
-                        `
+                        `,
                                 )
                                 .join('')
                             : `<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No acceptance criteria items found under '## Acceptance Criteria' in this spec.</div>`
@@ -4916,7 +4951,7 @@
                           <span class="ac-checkbox-icon">${ac.isCompleted ? '✅' : '⚪'}</span>
                           <span class="ac-text">${formatAcLine(ac.text)}</span>
                         </div>
-                      `
+                      `,
                               )
                               .join('')
                           : `<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No acceptance criteria items found under '## Acceptance Criteria' in this spec.</div>`

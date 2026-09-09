@@ -980,7 +980,7 @@ const DEFAULT_NVIDIA_MODEL = 'meta/llama-3.2-11b-vision-instruct';
 function readSkillInstructions(stepKey) {
   const FRAMEWORK_ROOT = path.resolve(__dirname, '..');
   const skillMap = {
-    project_context: 'src/acl-skills/0-context/acl-generate-project-context/SKILL.md',
+    project_context: 'src/acl-skills/3-solutioning/acl-generate-project-context/SKILL.md',
     brief: 'src/acl-skills/1-analysis/acl-product-brief/SKILL.md',
     prd: 'src/acl-skills/2-plan-workflows/acl-prd/SKILL.md',
     architecture: 'src/acl-skills/3-solutioning/acl-architecture/SKILL.md',
