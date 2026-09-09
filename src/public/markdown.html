@@ -1871,17 +1871,17 @@
         margin-bottom: 0.2rem;
       }
       .story-ac-item {
-        font-size: 16px;
-        line-height: 1.45;
+        font-size: 0.86rem;
+        line-height: 1.5;
         color: #334155;
         display: flex;
         align-items: flex-start;
-        gap: 0.4rem;
+        gap: 0.5rem;
+        padding: 0.3rem 0;
+        border-bottom: 1px solid #f1f5f9;
       }
-      .story-ac-item::before {
-        content: '•';
-        color: #3b82f6;
-        font-weight: bold;
+      .story-ac-item:last-child {
+        border-bottom: none;
       }
 
       .spec-ac-item {
@@ -3262,20 +3262,17 @@
                 matchFile = allFiles.find((f) => {
                   const fn = (f.filename || '').toLowerCase();
                   const fp = (f.fullPath || f.folderPath || f.path || '').toLowerCase();
+                  if (!numSlug) return false;
+                  const pattern = new RegExp(`(?:story|spec)[-_\\.]?${numSlug.replace(/-/g, '[-_\\.]')}(?![-_\\.]?\\d)`, 'i');
                   return (
-                    numSlug &&
-                    (fn.includes(`spec-${numSlug}`) ||
-                      fn.includes(`spec-${dotSlug}`) ||
-                      fn.includes(`story-${numSlug}`) ||
-                      fn.includes(`story-${dotSlug}`) ||
-                      fn.includes(`-${numSlug}-`) ||
-                      fn.includes(`-${dotSlug}-`) ||
-                      fn.startsWith(`${numSlug}-`) ||
-                      fn.startsWith(`${dotSlug}-`) ||
-                      fp.includes(`story-${numSlug}`) ||
-                      fp.includes(`story-${dotSlug}`) ||
-                      fp.includes(`spec-${numSlug}`) ||
-                      fp.includes(`spec-${dotSlug}`))
+                    pattern.test(fn) ||
+                    pattern.test(fp) ||
+                    fn.startsWith(`${numSlug}-`) ||
+                    fn.startsWith(`${dotSlug}-`) ||
+                    fn.includes(`story-${numSlug}`) ||
+                    fn.includes(`story-${dotSlug}`) ||
+                    fn.includes(`spec-${numSlug}`) ||
+                    fn.includes(`spec-${dotSlug}`)
                   );
                 });
 
@@ -3316,29 +3313,16 @@
                 title: sTitle,
                 status: status,
                 isCompleted: isCompleted,
+                fileId: matchFile ? matchFile.id : null,
+                filename: matchFile ? matchFile.filename : null,
                 acceptanceCriteria: [],
               };
 
               // If matchFile has AC, try reading from matchFile content
               if (matchFile && matchFile.content) {
-                const mLines = matchFile.content.split(/\r?\n/);
-                let mInAC = false;
-                for (const ml of mLines) {
-                  const tml = ml.trim();
-                  if (tml.match(/(?:\*\*|\*|#+\s*)Acceptance Criteria:?(?:\*\*|\*)?/i)) {
-                    mInAC = true;
-                    const afterAc = tml.replace(/^.*Acceptance Criteria:?(?:\*\*|\*)?\s*/i, '').trim();
-                    if (afterAc.length > 0) {
-                      currentStory.acceptanceCriteria.push(afterAc);
-                    }
-                    continue;
-                  }
-                  if (mInAC && (tml.startsWith('---') || tml.startsWith('##') || tml.match(/^-\s*\*\*/))) {
-                    break;
-                  }
-                  if (mInAC && tml.length > 0) {
-                    currentStory.acceptanceCriteria.push(tml.replace(/^\s*[\*\-]\s*/, ''));
-                  }
+                const parsedAcs = parseAcceptanceCriteriaFromSpec(matchFile.content);
+                if (parsedAcs && parsedAcs.length > 0) {
+                  currentStory.acceptanceCriteria = parsedAcs;
                 }
               }
 
@@ -3348,12 +3332,23 @@
             }
 
             // Gather Acceptance Criteria for currentStory from epics.md
-            if (currentStory) {
+            if (currentStory && currentStory.acceptanceCriteria.length === 0) {
               if (line.match(/(?:\*\*|\*|#+\s*)Acceptance Criteria:?(?:\*\*|\*)?/i)) {
                 inAC = true;
                 const afterAc = line.replace(/^.*Acceptance Criteria:?(?:\*\*|\*)?\s*/i, '').trim();
                 if (afterAc.length > 0) {
-                  currentStory.acceptanceCriteria.push(afterAc);
+                  const checkMatch = afterAc.match(/^[-*]?\s*\[([ xX])\]\s*(.*)$/);
+                  if (checkMatch) {
+                    currentStory.acceptanceCriteria.push({
+                      isCompleted: checkMatch[1].toLowerCase() === 'x',
+                      text: checkMatch[2].trim(),
+                    });
+                  } else {
+                    currentStory.acceptanceCriteria.push({
+                      isCompleted: false,
+                      text: afterAc.replace(/^[-*•]\s*/, '').trim(),
+                    });
+                  }
                 }
                 continue;
               }
@@ -3361,7 +3356,21 @@
                 inAC = false;
               }
               if (inAC && line.length > 0) {
-                currentStory.acceptanceCriteria.push(line.replace(/^\s*[\*\-]\s*/, ''));
+                const trimmed = line.trim();
+                const checkMatch = trimmed.match(/^[-*]?\s*\[([ xX])\]\s*(.*)$/);
+                if (checkMatch) {
+                  currentStory.acceptanceCriteria.push({
+                    isCompleted: checkMatch[1].toLowerCase() === 'x',
+                    text: checkMatch[2].trim(),
+                  });
+                } else if (trimmed.match(/^[-*•]\s+/)) {
+                  currentStory.acceptanceCriteria.push({
+                    isCompleted: false,
+                    text: trimmed.replace(/^[-*•]\s*/, '').trim(),
+                  });
+                } else if (trimmed.length > 0 && currentStory.acceptanceCriteria.length > 0) {
+                  currentStory.acceptanceCriteria[currentStory.acceptanceCriteria.length - 1].text += ' ' + trimmed;
+                }
               }
             }
           }
@@ -3380,6 +3389,9 @@
                 title: storyMatch[3].trim(),
                 status: isDone ? 'Approved' : 'To Do',
                 isCompleted: isDone,
+                fileId: null,
+                filename: null,
+                acceptanceCriteria: [],
               });
             }
           }
@@ -3395,7 +3407,7 @@
         return epics;
       }
 
-      let openAccordionEpicIndex = null;
+      const openEpicIndices = new Set([0]);
 
       function formatStoryTitle(title) {
         if (!title) return '';
@@ -3409,15 +3421,27 @@
           );
       }
 
+      function normalizeAcItem(ac) {
+        if (!ac) return { isCompleted: false, text: '' };
+        if (typeof ac === 'string') {
+          const checkMatch = ac.match(/^\[([ xX])\]\s*(.*)$/);
+          if (checkMatch) {
+            return { isCompleted: checkMatch[1].toLowerCase() === 'x', text: checkMatch[2].trim() };
+          }
+          return { isCompleted: false, text: ac.replace(/^[•\-\*]\s*/, '').trim() };
+        }
+        return ac;
+      }
+
       window.toggleEpicAccordion = function (index) {
-        if (openAccordionEpicIndex === index) {
-          openAccordionEpicIndex = null;
+        if (openEpicIndices.has(index)) {
+          openEpicIndices.delete(index);
         } else {
-          openAccordionEpicIndex = index;
+          openEpicIndices.add(index);
         }
         const groups = document.querySelectorAll('.epic-group');
         groups.forEach((group, idx) => {
-          if (openAccordionEpicIndex === idx) {
+          if (openEpicIndices.has(idx)) {
             group.classList.add('open');
           } else {
             group.classList.remove('open');
@@ -4511,16 +4535,16 @@
       `;
       }
 
-      let openStoryKey = null;
+      const openStoryKeys = new Set();
       window.toggleStoryAccordion = function (key) {
-        if (openStoryKey === key) {
-          openStoryKey = null;
+        if (openStoryKeys.has(key)) {
+          openStoryKeys.delete(key);
         } else {
-          openStoryKey = key;
+          openStoryKeys.add(key);
         }
         const items = document.querySelectorAll('.story-accordion-item');
         items.forEach((item) => {
-          if (item.dataset.storyKey === openStoryKey) {
+          if (openStoryKeys.has(item.dataset.storyKey)) {
             item.classList.add('open');
           } else {
             item.classList.remove('open');
@@ -4848,7 +4872,7 @@
                 ${parsedEpics
                   .map(
                     (epic, eIdx) => `
-                  <div class="epic-group ${openAccordionEpicIndex === eIdx ? 'open' : ''}">
+                  <div class="epic-group ${openEpicIndices.has(eIdx) ? 'open' : ''}">
                     <div class="epic-header" onclick="toggleEpicAccordion(${eIdx})">
                       <div class="epic-header-left">
                         <span class="epic-chevron">▶</span>
@@ -4861,33 +4885,64 @@
                         .map((story, sIdx) => {
                           const sKey = `epic-${eIdx}-story-${sIdx}`;
                           const hasAC = Array.isArray(story.acceptanceCriteria) && story.acceptanceCriteria.length > 0;
-                          const isOpen = openStoryKey === sKey;
+                          const isOpen = openStoryKeys.has(sKey);
                           return `
                           <div class="story-accordion-item ${isOpen ? 'open' : ''}" data-story-key="${sKey}">
                             <div class="story-accordion-header" onclick="toggleStoryAccordion('${sKey}')">
                               <div class="story-item-left">
                                 <span class="story-chevron">▶</span>
-                                <span>${story.isCompleted || story.status === 'Approved' ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' || story.status === 'Need Action' ? '🔴' : '🔹'}</span>
+                                <span>${story.isCompleted || story.status === 'Approved' ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' || story.status === 'Need Action' ? '🔴' : '⚪'}</span>
                                 <span style="font-weight: 600; color: #1e293b;">${story.num ? `Story ${story.num}: ` : ''}${formatStoryTitle(story.title)}</span>
                               </div>
-                              ${renderStatusBadge(story.status)}
+                              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                ${
+                                  story.fileId
+                                    ? `
+                                  <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${story.fileId}')" title="Open ${story.filename} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
+                                    <span>📄</span> <span>${story.filename}</span>
+                                  </button>
+                                `
+                                    : ''
+                                }
+                                ${renderStatusBadge(story.status)}
+                              </div>
                             </div>
                             <div class="story-ac-body">
                               <div class="story-ac-card">
-                                <div class="story-ac-title">
-                                  <span>📋</span>
-                                  <span>Acceptance Criteria</span>
+                                <div class="story-ac-title" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.35rem; margin-bottom: 0.35rem;">
+                                  <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                    <span>📋</span>
+                                    <span style="font-weight: 700; color: #1e293b;">Acceptance Criteria Checklist</span>
+                                  </div>
+                                  ${
+                                    story.fileId
+                                      ? `
+                                    <a href="javascript:void(0)" onclick="openDocInStudio('${story.fileId}')" style="font-size: 0.74rem; color: #2563eb; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">
+                                      <span>📝</span> Manager Sign-Off (Studio) &rarr;
+                                    </a>
+                                  `
+                                      : `
+                                    <span style="font-size: 0.72rem; color: #64748b;">
+                                      Requires <code>_acl-output/4-implementation/story-${(story.num || '').replace(/\./g, '-')}.md</code> sign-off
+                                    </span>
+                                  `
+                                  }
                                 </div>
                                 ${
                                   hasAC
                                     ? story.acceptanceCriteria
-                                        .map(
-                                          (ac) => `
-                                      <div class="story-ac-item">${formatAcLine(ac.replace(/^[•\-\*]\s*/, ''))}</div>
-                                    `,
-                                        )
+                                        .map((rawAc) => {
+                                          const ac = normalizeAcItem(rawAc);
+                                          const isDone = ac.isCompleted || story.isCompleted || story.status === 'Approved';
+                                          return `
+                                        <div class="story-ac-item">
+                                          <span class="ac-checkbox-icon">${isDone ? '✅' : '⚪'}</span>
+                                          <span class="ac-text">${formatAcLine(ac.text)}</span>
+                                        </div>
+                                      `;
+                                        })
                                         .join('')
-                                    : '<div style="font-size: 0.73rem; color: #94a3b8; font-style: italic;">No specific acceptance criteria listed in epics.md</div>'
+                                    : '<div style="font-size: 0.76rem; color: #94a3b8; font-style: italic;">No specific acceptance criteria listed in epics.md</div>'
                                 }
                               </div>
                             </div>
