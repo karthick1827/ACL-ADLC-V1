@@ -189,12 +189,13 @@ Update the project context file with completion information:
 ```yaml
 ---
 project_name: '{{project_name}}'
+project_type: '{{project_type}}' # MANDATORY: brownfield (or greenfield if running downstream of Greenfield brief)
 user_name: '{{user_name}}'
 date: '{{date}}'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
-status: 'complete'
-rule_count: { { total_rules } }
+status: In Review
+rule_count: {{ total_rules }}
 optimized_for_llm: true
 ---
 ```
@@ -207,6 +208,7 @@ Append the usage guidelines from step 3 to complete the document.
 Final checks before completion:
 
 **Content Validation:**
+✅ Frontmatter includes project_type (brownfield or greenfield) and status (In Review)
 ✅ All critical technology versions documented
 ✅ Language-specific rules are specific and actionable
 ✅ Framework rules cover project conventions
