@@ -2425,22 +2425,7 @@
           }
         }
 
-        evaluateProceedButton();
-
-        // Auto-Sync: Window focus/visibility and manual sync triggers (NO high-frequency polling loop)
-        if (!window.__acl_sync_interval_started) {
-          window.__acl_sync_interval_started = true;
-
-          window.addEventListener('focus', () => {
-            syncFromLiveDisk(true);
-          });
-
-          document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-              syncFromLiveDisk(true);
-            }
-          });
-        }
+        // NO background polling or window-focus triggers: files sync strictly on initial load, manual Sync button, or file save.
       }
 
       async function saveCurrentFile() {
