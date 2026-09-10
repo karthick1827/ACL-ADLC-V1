@@ -849,14 +849,16 @@ For each fuzzy match:
 <action>Combine results:
 Set {{incomplete_docs_list}} = {{incomplete_docs_strict}} + {{incomplete_docs_fuzzy}}
 For each item store structure:
+```json
 {
-"title": "Architecture – Server",
-"file\*path": "./architecture-server.md",
-"doc_type": "architecture",
-"part_id": "server",
-"line_text": "- [Architecture – Server](./architecture-server.md) (To be generated)",
-"fuzzy_match": false
+  "title": "Architecture – Server",
+  "file_path": "./architecture-server.md",
+  "doc_type": "architecture",
+  "part_id": "server",
+  "line_text": "- [Architecture – Server](./architecture-server.md) (To be generated)",
+  "fuzzy_match": false
 }
+```
 </action>
 
 <ask>Documentation generation complete!
