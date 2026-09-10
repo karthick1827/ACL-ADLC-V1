@@ -84,7 +84,7 @@ function parseMarkdownMetadata(content, fullPath, statTime = null) {
 // In-memory cache for GitHub responses to minimize API rate limit usage
 let cacheData = null;
 let cacheTime = 0;
-const CACHE_TTL_MS = 2500; // 2.5 seconds cache TTL for high frequency polling
+const CACHE_TTL_MS = 1000; // 1 second cache TTL for live responsiveness
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -100,16 +100,19 @@ module.exports = async function handler(req, res) {
 
   try {
     const now = Date.now();
-    if (cacheData && now - cacheTime < CACHE_TTL_MS) {
+    const reqUrl = req.url || '';
+    const bypassCache = reqUrl.includes('nocache=1') || reqUrl.includes('force=1');
+
+    if (!bypassCache && cacheData && now - cacheTime < CACHE_TTL_MS) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(cacheData));
       return;
     }
 
-    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT;
-    let owner = process.env.GITHUB_OWNER || process.env.VERCEL_GIT_REPO_OWNER;
-    let repo = process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG;
-    const branch = process.env.GITHUB_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || 'main';
+    const token = (process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT || '').trim();
+    let owner = (process.env.GITHUB_OWNER || process.env.VERCEL_GIT_REPO_OWNER || '').trim();
+    let repo = (process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG || '').trim();
+    const branch = (process.env.GITHUB_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || 'main').trim();
 
     if (!owner || !repo) {
       try {
@@ -130,6 +133,10 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // Default repository fallback
+    if (!owner) owner = 'karthick1827';
+    if (!repo) repo = 'jira-clone';
+
     // 1. Fetch from GitHub API if owner and repo are known
     if (owner && repo) {
       try {
@@ -137,7 +144,14 @@ module.exports = async function handler(req, res) {
           Accept: 'application/vnd.github.v3+json',
           'User-Agent': 'ACL-ADLC-Markdown-Studio',
         };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
+        if (token) {
+          headers.Authorization =
+            token.startsWith('Bearer ') || token.startsWith('token ')
+              ? token
+              : token.startsWith('ghp_')
+                ? `token ${token}`
+                : `Bearer ${token}`;
+        }
 
         const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
         const treeRes = await fetch(treeUrl, { headers });
@@ -200,8 +214,8 @@ module.exports = async function handler(req, res) {
             success: true,
             files: deduplicated,
             activeTier: activeTier,
-            frameworkVersion: '6.11.19',
-            version: '6.11.19',
+            frameworkVersion: '6.11.20',
+            version: '6.11.20',
             source: 'github',
             repo: `${owner}/${repo}`,
             branch: branch,
@@ -275,8 +289,8 @@ module.exports = async function handler(req, res) {
       success: true,
       files: finalDiskList,
       activeTier: diskActiveTier,
-      frameworkVersion: '6.11.19',
-      version: '6.11.19',
+      frameworkVersion: '6.11.20',
+      version: '6.11.20',
       source: 'local-disk',
     };
     cacheTime = Date.now();

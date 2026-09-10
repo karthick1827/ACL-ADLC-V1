@@ -16,7 +16,7 @@ module.exports = async function handler(req, res) {
 
   if (req.method !== 'POST') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method Not Allowed. Use POST.' }));
+    res.end(JSON.stringify({ success: false, error: 'Method Not Allowed. Use POST.' }));
     return;
   }
 
@@ -47,14 +47,16 @@ module.exports = async function handler(req, res) {
 
     if (!filename || typeof content !== 'string') {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing required fields: filename and content.' }));
+      res.end(JSON.stringify({ success: false, error: 'Missing required fields: filename and content.' }));
       return;
     }
 
     // Path normalization: canonical phase structure inside _acl-output/
     let cleanFolder = (folderPath || '').replaceAll('\\', '/').trim();
     cleanFolder = cleanFolder.replace(/^(_acl-output|_acl_output|acl-output)\/?/i, '');
-    const lowerName = filename.toLowerCase();
+    cleanFolder = cleanFolder.replace(/^\/+/, '').replace(/\/+$/, '');
+    const cleanFilename = filename.replace(/^\/+/, '').trim();
+    const lowerName = cleanFilename.toLowerCase();
 
     if (lowerName === 'project-context.md') {
       cleanFolder = '';
@@ -88,13 +90,13 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    const repoFilePath = cleanFolder ? `_acl-output/${cleanFolder}/${filename}` : `_acl-output/${filename}`;
+    const repoFilePath = cleanFolder ? `_acl-output/${cleanFolder}/${cleanFilename}` : `_acl-output/${cleanFilename}`;
 
     // Detect GitHub Configuration
-    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT;
-    let owner = process.env.GITHUB_OWNER || process.env.VERCEL_GIT_REPO_OWNER;
-    let repo = process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG;
-    const branch = process.env.GITHUB_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || 'main';
+    const token = (process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT || '').trim();
+    let owner = (process.env.GITHUB_OWNER || process.env.VERCEL_GIT_REPO_OWNER || '').trim();
+    let repo = (process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG || '').trim();
+    const branch = (process.env.GITHUB_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || 'main').trim();
 
     // Auto-detect owner and repo from package.json if not explicitly provided
     if (!owner || !repo) {
@@ -116,11 +118,18 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 1. If GitHub Token and Repo are configured: Commit to GitHub via REST API
-    if (token && owner && repo) {
+    // Default repository fallback
+    if (!owner) owner = 'karthick1827';
+    if (!repo) repo = 'jira-clone';
+
+    // 1. If GitHub Token is configured: Commit to GitHub via REST API
+    if (token) {
+      const authHeader =
+        token.startsWith('Bearer ') || token.startsWith('token ') ? token : token.startsWith('ghp_') ? `token ${token}` : `Bearer ${token}`;
+
       const headers = {
         Accept: 'application/vnd.github.v3+json',
-        Authorization: `Bearer ${token}`,
+        Authorization: authHeader,
         'User-Agent': 'ACL-ADLC-Markdown-Studio',
       };
 
@@ -132,16 +141,35 @@ module.exports = async function handler(req, res) {
         if (getRes.ok) {
           const fileData = await getRes.json();
           sha = fileData.sha;
+        } else if (getRes.status === 401) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: 'GitHub Token is invalid or expired. Check GITHUB_TOKEN in Vercel settings.',
+            }),
+          );
+          return;
+        } else if (getRes.status === 403) {
+          const errBody = await getRes.text();
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: `GitHub token lacks permission to read repository: ${errBody}`,
+            }),
+          );
+          return;
         }
       } catch {
-        // If file not found (404), sha remains undefined -> create new file
+        // Network or fetch error
       }
 
       // Prepare commit message adhering to Conventional Commits
       const cleanStatus = (status || '').trim();
       const commitMsg = cleanStatus
-        ? `docs(review): update ${filename} status to [${cleanStatus}] via Markdown Studio`
-        : `docs(${filename}): update content via Markdown Studio`;
+        ? `docs(review): update ${cleanFilename} status to [${cleanStatus}] via Markdown Studio`
+        : `docs(${cleanFilename}): update content via Markdown Studio`;
 
       const putUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${repoFilePath}`;
       const putRes = await fetch(putUrl, {
@@ -160,7 +188,15 @@ module.exports = async function handler(req, res) {
 
       if (!putRes.ok) {
         const errText = await putRes.text();
-        throw new Error(`GitHub Commit failed (${putRes.status}): ${errText}`);
+        res.writeHead(putRes.status, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: `GitHub Commit failed (${putRes.status}): ${errText}`,
+            hint: 'Verify GITHUB_TOKEN has write access (contents:write or repo scope) to ' + owner + '/' + repo,
+          }),
+        );
+        return;
       }
 
       const commitResult = await putRes.json();
@@ -184,7 +220,7 @@ module.exports = async function handler(req, res) {
           path: repoFilePath,
           commitSha: commitResult.commit?.sha || commitResult.sha,
           status: status,
-          message: `Successfully committed ${filename} to ${owner}/${repo}@${branch}`,
+          message: `Successfully committed ${cleanFilename} to ${owner}/${repo}@${branch}`,
         }),
       );
       return;
@@ -203,17 +239,16 @@ module.exports = async function handler(req, res) {
           mode: 'local-disk',
           path: repoFilePath,
           status: status,
-          warning:
-            'Saved to local disk only. To enable cloud commits on Vercel, configure GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO in Vercel environment variables.',
+          warning: 'Saved to local disk only. To enable cloud commits on Vercel, configure GITHUB_TOKEN in Vercel environment variables.',
         }),
       );
-    } catch (fsErr) {
+    } catch {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
           success: false,
-          error: `Could not save file. GITHUB_TOKEN is not configured and local disk is read-only: ${fsErr.message}`,
-          hint: 'Add GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO to your Vercel Project Settings > Environment Variables.',
+          error: 'GITHUB_TOKEN is missing or not configured in Vercel environment variables. Local disk is read-only in cloud lambdas.',
+          hint: 'Please add GITHUB_TOKEN in Vercel Project Settings > Environment Variables.',
         }),
       );
     }

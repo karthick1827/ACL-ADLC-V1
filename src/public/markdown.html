@@ -2204,8 +2204,10 @@
       }
 
       let isSyncing = false;
+      let isSaving = false;
+      let lastSaveTime = 0;
       async function syncFromLiveDisk(quiet = false) {
-        if (isSyncing) return false;
+        if (isSyncing || isSaving || Date.now() - lastSaveTime < 3500) return false;
         isSyncing = true;
         try {
           const res = await fetch('/api/list-markdown-files?t=' + Date.now(), { cache: 'no-store' });
@@ -2441,6 +2443,7 @@
         } catch (e) {}
 
         // Save to disk locally or commit to GitHub if hosted on Vercel
+        isSaving = true;
         try {
           const resp = await fetch('/api/save-markdown', {
             method: 'POST',
@@ -2453,15 +2456,27 @@
               autoPush: false,
             }),
           });
-          if (resp.ok) {
-            const resData = await resp.json();
+          const resData = await resp.json().catch(() => ({}));
+          if (resp.ok && resData.success !== false) {
+            lastSaveTime = Date.now();
             if (resData && resData.repo) {
               setSyncStatus(`Committed to GitHub (${resData.repo}@${resData.branch || 'main'}) ✔`, 'green');
             } else {
               setSyncStatus('Saved locally to disk, VS Code & Github ✔', 'green');
             }
+          } else {
+            const errorMsg = resData.error || resData.message || `Server error (${resp.status})`;
+            showToast(`Save failed: ${errorMsg}`, 'error');
+            setSyncStatus(`Save failed: ${errorMsg}`, 'red');
+            return false;
           }
-        } catch (e) {}
+        } catch (e) {
+          showToast(`Save network error: ${e.message}`, 'error');
+          setSyncStatus(`Network error: ${e.message}`, 'red');
+          return false;
+        } finally {
+          isSaving = false;
+        }
 
         isDirty = false;
 
@@ -2477,6 +2492,7 @@
         if (activeAppView === 'dashboard') {
           renderDeliveryDashboard();
         }
+        return true;
       }
 
       function updateDocumentStatusFrontmatter(content, newStatus, nowIso = new Date().toISOString()) {
@@ -2532,6 +2548,7 @@
         const file = getActiveFile();
         if (!file) return;
 
+        const prevStatus = file.status;
         file.status = newStatus;
         const nowIso = new Date().toISOString();
         file.updatedAt = nowIso;
@@ -2542,7 +2559,16 @@
         document.getElementById('markdownTextarea').value = updatedContent;
         file.content = updatedContent;
 
-        await saveCurrentFile();
+        const ok = await saveCurrentFile();
+        if (ok === false) {
+          file.status = prevStatus;
+          const sel = document.getElementById('statusSelect');
+          if (sel) {
+            sel.value = prevStatus === 'Accepted' || prevStatus === 'approved' ? 'Approved' : prevStatus;
+          }
+          renderFileTree();
+          return;
+        }
 
         // Update status pill on active file in sidebar
         const root = document.getElementById('fileTreeRoot');
