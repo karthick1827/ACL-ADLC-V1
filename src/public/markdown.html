@@ -2004,11 +2004,6 @@
           <span id="syncStatusText">Synced with VS code and Github</span>
         </div>
 
-        <!-- GitHub Cloud Sync Settings Button -->
-        <button type="button" class="btn-workflow" id="btnCloudSync" onclick="openCloudSettingsModal(event)" title="GitHub Cloud Sync Settings">
-          🐙 Cloud Sync
-        </button>
-
         <!-- Manual Refresh Button -->
         <button type="button" class="btn-workflow" id="btnManualSync" onclick="manualSyncFromLiveDisk(event)" title="Refresh files from GitHub & disk">
           🔄 Sync
@@ -2508,9 +2503,7 @@
             const errorMsg = resData.error || resData.message || `Server error (${resp.status})`;
             showToast(`Save failed: ${errorMsg}`, 'error');
             setSyncStatus(`Save failed: ${errorMsg}`, 'red');
-            if (errorMsg.includes('GITHUB_TOKEN') || resp.status === 401 || resp.status === 403) {
-              openCloudSettingsModal();
-            }
+
             return false;
           }
         } catch (e) {
@@ -4971,79 +4964,7 @@
       }
 
 
-      function updateCloudSyncButtonStatus() {
-        const token = localStorage.getItem('acl_github_token');
-        const btn = document.getElementById('btnCloudSync');
-        if (btn) {
-          if (token && token.trim()) {
-            btn.innerHTML = '🟢 Cloud Sync';
-            btn.title = 'GitHub Connected (' + (localStorage.getItem('acl_github_repo') || 'jira-clone') + ')';
-          } else {
-            btn.innerHTML = '🐙 Cloud Sync';
-            btn.title = 'Configure GitHub Cloud Sync';
-          }
-        }
-      }
-
-      function openCloudSettingsModal(e) {
-        if (e) e.stopPropagation();
-        const modal = document.getElementById('cloudSettingsModal');
-        if (!modal) return;
-        const inputToken = document.getElementById('inputGithubToken');
-        const inputOwner = document.getElementById('inputGithubOwner');
-        const inputRepo = document.getElementById('inputGithubRepo');
-        const inputBranch = document.getElementById('inputGithubBranch');
-
-        if (inputToken) inputToken.value = localStorage.getItem('acl_github_token') || '';
-        if (inputOwner) inputOwner.value = localStorage.getItem('acl_github_owner') || 'karthick1827';
-        if (inputRepo) inputRepo.value = localStorage.getItem('acl_github_repo') || 'jira-clone';
-        if (inputBranch) inputBranch.value = localStorage.getItem('acl_github_branch') || 'main';
-
-        modal.classList.add('active');
-      }
-
-      function closeCloudSettingsModal(e) {
-        if (e) e.stopPropagation();
-        const modal = document.getElementById('cloudSettingsModal');
-        if (modal) modal.classList.remove('active');
-      }
-
-      function toggleTokenVisibility() {
-        const input = document.getElementById('inputGithubToken');
-        if (input) {
-          input.type = input.type === 'password' ? 'text' : 'password';
-        }
-      }
-
-      function saveCloudSettings() {
-        const token = (document.getElementById('inputGithubToken')?.value || '').trim();
-        const owner = (document.getElementById('inputGithubOwner')?.value || '').trim();
-        const repo = (document.getElementById('inputGithubRepo')?.value || '').trim();
-        const branch = (document.getElementById('inputGithubBranch')?.value || '').trim();
-
-        if (token) {
-          localStorage.setItem('acl_github_token', token);
-        } else {
-          localStorage.removeItem('acl_github_token');
-        }
-        if (owner) localStorage.setItem('acl_github_owner', owner);
-        if (repo) localStorage.setItem('acl_github_repo', repo);
-        if (branch) localStorage.setItem('acl_github_branch', branch);
-
-        updateCloudSyncButtonStatus();
-        closeCloudSettingsModal();
-        showToast(token ? 'GitHub Cloud token saved!' : 'Cloud settings saved', 'success');
-        manualSyncFromLiveDisk();
-      }
-
-      function clearCloudSettings() {
-        localStorage.removeItem('acl_github_token');
-        const input = document.getElementById('inputGithubToken');
-        if (input) input.value = '';
-        updateCloudSyncButtonStatus();
-        showToast('GitHub token cleared', 'info');
-      }
-
+      
       async function manualSyncFromLiveDisk(e) {
         if (e) e.stopPropagation();
         setSyncStatus('Syncing with GitHub & disk...', 'blue');
@@ -5071,54 +4992,6 @@
           <div class="workflow-svg-viewport" id="workflowSvgViewport">
             <div class="workflow-svg-wrapper" id="workflowSvgWrapper">
               <img id="workflowSvgImg" src="" alt="Workflow Diagram" draggable="false" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- GitHub Cloud Sync Settings Modal -->
-    <div class="workflow-modal-backdrop" id="cloudSettingsModal" onclick="closeCloudSettingsModal(event)">
-      <div class="cloud-settings-card" onclick="event.stopPropagation()">
-        <div class="cloud-settings-header">
-          <div class="cloud-settings-title">
-            <span>🐙</span> GitHub Cloud Sync Settings
-          </div>
-          <button class="workflow-close-btn" onclick="closeCloudSettingsModal()" title="Close (Esc)">✕</button>
-        </div>
-        <div class="cloud-settings-body">
-          <p class="cloud-settings-desc">
-            Configure your GitHub Personal Access Token to enable seamless status sync and live commits directly to your GitHub repository from Vercel.
-          </p>
-
-          <div class="form-group">
-            <label for="inputGithubToken">GitHub Personal Access Token (PAT):</label>
-            <div class="token-input-wrapper">
-              <input type="password" id="inputGithubToken" class="cloud-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx or github_pat_..." />
-              <button type="button" class="btn-toggle-token" onclick="toggleTokenVisibility()">👁️</button>
-            </div>
-            <small class="form-help">Requires <code>repo</code> scope (or fine-grained <code>contents: write</code>). Stored securely in your browser's localStorage.</small>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group" style="flex: 1;">
-              <label for="inputGithubOwner">Repository Owner:</label>
-              <input type="text" id="inputGithubOwner" class="cloud-input" placeholder="karthick1827" />
-            </div>
-            <div class="form-group" style="flex: 1;">
-              <label for="inputGithubRepo">Repository Name:</label>
-              <input type="text" id="inputGithubRepo" class="cloud-input" placeholder="jira-clone" />
-            </div>
-            <div class="form-group" style="flex: 1;">
-              <label for="inputGithubBranch">Branch:</label>
-              <input type="text" id="inputGithubBranch" class="cloud-input" placeholder="main" />
-            </div>
-          </div>
-
-          <div class="cloud-settings-actions">
-            <button type="button" class="btn-secondary" onclick="clearCloudSettings()">Clear Token</button>
-            <div style="display: flex; gap: 8px;">
-              <button type="button" class="btn-secondary" onclick="closeCloudSettingsModal()">Cancel</button>
-              <button type="button" class="btn-primary" onclick="saveCloudSettings()">Save & Connect</button>
             </div>
           </div>
         </div>
