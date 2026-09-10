@@ -81,6 +81,35 @@ function parseMarkdownMetadata(content, fullPath, statTime = null) {
   };
 }
 
+function compareStoriesAndFiles(a, b) {
+  if (!a || !b) return 0;
+  const folderA = a.folderPath || '';
+  const folderB = b.folderPath || '';
+  if (folderA !== folderB) {
+    return folderA.localeCompare(folderB, undefined, { numeric: true, sensitivity: 'base' });
+  }
+  const nameA = a.filename || '';
+  const nameB = b.filename || '';
+  const matchA = nameA.match(/story[_-](\d+)[-.](\d+)/i);
+  const matchB = nameB.match(/story[_-](\d+)[-.](\d+)/i);
+  if (matchA && matchB) {
+    const epicA = parseInt(matchA[1], 10);
+    const epicB = parseInt(matchB[1], 10);
+    if (epicA !== epicB) return epicA - epicB;
+    const storyA = parseInt(matchA[2], 10);
+    const storyB = parseInt(matchB[2], 10);
+    if (storyA !== storyB) return storyA - storyB;
+  }
+  const specA = nameA.match(/spec[_-](\d+)/i);
+  const specB = nameB.match(/spec[_-](\d+)/i);
+  if (specA && specB) {
+    const numA = parseInt(specA[1], 10);
+    const numB = parseInt(specB[1], 10);
+    if (numA !== numB) return numA - numB;
+  }
+  return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -204,7 +233,7 @@ module.exports = async function handler(req, res) {
             }
           }
           const deduplicated = Array.from(seenMap.values());
-          deduplicated.sort((a, b) => a.fullPath.localeCompare(b.fullPath, undefined, { numeric: true, sensitivity: 'base' }));
+          deduplicated.sort(compareStoriesAndFiles);
 
           let activeTier = deduplicated.some(
             (f) =>
@@ -279,7 +308,7 @@ module.exports = async function handler(req, res) {
       }
     }
     const finalDiskList = Array.from(seenDisk.values());
-    finalDiskList.sort((a, b) => a.fullPath.localeCompare(b.fullPath, undefined, { numeric: true, sensitivity: 'base' }));
+    finalDiskList.sort(compareStoriesAndFiles);
 
     let diskActiveTier = finalDiskList.some(
       (f) => (f.filename || '').toLowerCase().includes('epics.md') || (f.filename || '').toLowerCase().includes('spine') || f.tier === '2',

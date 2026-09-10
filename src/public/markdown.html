@@ -1999,15 +1999,10 @@
         </div>
 
         <!-- Sync Status Indicator -->
-        <div class="file-sync-indicator" id="syncStatus" onclick="manualSyncFromLiveDisk(event)" style="cursor: pointer;" title="Click to refresh from GitHub & disk">
+        <div class="file-sync-indicator" id="syncStatus">
           <span>●</span>
           <span id="syncStatusText">Synced with VS code and Github</span>
         </div>
-
-        <!-- Manual Refresh Button -->
-        <button type="button" class="btn-workflow" id="btnManualSync" onclick="manualSyncFromLiveDisk(event)" title="Refresh files from GitHub & disk">
-          🔄 Sync
-        </button>
 
         <!-- Update Button -->
         <button class="btn-update" id="btnSave" onclick="saveCurrentFile()" title="Save & Sync with VS Code (Ctrl+S / Cmd+S)">
@@ -2620,23 +2615,50 @@
         }
       }
 
+      function compareStoriesAndFiles(a, b) {
+        if (!a || !b) return 0;
+        const nameA = a.filename || '';
+        const nameB = b.filename || '';
+        // Extract epic/story numbers: e.g. story-1-1 or story-1.1
+        const matchA = nameA.match(/story[_-](\d+)[-.](\d+)/i);
+        const matchB = nameB.match(/story[_-](\d+)[-.](\d+)/i);
+        if (matchA && matchB) {
+          const epicA = parseInt(matchA[1], 10);
+          const epicB = parseInt(matchB[1], 10);
+          if (epicA !== epicB) return epicA - epicB;
+          const storyA = parseInt(matchA[2], 10);
+          const storyB = parseInt(matchB[2], 10);
+          if (storyA !== storyB) return storyA - storyB;
+        }
+        // Spec numbers: e.g. spec-1, spec-2
+        const specA = nameA.match(/spec[_-](\d+)/i);
+        const specB = nameB.match(/spec[_-](\d+)/i);
+        if (specA && specB) {
+          const numA = parseInt(specA[1], 10);
+          const numB = parseInt(specB[1], 10);
+          if (numA !== numB) return numA - numB;
+        }
+        // Fallback to natural numeric collation
+        return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+      }
+
       function sortFilesList(fileList) {
         const sortSelect = document.getElementById('sortSelect');
         const sortType = (sortSelect && sortSelect.value) || 'alpha-asc';
         return [...fileList].sort((a, b) => {
           if (sortType === 'alpha-asc') {
-            return (a.filename || '').localeCompare(b.filename || '', undefined, { numeric: true, sensitivity: 'base' });
+            return compareStoriesAndFiles(a, b);
           }
           if (sortType === 'alpha-desc') {
-            return (b.filename || '').localeCompare(a.filename || '', undefined, { numeric: true, sensitivity: 'base' });
+            return compareStoriesAndFiles(b, a);
           }
           if (sortType === 'date-desc') {
-            return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+            return (new Date(b.createdAt || b.updatedAt) - new Date(a.createdAt || a.updatedAt)) || compareStoriesAndFiles(a, b);
           }
           if (sortType === 'date-asc') {
-            return new Date(a.updatedAt || a.createdAt) - new Date(b.updatedAt || b.createdAt);
+            return (new Date(a.createdAt || a.updatedAt) - new Date(b.createdAt || b.updatedAt)) || compareStoriesAndFiles(a, b);
           }
-          return 0;
+          return compareStoriesAndFiles(a, b);
         });
       }
 
@@ -2701,6 +2723,7 @@
           headerDiv.className = 'folder-header';
 
           const folderFiles = groups[folderPath];
+          folderFiles.sort(compareStoriesAndFiles);
           const fileCountText = folderFiles.length === 1 ? '1 file' : `${folderFiles.length} files`;
           const latestDate = folderFiles.reduce((latest, f) => {
             const d = new Date(f.updatedAt || f.createdAt);
@@ -4950,17 +4973,6 @@
 
 
       
-      async function manualSyncFromLiveDisk(e) {
-        if (e) e.stopPropagation();
-        setSyncStatus('Syncing with GitHub & disk...', 'blue');
-        const ok = await syncFromLiveDisk(false);
-        if (ok) {
-          showToast('Files synced successfully!', 'success');
-        } else {
-          showToast('Sync completed', 'info');
-        }
-      }
-
       window.addEventListener('DOMContentLoaded', init);
     </script>
 
