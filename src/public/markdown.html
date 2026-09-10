@@ -2635,18 +2635,6 @@
           activeFileId = filtered[0].id;
         }
 
-        // The target open folder is the folder that contains the active file
-        let targetOpenFolder = folderOrder.length > 0 ? folderOrder[0] : null;
-        if (activeFileId) {
-          const activeFile = filtered.find((f) => f.id === activeFileId);
-          if (activeFile) {
-            targetOpenFolder = activeFile.folderPath || 'root';
-          }
-        }
-        if (openFolders.size === 0 && targetOpenFolder) {
-          openFolders.add(targetOpenFolder);
-        }
-
         folderOrder.forEach((folderPath) => {
           const folderDiv = document.createElement('div');
           folderDiv.className = 'folder-item';
@@ -2683,16 +2671,12 @@
           headerDiv.addEventListener('click', () => {
             const isCurrentlyHidden = filesDiv.classList.contains('hidden');
             if (isCurrentlyHidden) {
-              filesDiv.classList.remove('hidden');
-              const chv = headerDiv.querySelector('.folder-chevron');
-              if (chv) chv.classList.remove('collapsed');
+              openFolders.clear();
               openFolders.add(folderPath);
             } else {
-              filesDiv.classList.add('hidden');
-              const chv = headerDiv.querySelector('.folder-chevron');
-              if (chv) chv.classList.add('collapsed');
               openFolders.delete(folderPath);
             }
+            renderFileTree();
           });
 
           folderFiles.forEach((file) => {
@@ -2735,12 +2719,19 @@
         });
       }
 
-      function loadFile(id) {
-        let file = files.find((f) => f.id === id);
-        if (!file || isChildFile(file.filename, file.folderPath)) {
+      function loadFile(id, openFolder = false) {
+        if (!id) return;
+        let file = (files || []).find((f) => f.id === id);
+        if (!file) {
+          const fn = id.replace(/^\.\//, '').toLowerCase();
+          file = (files || []).find(
+            (f) => f.filename.toLowerCase() === fn || f.id.toLowerCase() === fn || (f.fullPath && f.fullPath.toLowerCase().endsWith(fn)),
+          );
+        }
+        if (!file) {
           const fallbackId = getInitialActiveFileId(files);
           if (fallbackId && fallbackId !== id) {
-            loadFile(fallbackId);
+            loadFile(fallbackId, openFolder);
             return;
           }
           if (!file) {
@@ -2749,7 +2740,11 @@
           }
         }
         activeFileId = file.id;
-        openFolders.add(file.folderPath || 'root');
+        if (openFolder) {
+          openFolders.clear();
+          openFolders.add(file.folderPath || 'root');
+          renderFileTree();
+        }
 
         document.getElementById('breadcrumbPathText').textContent = `${file.folderPath} / ${file.filename}`;
         const statusSelect = document.getElementById('statusSelect');
@@ -2770,15 +2765,6 @@
           root.querySelectorAll('.file-item').forEach((item) => {
             if (item.dataset.fileId === id) {
               item.classList.add('active');
-              const parentList = item.closest('.folder-files-list');
-              if (parentList && parentList.classList.contains('hidden')) {
-                parentList.classList.remove('hidden');
-                const parentHeader = parentList.previousElementSibling;
-                if (parentHeader) {
-                  const chv = parentHeader.querySelector('.folder-chevron');
-                  if (chv) chv.classList.remove('collapsed');
-                }
-              }
             } else {
               item.classList.remove('active');
             }
@@ -3103,6 +3089,10 @@
         activeAppView = view;
         closeNavDrawer();
 
+        openAccordionEpicIndex = null;
+        openStoryKey = null;
+        openSpecElementId = null;
+
         const studioView = document.getElementById('studioView');
         const dashboardView = document.getElementById('dashboardView');
         const headerTitle = document.getElementById('appHeaderTitle');
@@ -3407,7 +3397,7 @@
         return epics;
       }
 
-      const openEpicIndices = new Set([0]);
+      let openAccordionEpicIndex = null;
 
       function formatStoryTitle(title) {
         if (!title) return '';
@@ -3434,18 +3424,26 @@
       }
 
       window.toggleEpicAccordion = function (index) {
-        if (openEpicIndices.has(index)) {
-          openEpicIndices.delete(index);
+        if (openAccordionEpicIndex === index) {
+          openAccordionEpicIndex = null;
         } else {
-          openEpicIndices.add(index);
+          openAccordionEpicIndex = index;
         }
+        openStoryKey = null;
+
         const groups = document.querySelectorAll('.epic-group');
         groups.forEach((group, idx) => {
-          if (openEpicIndices.has(idx)) {
+          const gIdx = group.dataset.epicIndex !== undefined ? parseInt(group.dataset.epicIndex, 10) : idx;
+          if (openAccordionEpicIndex !== null && openAccordionEpicIndex === gIdx) {
             group.classList.add('open');
           } else {
             group.classList.remove('open');
           }
+        });
+
+        const storyItems = document.querySelectorAll('.story-accordion-item');
+        storyItems.forEach((item) => {
+          item.classList.remove('open');
         });
       };
 
@@ -3516,7 +3514,7 @@
 
       window.openDocInStudio = function (fileId) {
         if (!fileId) return;
-        loadFile(fileId);
+        loadFile(fileId, true);
         switchAppView('studio');
       };
 
@@ -3652,17 +3650,26 @@
         return items;
       }
 
+      let openSpecElementId = null;
       window.toggleSpecAccordion = function (elementId) {
-        const el = document.getElementById(elementId);
-        if (!el) return;
-        const body = el.querySelector('.story-ac-body');
-        if (el.classList.contains('open')) {
-          el.classList.remove('open');
-          if (body) body.style.display = 'none';
+        if (openSpecElementId === elementId) {
+          openSpecElementId = null;
         } else {
-          el.classList.add('open');
-          if (body) body.style.display = 'block';
+          openSpecElementId = elementId;
         }
+        const items = document.querySelectorAll('.story-accordion-item');
+        items.forEach((el) => {
+          if (el.id && el.id.startsWith('specDevItem_')) {
+            const body = el.querySelector('.story-ac-body');
+            if (el.id === openSpecElementId) {
+              el.classList.add('open');
+              if (body) body.style.display = 'block';
+            } else {
+              el.classList.remove('open');
+              if (body) body.style.display = 'none';
+            }
+          }
+        });
       };
 
       function renderProjectBadge() {
@@ -4101,7 +4108,7 @@
                     ${parsedEpics
                       .map(
                         (epic, idx) => `
-                      <div class="epic-group ${openAccordionEpicIndex === idx ? 'open' : ''}">
+                      <div class="epic-group ${openAccordionEpicIndex === idx ? 'open' : ''}" data-epic-index="${idx}">
                         <div class="epic-header" onclick="toggleEpicAccordion(${idx})">
                           <div class="epic-header-left">
                             <span class="epic-chevron">▶</span>
@@ -4458,7 +4465,7 @@
                 ${parsedEpics
                   .map(
                     (epic, idx) => `
-                  <div class="epic-group ${openAccordionEpicIndex === idx ? 'open' : ''}">
+                  <div class="epic-group ${openAccordionEpicIndex === idx ? 'open' : ''}" data-epic-index="${idx}">
                     <div class="epic-header" onclick="toggleEpicAccordion(${idx})">
                       <div class="epic-header-left">
                         <span class="epic-chevron">▶</span>
@@ -4535,16 +4542,16 @@
       `;
       }
 
-      const openStoryKeys = new Set();
+      let openStoryKey = null;
       window.toggleStoryAccordion = function (key) {
-        if (openStoryKeys.has(key)) {
-          openStoryKeys.delete(key);
+        if (openStoryKey === key) {
+          openStoryKey = null;
         } else {
-          openStoryKeys.add(key);
+          openStoryKey = key;
         }
         const items = document.querySelectorAll('.story-accordion-item');
         items.forEach((item) => {
-          if (openStoryKeys.has(item.dataset.storyKey)) {
+          if (item.dataset.storyKey === openStoryKey) {
             item.classList.add('open');
           } else {
             item.classList.remove('open');
@@ -4593,8 +4600,9 @@
                         .map((doc, idx) => {
                           const acItems = parseAcceptanceCriteriaFromSpec(doc.content);
                           const accId = `specDevItem_${idx}`;
+                          const isSpecOpen = openSpecElementId === accId;
                           return `
-                    <div class="story-accordion-item open" id="${accId}">
+                    <div class="story-accordion-item ${isSpecOpen ? 'open' : ''}" id="${accId}">
                       <!-- Clickable Spec File Row: Toggles acceptance criteria directly -->
                       <div class="story-accordion-header" onclick="toggleSpecAccordion('${accId}')" style="cursor: pointer; padding: 0.75rem 1rem;">
                         <div class="story-item-left" style="display: flex; align-items: center; gap: 0.6rem;">
@@ -4609,7 +4617,7 @@
                       </div>
 
                       <!-- Acceptance criteria checklist revealed directly under spec file -->
-                      <div class="story-ac-body" style="display: block; padding: 0.75rem 1.25rem 1rem 2.4rem;">
+                      <div class="story-ac-body" style="${isSpecOpen ? 'display: block;' : 'display: none;'} padding: 0.75rem 1.25rem 1rem 2.4rem;">
                         <div class="story-ac-card" style="border-left: 3px solid #3b82f6;">
                           ${
                             acItems.length > 0
@@ -4656,10 +4664,8 @@
           return;
         }
 
-        // Tier 2 (Brownfield) or Greenfield: Full Developer dashboard
+        // Tier 2 (Brownfield) or Greenfield: Full Developer dashboard (Epics and Stories only)
         const docEpics = getDoc(/epics\.md$/);
-        const specDocs = isBrownfield ? getSpecDocs() : [];
-        const approvedSpecsCount = specDocs.filter((d) => getNormStatus(d) === 'Approved').length;
         let parsedEpics = [];
         let totalStories = 0;
         let completedStories = 0;
@@ -4685,14 +4691,8 @@
         }
 
         let implementationProgress = 0;
-        if (totalStories > 0 && specDocs.length > 0) {
-          implementationProgress = Math.round(
-            ((completedStories / totalStories) * 0.7 + (approvedSpecsCount / specDocs.length) * 0.3) * 100,
-          );
-        } else if (totalStories > 0) {
+        if (totalStories > 0) {
           implementationProgress = Math.round((completedStories / totalStories) * 100);
-        } else if (specDocs.length > 0) {
-          implementationProgress = Math.round((approvedSpecsCount / specDocs.length) * 100);
         }
 
         if (!docEpics || parsedEpics.length === 0) {
@@ -4718,72 +4718,6 @@
               </p>
             </div>
           </div>
-
-          ${
-            specDocs.length > 0
-              ? `
-          <!-- Standalone Spec Implementation (Below Backlog notice) -->
-          <div class="dashboard-phases-container" style="margin-top: 1rem;">
-            <div class="phase-card">
-              <div class="phase-card-header">
-                <div class="phase-title-left">
-                  <div class="phase-icon-badge">⚡</div>
-                  <div class="phase-title-text">
-                    <h3>Standalone Spec Implementation</h3>
-                    <span>Technical contracts, standalone specifications, and acceptance criteria</span>
-                  </div>
-                </div>
-                <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
-              </div>
-              <div class="phase-card-body">
-                ${specDocs
-                  .map((doc, idx) => {
-                    const acItems = parseAcceptanceCriteriaFromSpec(doc.content);
-                    const accId = `specDevItem_zero_${idx}`;
-                    return `
-                  <div class="story-accordion-item open" id="${accId}">
-                    <!-- Clickable Spec File Row: Toggles acceptance criteria directly -->
-                    <div class="story-accordion-header" onclick="toggleSpecAccordion('${accId}')" style="cursor: pointer; padding: 0.75rem 1rem;">
-                      <div class="story-item-left" style="display: flex; align-items: center; gap: 0.6rem;">
-                        <span class="story-chevron">▶</span>
-                        <span class="artifact-icon" style="font-size: 1.15rem;">📄</span>
-                        <div class="artifact-info">
-                          <span class="artifact-filename" style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${doc.filename}</span>
-                          <span class="artifact-meta" style="font-size: 0.76rem; color: #64748b;">Implementation Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
-                        </div>
-                      </div>
-                      ${renderStatusBadge(getNormStatus(doc))}
-                    </div>
-
-                    <!-- Acceptance criteria checklist revealed directly under spec file -->
-                    <div class="story-ac-body" style="display: block; padding: 0.75rem 1.25rem 1rem 2.4rem;">
-                      <div class="story-ac-card" style="border-left: 3px solid #3b82f6;">
-                        ${
-                          acItems.length > 0
-                            ? acItems
-                                .map(
-                                  (ac) => `
-                          <div class="spec-ac-item">
-                            <span class="ac-checkbox-icon">${ac.isCompleted ? '✅' : '⚪'}</span>
-                            <span class="ac-text">${formatAcLine(ac.text)}</span>
-                          </div>
-                        `,
-                                )
-                                .join('')
-                            : `<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No acceptance criteria items found under '## Acceptance Criteria' in this spec.</div>`
-                        }
-                      </div>
-                    </div>
-                  </div>
-                `;
-                  })
-                  .join('')}
-              </div>
-            </div>
-          </div>
-          `
-              : ''
-          }
 
           <!-- Footer -->
           <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1.5rem;">
@@ -4814,11 +4748,11 @@
             </div>
             <div class="progress-bar-subtext">
               <span>Total Deliverables Progress</span>
-              <span>${completedStories} of ${totalStories} Stories${specDocs.length > 0 ? ` • ${approvedSpecsCount} of ${specDocs.length} Standalone Specs Approved` : ' Completed'}</span>
+              <span>${completedStories} of ${totalStories} Stories Completed</span>
             </div>
           </div>
 
-          <!-- Quick Summary Stats Grid (Epics, Stories, and Standalone Specs if present) -->
+          <!-- Quick Summary Stats Grid (Epics and Stories only) -->
           <div class="dashboard-stats-grid">
             <div class="stat-card">
               <div class="stat-card-label">Epics</div>
@@ -4834,19 +4768,6 @@
                 <span class="stat-unit">Completed</span>
               </div>
             </div>
-            ${
-              specDocs.length > 0
-                ? `
-            <div class="stat-card">
-              <div class="stat-card-label">Specs</div>
-              <div class="stat-card-value-col">
-                <span class="stat-number" style="color: #0891b2;">${approvedSpecsCount}/${specDocs.length}</span>
-                <span class="stat-unit">Approved</span>
-              </div>
-            </div>
-            `
-                : ''
-            }
           </div>
         </div>
 
@@ -4872,7 +4793,7 @@
                 ${parsedEpics
                   .map(
                     (epic, eIdx) => `
-                  <div class="epic-group ${openEpicIndices.has(eIdx) ? 'open' : ''}">
+                  <div class="epic-group ${openAccordionEpicIndex === eIdx ? 'open' : ''}" data-epic-index="${eIdx}">
                     <div class="epic-header" onclick="toggleEpicAccordion(${eIdx})">
                       <div class="epic-header-left">
                         <span class="epic-chevron">▶</span>
@@ -4885,7 +4806,7 @@
                         .map((story, sIdx) => {
                           const sKey = `epic-${eIdx}-story-${sIdx}`;
                           const hasAC = Array.isArray(story.acceptanceCriteria) && story.acceptanceCriteria.length > 0;
-                          const isOpen = openStoryKeys.has(sKey);
+                          const isOpen = openStoryKey === sKey;
                           return `
                           <div class="story-accordion-item ${isOpen ? 'open' : ''}" data-story-key="${sKey}">
                             <div class="story-accordion-header" onclick="toggleStoryAccordion('${sKey}')">
@@ -4958,70 +4879,6 @@
               </div>
             </div>
           </div>
-
-          ${
-            specDocs.length > 0
-              ? `
-          <!-- Standalone Spec Implementation (Below Implementation Backlog) -->
-          <div class="phase-card">
-            <div class="phase-card-header">
-              <div class="phase-title-left">
-                <div class="phase-icon-badge">⚡</div>
-                <div class="phase-title-text">
-                  <h3>Standalone Spec Implementation</h3>
-                  <span>Technical contracts, standalone specifications, and acceptance criteria</span>
-                </div>
-              </div>
-              <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
-            </div>
-            <div class="phase-card-body">
-              ${specDocs
-                .map((doc, idx) => {
-                  const acItems = parseAcceptanceCriteriaFromSpec(doc.content);
-                  const accId = `specDevItem_tier2_${idx}`;
-                  return `
-                <div class="story-accordion-item open" id="${accId}">
-                  <!-- Clickable Spec File Row: Toggles acceptance criteria directly -->
-                  <div class="story-accordion-header" onclick="toggleSpecAccordion('${accId}')" style="cursor: pointer; padding: 0.75rem 1rem;">
-                    <div class="story-item-left" style="display: flex; align-items: center; gap: 0.6rem;">
-                      <span class="story-chevron">▶</span>
-                      <span class="artifact-icon" style="font-size: 1.15rem;">📄</span>
-                      <div class="artifact-info">
-                        <span class="artifact-filename" style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${doc.filename}</span>
-                        <span class="artifact-meta" style="font-size: 0.76rem; color: #64748b;">Implementation Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
-                      </div>
-                    </div>
-                    ${renderStatusBadge(getNormStatus(doc))}
-                  </div>
-
-                  <!-- Acceptance criteria checklist revealed directly under spec file -->
-                  <div class="story-ac-body" style="display: block; padding: 0.75rem 1.25rem 1rem 2.4rem;">
-                    <div class="story-ac-card" style="border-left: 3px solid #3b82f6;">
-                      ${
-                        acItems.length > 0
-                          ? acItems
-                              .map(
-                                (ac) => `
-                        <div class="spec-ac-item">
-                          <span class="ac-checkbox-icon">${ac.isCompleted ? '✅' : '⚪'}</span>
-                          <span class="ac-text">${formatAcLine(ac.text)}</span>
-                        </div>
-                      `,
-                              )
-                              .join('')
-                          : `<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No acceptance criteria items found under '## Acceptance Criteria' in this spec.</div>`
-                      }
-                    </div>
-                  </div>
-                </div>
-              `;
-                })
-                .join('')}
-            </div>
-          </div>
-          `
-              : ''
-          }
         </div>
 
         <!-- Footer -->
