@@ -6,7 +6,7 @@ module.exports = async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-GitHub-Token');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -92,11 +92,26 @@ module.exports = async function handler(req, res) {
 
     const repoFilePath = cleanFolder ? `_acl-output/${cleanFolder}/${cleanFilename}` : `_acl-output/${cleanFilename}`;
 
-    // Detect GitHub Configuration
-    const token = (process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PAT || '').trim();
-    let owner = (process.env.GITHUB_OWNER || process.env.VERCEL_GIT_REPO_OWNER || '').trim();
-    let repo = (process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG || '').trim();
-    const branch = (process.env.GITHUB_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || 'main').trim();
+    // Detect GitHub Configuration: Check headers, body, or environment variables
+    const rawHeaderAuth = req.headers['authorization'] || '';
+    const rawCustomToken = req.headers['x-github-token'] || '';
+    const rawBodyToken = (payload && payload.githubToken) || '';
+
+    const token = (
+      rawCustomToken ||
+      rawHeaderAuth.replace(/^Bearer\s+/i, '').replace(/^token\s+/i, '') ||
+      rawBodyToken ||
+      process.env.GITHUB_TOKEN ||
+      process.env.GH_TOKEN ||
+      process.env.GITHUB_PAT ||
+      ''
+    ).trim();
+
+    let owner = ((payload && payload.githubOwner) || process.env.GITHUB_OWNER || process.env.VERCEL_GIT_REPO_OWNER || '').trim();
+
+    let repo = ((payload && payload.githubRepo) || process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG || '').trim();
+
+    const branch = ((payload && payload.githubBranch) || process.env.GITHUB_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || 'main').trim();
 
     // Auto-detect owner and repo from package.json if not explicitly provided
     if (!owner || !repo) {
@@ -146,7 +161,7 @@ module.exports = async function handler(req, res) {
           res.end(
             JSON.stringify({
               success: false,
-              error: 'GitHub Token is invalid or expired. Check GITHUB_TOKEN in Vercel settings.',
+              error: 'GitHub Token is invalid or expired. Please check your token or re-enter it in Cloud Sync Settings.',
             }),
           );
           return;
@@ -156,7 +171,8 @@ module.exports = async function handler(req, res) {
           res.end(
             JSON.stringify({
               success: false,
-              error: `GitHub token lacks permission to read repository: ${errBody}`,
+              error: `GitHub token lacks permission: ${errBody}`,
+              hint: 'Token needs repo or contents:write permissions.',
             }),
           );
           return;
@@ -239,7 +255,8 @@ module.exports = async function handler(req, res) {
           mode: 'local-disk',
           path: repoFilePath,
           status: status,
-          warning: 'Saved to local disk only. To enable cloud commits on Vercel, configure GITHUB_TOKEN in Vercel environment variables.',
+          warning:
+            'Saved to local disk only. To enable cloud commits on Vercel, configure GITHUB_TOKEN in Vercel environment variables or enter it in Markdown Studio Cloud Sync settings.',
         }),
       );
     } catch {
@@ -247,8 +264,9 @@ module.exports = async function handler(req, res) {
       res.end(
         JSON.stringify({
           success: false,
-          error: 'GITHUB_TOKEN is missing or not configured in Vercel environment variables. Local disk is read-only in cloud lambdas.',
-          hint: 'Please add GITHUB_TOKEN in Vercel Project Settings > Environment Variables.',
+          error:
+            'GITHUB_TOKEN is missing. Click "🐙 Cloud Sync" in the top header to enter your token, or add GITHUB_TOKEN in Vercel settings.',
+          hint: 'Click "🐙 Cloud Sync" in the top bar to paste your GitHub token.',
         }),
       );
     }
