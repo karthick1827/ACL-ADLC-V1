@@ -772,6 +772,9 @@ class Installer {
 
       // Auto-configure Vite middleware if Vite config exists in project
       await this._configureViteProject(projectRoot);
+
+      // Auto-deploy Vercel Serverless API endpoints for Cloud GitHub Sync
+      await this._deployVercelApiEndpoints(projectRoot);
     }
   }
 
@@ -951,6 +954,83 @@ function aclMarkdownSaverPlugin() {
           // Best-effort config wiring
         }
       }
+    }
+  }
+
+  async _deployVercelApiEndpoints(projectRoot) {
+    if (!projectRoot) return;
+    try {
+      const apiDir = path.join(projectRoot, 'api');
+      await fs.ensureDir(apiDir);
+
+      // Check if target project is ESM
+      let isEsm = false;
+      const pkgJsonPath = path.join(projectRoot, 'package.json');
+      if (await fs.pathExists(pkgJsonPath)) {
+        try {
+          const pkg = JSON.parse(await fs.readFile(pkgJsonPath, 'utf8'));
+          isEsm = pkg.type === 'module';
+        } catch {
+          // Default to CommonJS
+        }
+      }
+
+      const srcApiDirCandidates = [path.join(path.resolve(__dirname, '../../..'), 'api'), path.join(getProjectRoot(), 'api')];
+
+      let srcApiDir = null;
+      for (const cand of srcApiDirCandidates) {
+        if (await fs.pathExists(cand)) {
+          srcApiDir = cand;
+          break;
+        }
+      }
+
+      if (srcApiDir) {
+        for (const endpointFile of ['save-markdown.js', 'list-markdown-files.js']) {
+          const srcFile = path.join(srcApiDir, endpointFile);
+          if (await fs.pathExists(srcFile)) {
+            let content = await fs.readFile(srcFile, 'utf8');
+            if (isEsm) {
+              content = content
+                .replace(
+                  "const fs = require('node:fs');\nconst path = require('node:path');\n\nmodule.exports = async function handler(req, res) {",
+                  "import fs from 'node:fs';\nimport path from 'node:path';\n\nexport default async function handler(req, res) {",
+                )
+                .replace(
+                  "const fs = require('node:fs');\nconst path = require('node:path');",
+                  "import fs from 'node:fs';\nimport path from 'node:path';",
+                )
+                .replace('module.exports = async function handler(req, res) {', 'export default async function handler(req, res) {');
+            }
+            const targetFile = path.join(apiDir, endpointFile);
+            await fs.writeFile(targetFile, content, 'utf8');
+            this.installedFiles.add(targetFile);
+          }
+        }
+      }
+
+      // Deploy vercel.json if not present
+      const targetVercelJson = path.join(projectRoot, 'vercel.json');
+      if (!(await fs.pathExists(targetVercelJson))) {
+        const vercelConfig = {
+          $schema: 'https://openapi.vercel.sh/vercel.json',
+          cleanUrls: true,
+          rewrites: [
+            {
+              source: '/api/(.*)',
+              destination: '/api/$1',
+            },
+            {
+              source: '/markdown.html',
+              destination: '/markdown.html',
+            },
+          ],
+        };
+        await fs.writeFile(targetVercelJson, JSON.stringify(vercelConfig, null, 2) + '\n', 'utf8');
+        this.installedFiles.add(targetVercelJson);
+      }
+    } catch {
+      // Best-effort vercel endpoints deployment
     }
   }
 

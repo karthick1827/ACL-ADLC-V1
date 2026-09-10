@@ -84,9 +84,18 @@ export default [
     },
   },
 
-  // CLI scripts under tools/**, test/**, and src/scripts/**
+  // CLI scripts under tools/**, test/**, src/scripts/**, and api/**
   {
-    files: ['tools/**/*.js', 'tools/**/*.mjs', 'test/**/*.js', 'test/**/*.mjs', 'src/scripts/**/*.js', 'src/scripts/**/*.mjs'],
+    files: [
+      'tools/**/*.js',
+      'tools/**/*.mjs',
+      'test/**/*.js',
+      'test/**/*.mjs',
+      'src/scripts/**/*.js',
+      'src/scripts/**/*.mjs',
+      'api/**/*.js',
+      'api/**/*.mjs',
+    ],
     rules: {
       // Allow CommonJS patterns for Node CLI scripts
       'unicorn/prefer-module': 'off',
@@ -114,6 +123,12 @@ export default [
       'unicorn/prefer-number-properties': 'off',
       'no-unreachable': 'off',
       'unicorn/text-encoding-identifier-case': 'off',
+      'n/no-unsupported-features/node-builtins': 'off',
+      'unicorn/no-negated-condition': 'off',
+      'unicorn/catch-error-name': 'off',
+      'unicorn/prefer-spread': 'off',
+      'unicorn/prefer-regexp-test': 'off',
+      'unicorn/prefer-string-raw': 'off',
     },
   },
 

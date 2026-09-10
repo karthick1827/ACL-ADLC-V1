@@ -2302,7 +2302,11 @@
                   renderDeveloperDashboard();
                 }
               }
-              setSyncStatus('Synced with VS code and Github', 'green');
+              if (data && data.source === 'github') {
+                setSyncStatus(`Synced live with GitHub (${data.repo || 'origin'})`, 'green');
+              } else {
+                setSyncStatus('Synced with VS code and Github', 'green');
+              }
               evaluateProceedButton();
               return true;
             }
@@ -2436,9 +2440,9 @@
           localStorage.setItem('acl_adlc_project_markdown_files', JSON.stringify(files));
         } catch (e) {}
 
-        // Save to disk locally (No remote Git push during testing)
+        // Save to disk locally or commit to GitHub if hosted on Vercel
         try {
-          await fetch('/api/save-markdown', {
+          const resp = await fetch('/api/save-markdown', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2449,10 +2453,17 @@
               autoPush: false,
             }),
           });
+          if (resp.ok) {
+            const resData = await resp.json();
+            if (resData && resData.repo) {
+              setSyncStatus(`Committed to GitHub (${resData.repo}@${resData.branch || 'main'}) ✔`, 'green');
+            } else {
+              setSyncStatus('Saved locally to disk, VS Code & Github ✔', 'green');
+            }
+          }
         } catch (e) {}
 
         isDirty = false;
-        setSyncStatus('Saved locally to disk, VS Code & Github ✔', 'green');
 
         if (status === 'Approved' || status === 'Accepted') {
           showToast(`🎉 Approved '${file.filename}' & Gate Unlocked!`, 'success');
@@ -3197,13 +3208,10 @@
             const storyHeaderMatch = line.match(
               /^(?:###|####)\s*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(?:\[([ xX])\]\s*)?(.+)$/i,
             );
-            const checkboxMatch =
-              !inAC && line.match(/^-\s*\[([ xX])\]\s*(?:Story\s*([\d\.]+)[:\-\s]+|STORY-([\d\.]+)[:\-\s]+)(.+)$/i);
+            const checkboxMatch = !inAC && line.match(/^-\s*\[([ xX])\]\s*(?:Story\s*([\d\.]+)[:\-\s]+|STORY-([\d\.]+)[:\-\s]+)(.+)$/i);
             const bulletBoldMatch =
-              !inAC &&
-              line.match(/^(?:-\s*)?\*\*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]+|STORY-([\d\.]+)[:\-\s]+)(.+?)\*\*(.*)$/i);
-            const bulletPlainMatch =
-              !inAC && line.match(/^-\s*(?:Story\s*([\d\.]+)[:\-\s]+|STORY-([\d\.]+)[:\-\s]+)(.+)$/i);
+              !inAC && line.match(/^(?:-\s*)?\*\*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]+|STORY-([\d\.]+)[:\-\s]+)(.+?)\*\*(.*)$/i);
+            const bulletPlainMatch = !inAC && line.match(/^-\s*(?:Story\s*([\d\.]+)[:\-\s]+|STORY-([\d\.]+)[:\-\s]+)(.+)$/i);
 
             let sNum = null;
             let sTitle = null;
