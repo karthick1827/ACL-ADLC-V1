@@ -3197,11 +3197,13 @@
             const storyHeaderMatch = line.match(
               /^(?:###|####)\s*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(?:\[([ xX])\]\s*)?(.+)$/i,
             );
-            const checkboxMatch = line.match(/^-\s*\[([ xX])\]\s*(?:Story\s*([\d\.]+)[:\-\s]*)?(.+)$/i);
-            const bulletBoldMatch = line.match(
-              /^(?:-\s*)?\*\*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(.+?)\*\*(.*)$/i,
-            );
-            const bulletPlainMatch = line.match(/^-\s*(?:Story\s*([\d\.]+)[:\-\s]*|STORY-([\d\.]+)[:\-\s]*)(.+)$/i);
+            const checkboxMatch =
+              !inAC && line.match(/^-\s*\[([ xX])\]\s*(?:Story\s*([\d\.]+)[:\-\s]+|STORY-([\d\.]+)[:\-\s]+)(.+)$/i);
+            const bulletBoldMatch =
+              !inAC &&
+              line.match(/^(?:-\s*)?\*\*(?:\[([ xX])\]\s*)?(?:Story\s*([\d\.]+)[:\-\s]+|STORY-([\d\.]+)[:\-\s]+)(.+?)\*\*(.*)$/i);
+            const bulletPlainMatch =
+              !inAC && line.match(/^-\s*(?:Story\s*([\d\.]+)[:\-\s]+|STORY-([\d\.]+)[:\-\s]+)(.+)$/i);
 
             let sNum = null;
             let sTitle = null;
@@ -3306,6 +3308,7 @@
                 fileId: matchFile ? matchFile.id : null,
                 filename: matchFile ? matchFile.filename : null,
                 acceptanceCriteria: [],
+                hasFileAC: false,
               };
 
               // If matchFile has AC, try reading from matchFile content
@@ -3313,6 +3316,7 @@
                 const parsedAcs = parseAcceptanceCriteriaFromSpec(matchFile.content);
                 if (parsedAcs && parsedAcs.length > 0) {
                   currentStory.acceptanceCriteria = parsedAcs;
+                  currentStory.hasFileAC = true;
                 }
               }
 
@@ -3322,7 +3326,7 @@
             }
 
             // Gather Acceptance Criteria for currentStory from epics.md
-            if (currentStory && currentStory.acceptanceCriteria.length === 0) {
+            if (currentStory && !currentStory.hasFileAC) {
               if (line.match(/(?:\*\*|\*|#+\s*)Acceptance Criteria:?(?:\*\*|\*)?/i)) {
                 inAC = true;
                 const afterAc = line.replace(/^.*Acceptance Criteria:?(?:\*\*|\*)?\s*/i, '').trim();
@@ -4674,6 +4678,7 @@
         if (docEpics && docEpics.content) {
           parsedEpics = parseEpicsAndStoriesFromMarkdown(docEpics.content, files);
           parsedEpics.forEach((ep) => {
+            ep.stories = ep.stories.filter((story) => Boolean(story.num) || /^Story\s*[\d\.]+/i.test(story.title || ''));
             let epicStoriesTotal = 0;
             let epicStoriesDone = 0;
             ep.stories.forEach((st) => {
