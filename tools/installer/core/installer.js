@@ -833,7 +833,7 @@ function aclMarkdownSaverPlugin() {
                   const match = content.match(/status:\\s*([^\\n\\r]+)/i);
                   if (match && match[1]) {
                     const raw = match[1].trim().toLowerCase();
-                    if (raw.includes('accept') || raw.includes('updated') || raw.includes('final') || raw.includes('approved')) status = 'Accepted';
+                    if (raw.includes('approved') || raw.includes('accept')) status = 'Accepted';
                     else if (raw.includes('reject')) status = 'Rejected';
                     else status = 'In Review';
                   }

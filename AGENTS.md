@@ -13,6 +13,20 @@ Open source framework for structured, agent-assisted software delivery.
 
 ## 🚦 Phase Gate Approval Invariants (Mandatory & Non-Negotiable)
 
+- **The Closed 3-Value Frontmatter Status Enum Rule (Strict & Non-Negotiable)**:
+  - The frontmatter `status` field across ALL deliverables, specs, and documents in `_acl-output/` is **STRICTLY AN ENUM OF ONLY THREE PERMITTED VALUES**:
+    1. `status: In Review` (Document generated, updated, or awaiting review)
+    2. `status: Approved` (Official sign-off granted by Manager in Markdown Studio)
+    3. `status: Rejected` (Manager rejected document, revisions required)
+  - **STRICT PROHIBITION OF OTHER STATUS VALUES**:
+    - The frontmatter `status` field is **STRICTLY FORBIDDEN from having ANY value other than these three**.
+    - Values such as `final`, `draft`, `Pending`, `Accepted`, `ready-for-dev`, `in-progress`, `done`, or any custom string are **STRICTLY FORBIDDEN** from appearing in ANY frontmatter.
+    - AI agents and skills are **STRICTLY FORBIDDEN** from auto-setting `status: final` or `status: draft` upon closing or finalizing. When an AI skill finishes generating or updating a deliverable, it MUST ONLY set `status: In Review`.
+  - **Single Approval Invariant (`status: Approved` ONLY)**:
+    - Downstream phases, skills, and code generation can **ONLY and EXCLUSIVELY** proceed when the upstream deliverable has exact `status: Approved`.
+    - Under NO circumstances does `status: final` or any other string unlock any phase gate.
+    - Until a deliverable is marked `status: Approved` by the Manager in Markdown Studio, the next step **CANNOT and MUST NOT** proceed under any circumstances!
+
 - **Universal Sequential Document Gate for ALL Agents & Skills**:
   - EVERY single agent (Sally UX Designer, Winston Architect, Amelia Developer, Mary Analyst, etc.) and EVERY skill (`acl-architecture`, `acl-ux`, `acl-create-epics-and-stories`, `acl-quick-dev`, `acl-figma-bridge`, etc.) across ALL AI tools (Cursor, Antigravity, AGY, GitHub Copilot, Claude Code, Windsurf, Roo Code, etc.) MUST FIRST verify that all applicable upstream phase deliverables in `_acl-output/` have `status: Approved`.
   - **Prerequisite Deliverables Scope (What Requires Approval)**:
@@ -24,7 +38,7 @@ Open source framework for structured, agent-assisted software delivery.
   - **STRICT EXCLUSIONS (Internal Working Files NEVER Require Approval)**:
     - Internal working memory logs (`.memlog.md`, `*-memlog.md`), supplementary child files (`addendum.md`, `sources.md`, `research.md`, `review-triage.md`, `patch-plan.md`, `test-summary.md`), and test directories are internal AI working artifacts.
     - AI agents MUST NEVER evaluate internal memory logs or child files for approval status, and MUST NEVER block gates based on them. Gate evaluation applies STRICTLY to the primary deliverables listed above.
-  - If **ANY** required upstream phase deliverable listed above is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
+  - If **ANY** required upstream phase deliverable listed above is missing, or has ANY status other than `Approved` (e.g. `In Review`, `Rejected`):
     - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
       - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
       - The AI Agent is **STRICTLY FORBIDDEN** from offering conversational advice, whiteboard diagrams, or brainstorming in chat while waiting for approval.

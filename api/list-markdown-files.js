@@ -39,7 +39,7 @@ function parseMarkdownMetadata(content, fullPath, statTime = null) {
   const match = content.match(/status:\s*([^\r\n]+)/i);
   if (match && match[1]) {
     const raw = match[1].trim().toLowerCase();
-    if (raw.includes('accept') || raw.includes('approved') || raw.includes('final')) status = 'Approved';
+    if (raw.includes('approved') || raw.includes('accept')) status = 'Approved';
     else if (raw.includes('reject')) status = 'Rejected';
     else status = 'In Review';
   }

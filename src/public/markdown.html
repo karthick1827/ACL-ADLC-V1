@@ -3650,7 +3650,7 @@
       function getNormStatus(doc) {
         if (!doc) return 'To Do';
         const raw = (doc.status || 'In Review').trim().toLowerCase();
-        if (raw.includes('accept') || raw.includes('approved') || raw.includes('final')) return 'Approved';
+        if (raw.includes('approved') || raw.includes('accept')) return 'Approved';
         if (raw.includes('reject') || raw.includes('action')) return 'Need Action';
         return 'In Review';
       }
