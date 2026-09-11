@@ -759,14 +759,12 @@ class Installer {
           }
         }
 
-        // Deploy AGENTS.md governance rules to project root if not present
+        // Deploy AGENTS.md governance rules to project root
         const targetAgentsMd = path.join(projectRoot, 'AGENTS.md');
-        if (!(await fs.pathExists(targetAgentsMd))) {
-          const srcAgentsMd = path.join(path.resolve(__dirname, '../../..'), 'AGENTS.md');
-          if (await fs.pathExists(srcAgentsMd)) {
-            await fs.copy(srcAgentsMd, targetAgentsMd);
-            this.installedFiles.add(targetAgentsMd);
-          }
+        const srcAgentsMd = path.join(path.resolve(__dirname, '../../..'), 'AGENTS.md');
+        if (await fs.pathExists(srcAgentsMd)) {
+          await fs.copy(srcAgentsMd, targetAgentsMd);
+          this.installedFiles.add(targetAgentsMd);
         }
       }
 

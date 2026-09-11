@@ -14,8 +14,17 @@ Open source framework for structured, agent-assisted software delivery.
 ## 🚦 Phase Gate Approval Invariants (Mandatory & Non-Negotiable)
 
 - **Universal Sequential Document Gate for ALL Agents & Skills**:
-  - EVERY single agent (Sally UX Designer, Winston Architect, Amelia Developer, Mary Analyst, etc.) and EVERY skill (`acl-architecture`, `acl-ux`, `acl-create-epics-and-stories`, `acl-quick-dev`, `acl-figma-bridge`, etc.) MUST FIRST verify that ALL upstream documents in `_acl-output/` have `status: Approved`.
-  - If **ANY** prerequisite document in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
+  - EVERY single agent (Sally UX Designer, Winston Architect, Amelia Developer, Mary Analyst, etc.) and EVERY skill (`acl-architecture`, `acl-ux`, `acl-create-epics-and-stories`, `acl-quick-dev`, `acl-figma-bridge`, etc.) across ALL AI tools (Cursor, Antigravity, AGY, GitHub Copilot, Claude Code, Windsurf, Roo Code, etc.) MUST FIRST verify that all applicable upstream phase deliverables in `_acl-output/` have `status: Approved`.
+  - **Prerequisite Deliverables Scope (What Requires Approval)**:
+    - Phase 1: `_acl-output/1-analysis/acl-product-brief/brief.md`
+    - Phase 2: `_acl-output/2-plan-workflows/acl-prd/prd.md`
+    - Phase 3A: `_acl-output/3-solutioning/acl-architecture/architecture-spine.md` (or `architecture.md`)
+    - Phase 3B: `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`
+    - Phase 4: `_acl-output/4-implementation/story-<epic_num>-<story_num>.md` (Tier 2) or `_acl-output/4-implementation/spec-<feature-slug>.md` (Tier 1)
+  - **STRICT EXCLUSIONS (Internal Working Files NEVER Require Approval)**:
+    - Internal working memory logs (`.memlog.md`, `*-memlog.md`), supplementary child files (`addendum.md`, `sources.md`, `research.md`, `review-triage.md`, `patch-plan.md`, `test-summary.md`), and test directories are internal AI working artifacts.
+    - AI agents MUST NEVER evaluate internal memory logs or child files for approval status, and MUST NEVER block gates based on them. Gate evaluation applies STRICTLY to the primary deliverables listed above.
+  - If **ANY** required upstream phase deliverable listed above is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
     - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
       - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
       - The AI Agent is **STRICTLY FORBIDDEN** from offering conversational advice, whiteboard diagrams, or brainstorming in chat while waiting for approval.
