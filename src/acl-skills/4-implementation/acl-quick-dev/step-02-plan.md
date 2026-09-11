@@ -23,25 +23,43 @@
      ```
    - On **K**: Continue to checkpoint with full spec.
 
-### CHECKPOINT 1
+### CHECKPOINT 1: GATE LOCK (Awaiting Manager Sign-Off in Markdown Studio)
 
-Present summary. Display the spec file path as a CWD-relative path (no leading `/`) so it is clickable in the terminal. If token count exceeded 1600 and user chose [K], include the token count and explain why it may be a problem.
+1. Write the completed specification to `{spec_file}` with frontmatter:
+   ```yaml
+   ---
+   title: <Feature Title>
+   tier: Tier 1 (Self-Contained)
+   status: In Review
+   type: feature
+   created: <YYYY-MM-DD>
+   ---
+   ```
+2. **HALT IMMEDIATELY**. Do NOT proceed to implementation (`./step-03-implement.md`).
+3. Do NOT ask or prompt the human to self-approve in chat (`[A] Approve` is strictly prohibited).
+4. Display the official Gate Locked banner:
 
-After presenting the summary, display this note:
+```text
+========================================================================
+⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)
+========================================================================
+📄 Document in Review: {spec_file}
+🏷️ Current Status:      [IN REVIEW]
 
----
+⚠️ STATUS:
+   As per the ACL-ADLC Brownfield Tier 1 protocol, this specification
+   is currently awaiting official review and sign-off by your Manager.
+   Code implementation is strictly locked until approved.
 
-Before approving, you can open the spec file in an editor or ask me questions and tell me what to change. You can also use `acl-advanced-elicitation`, `acl-party-mode`, or `acl-code-review` skills, ideally in another session to avoid context bloat.
+👉 NEXT STEP:
+   Please open Markdown Studio (http://localhost:5173/markdown.html)
+   and have your Manager review and mark this document as 'Approved'
+   or 'Rejected' before proceeding with code implementation.
+========================================================================
+```
 
----
-
-HALT and ask human: `[A] Approve` | `[E] Edit`
-
-- **A**: Re-read `{spec_file}` from disk.
-  - **If the file is missing:** HALT. Tell the user the spec file is gone and STOP — do not write anything to `{spec_file}`, do not set status, do not proceed to Step 3. Nothing below this point runs.
-  - **If the file exists:** Compare the content to what you wrote. If it has changed since you wrote it, acknowledge the external edits — show a brief summary of what changed — and proceed with the updated version. Then set status `ready-for-dev` in `{spec_file}`. Everything inside `<frozen-after-approval>` is now locked — only the human can change it. → Step 3.
-- **E**: Apply changes, then return to CHECKPOINT 1.
+5. **STOP EXECUTION.** When the developer later asks to implement the code, verify that `{spec_file}` has `status: Approved` (or `Accepted`) before proceeding to `./step-03-implement.md`.
 
 ## NEXT
 
-Read fully and follow `./step-03-implement.md`
+When `{spec_file}` has `status: Approved` (or `Accepted`), read fully and follow `./step-03-implement.md`.
