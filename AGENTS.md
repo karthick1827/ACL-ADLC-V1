@@ -201,6 +201,53 @@ Please choose which Tier you want to proceed with:
 
 ---
 
+### 3. Greenfield Feature Addition Protocol (Full-Cascade Documentation Sync)
+
+Whenever the developer asks to add a new feature, capability, or change in a completed or existing Greenfield project (`project_type: greenfield`):
+
+> ⚠️ **GREENFIELD FEATURE GOVERNANCE**: Execution tiers (Tier 1 / Tier 2) do **NOT** apply to Greenfield projects. Adding any new feature requires end-to-end documentation synchronization across all upstream deliverables before any implementation code can be written.
+
+#### Greenfield Full-Cascade Workflow:
+
+1. **Sequential Upstream Documentation Updates**:
+   - The AI Agent **MUST NOT** immediately write or modify application code.
+   - The AI Agent updates all applicable upstream specification deliverables in `_acl-output/`:
+     - **Phase 1 (`brief.md`)**: Appends the new feature description, problem statement, and scope in `_acl-output/1-analysis/acl-product-brief/brief.md`; sets frontmatter `status: In Review` and `project_type: greenfield`.
+     - **Phase 2 (`prd.md`)**: Appends functional requirements (FRs), user stories, and acceptance criteria in `_acl-output/2-plan-workflows/acl-prd/prd.md`; sets frontmatter `status: In Review`.
+     - **Phase 3A (`architecture-spine.md` or `architecture.md`)**: Appends component interfaces, data models, and API contracts in `_acl-output/3-solutioning/acl-architecture/architecture-spine.md`; sets frontmatter `status: In Review`.
+     - **Phase 3B (`epics.md`)**: Appends the new Epic or Story with an unchecked acceptance criteria checklist (`- [ ]`) in `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`, strictly preserving all existing completed stories (`- [x]`); sets frontmatter `status: In Review`.
+
+2. **Immediate Gate Lock**:
+   - The AI Agent **MUST IMMEDIATELY HALT**.
+   - The AI Agent is **STRICTLY FORBIDDEN** from generating or modifying any application code.
+   - The AI Agent **MUST** output the Gate Lock banner:
+
+     ```text
+     ========================================================================
+     ⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (Greenfield Full-Cascade)
+     ========================================================================
+     📄 Documents in Review: brief.md, prd.md, architecture-spine.md, epics.md
+     🏷️ Current Status:      [IN REVIEW]
+
+     ⚠️ STATUS:
+        As per the Greenfield Feature Addition protocol, all upstream deliverables
+        have been updated with the new feature specifications and reverted to
+        'In Review'. Code implementation is strictly locked until approved.
+
+     👉 NEXT STEP:
+        Please open Markdown Studio (http://localhost:5173/markdown.html)
+        and have your Manager review and mark these documents as 'Approved'
+        or 'Rejected' before proceeding with code implementation.
+     ========================================================================
+     ```
+
+3. **Verification Before Coding**:
+   - When the developer later asks to implement the code, the AI Agent **MUST check the status of ALL updated upstream deliverables** (`brief.md`, `prd.md`, `architecture-spine.md`, `epics.md`).
+   - If **ANY** document remains `status: In Review`, `status: Rejected`, or missing: The AI Agent **REMAINS BLOCKED** and refuses to write code.
+   - If all documents have `status: Approved`: The AI Agent is **UNBLOCKED** and proceeds to implement the application code for the new story with zero regressions on existing functionality.
+
+---
+
 ## 🛑 STRICT PROHIBITION: No Direct AI Status Manipulation & Manager-Only Approval
 
 - The AI agent is **STRICTLY PROHIBITED** from using tools (`replace_file_content`, `write_to_file`, `run_command`, etc.) to change `status: In Review` -> `status: Approved` at ANY cost.
