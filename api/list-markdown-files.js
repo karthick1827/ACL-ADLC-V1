@@ -246,8 +246,8 @@ module.exports = async function handler(req, res) {
             success: true,
             files: deduplicated,
             activeTier: activeTier,
-            frameworkVersion: '6.11.26',
-            version: '6.11.26',
+            frameworkVersion: '6.11.27',
+            version: '6.11.27',
             source: 'github',
             repo: `${owner}/${repo}`,
             branch: branch,
@@ -320,8 +320,8 @@ module.exports = async function handler(req, res) {
       success: true,
       files: finalDiskList,
       activeTier: diskActiveTier,
-      frameworkVersion: '6.11.26',
-      version: '6.11.26',
+      frameworkVersion: '6.11.27',
+      version: '6.11.27',
       source: 'local-disk',
     };
 
