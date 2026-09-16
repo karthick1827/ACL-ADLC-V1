@@ -203,54 +203,118 @@ Please choose which Tier you want to proceed with:
 
 ---
 
-### 3. Greenfield Feature Addition Protocol (Full-Cascade Documentation Sync)
+### 3. Greenfield Feature Addition Protocol (Sequential Phase-Gate Documentation Sync)
 
 Whenever the developer asks to add a new feature, capability, or change in a completed or existing Greenfield project (`project_type: greenfield`):
 
-> ⚠️ **GREENFIELD FEATURE GOVERNANCE**: Execution tiers (Tier 1 / Tier 2) do **NOT** apply to Greenfield projects. Adding any new feature requires end-to-end documentation synchronization across all upstream deliverables before any implementation code can be written.
+> ⚠️ **GREENFIELD FEATURE GOVERNANCE**: Execution tiers (Tier 1 / Tier 2) do **NOT** apply to Greenfield projects. Adding any new feature requires strict sequential, one-phase-at-a-time documentation approval. Each document must be individually reviewed and approved by the Manager before the next phase document can be created or modified. No downstream document or application code may be written until the upstream document for that phase is `status: Approved`.
 
-#### Greenfield Full-Cascade Workflow:
+#### Greenfield Sequential Phase-Gate Workflow:
 
-1. **Sequential Upstream Documentation Updates**:
+1. **Phase 1 — Product Brief Update (Gate 1/4)**:
    - The AI Agent **MUST NOT** immediately write or modify application code.
-   - The AI Agent updates all applicable upstream specification deliverables in `_acl-output/`:
-     - **Phase 1 (`brief.md`)**: Appends the new feature description, problem statement, and scope in `_acl-output/1-analysis/acl-product-brief/brief.md`; sets frontmatter `status: In Review` and `project_type: greenfield`.
-     - **Phase 2 (`prd.md`)**: Appends functional requirements (FRs), user stories, and acceptance criteria in `_acl-output/2-plan-workflows/acl-prd/prd.md`; sets frontmatter `status: In Review`.
-     - **Phase 3A (`architecture-spine.md` or `architecture.md`)**: Appends component interfaces, data models, and API contracts in `_acl-output/3-solutioning/acl-architecture/architecture-spine.md`; sets frontmatter `status: In Review`.
-     - **Phase 3B (`epics.md`)**: Appends the new Epic or Story with an unchecked acceptance criteria checklist (`- [ ]`) in `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`, strictly preserving all existing completed stories (`- [x]`); sets frontmatter `status: In Review`.
-
-2. **Immediate Gate Lock**:
-   - The AI Agent **MUST IMMEDIATELY HALT**.
-   - The AI Agent is **STRICTLY FORBIDDEN** from generating or modifying any application code.
-   - The AI Agent **MUST** output the Gate Lock banner:
+   - The AI Agent **ONLY** appends the new feature description, problem statement, and scope in `_acl-output/1-analysis/acl-product-brief/brief.md`; sets frontmatter `status: In Review` and `project_type: greenfield`.
+   - **NO OTHER DOCUMENT** (`prd.md`, `architecture-spine.md`, `epics.md`) is created or modified at this step.
+   - **Immediate Gate Lock 1**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 
      ```text
      ========================================================================
-     ⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (Greenfield Full-Cascade)
+     ⏳ [GATE LOCKED — Phase 1/4]: Awaiting Manager Sign-Off (Greenfield Sequential Gate)
      ========================================================================
-     📄 Documents in Review: brief.md, prd.md, architecture-spine.md, epics.md
+     📄 Document in Review: brief.md (_acl-output/1-analysis/acl-product-brief/)
      🏷️ Current Status:      [IN REVIEW]
 
      ⚠️ STATUS:
-        As per the Greenfield Feature Addition protocol, all upstream deliverables
-        have been updated with the new feature specifications and reverted to
-        'In Review'. Code implementation is strictly locked until approved.
+        Phase 1 of 4: The Product Brief has been updated with the new feature.
+        As per the Greenfield Sequential Gate protocol, ALL downstream phases
+        (PRD, Architecture, Epics & Stories) and application code are strictly
+        locked until the Manager approves this document.
 
      👉 NEXT STEP:
         Please open Markdown Studio (http://localhost:5173/markdown.html)
-        and have your Manager review and mark these documents as 'Approved'
-        or 'Rejected' before proceeding with code implementation.
+        and have your Manager review and mark brief.md as 'Approved' before
+        proceeding to Phase 2 (PRD update).
      ========================================================================
      ```
 
-3. **Verification Before Coding**:
-   - When the developer later asks to implement the code, the AI Agent **MUST check the status of ALL updated upstream deliverables** (`brief.md`, `prd.md`, `architecture-spine.md`, `epics.md`).
-   - If **ANY** document remains `status: In Review`, `status: Rejected`, or missing: The AI Agent **REMAINS BLOCKED** and refuses to write code.
-   - If all documents have `status: Approved`: The AI Agent is **UNBLOCKED** and proceeds to implement the application code for the new story with zero regressions on existing functionality.
+2. **Phase 2 — PRD Update (Gate 2/4)**:
+   - **Prerequisite Check**: The AI Agent MUST verify `brief.md` has `status: Approved`. If it does not, the AI Agent MUST output Gate Lock 1 and halt immediately.
+   - The AI Agent **ONLY** appends functional requirements (FRs), user stories, and acceptance criteria in `_acl-output/2-plan-workflows/acl-prd/prd.md`; sets frontmatter `status: In Review`.
+   - **NO OTHER DOCUMENT** (`architecture-spine.md`, `epics.md`) is created or modified at this step.
+   - **Immediate Gate Lock 2**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 
-4. **Story Implementation & Gate Protocol**:
-   - The AI Agent is **STRICTLY PROHIBITED** from generating or modifying application code immediately after architecture sign-off! Phase 3B (`epics.md`) MUST be updated and approved first.
-   - Once ALL upstream deliverables (`brief.md`, `prd.md`, `architecture-spine.md`, `epics.md`) have `status: Approved`, the AI Agent implements the application code for the newly added story/epic.
+     ```text
+     ========================================================================
+     ⏳ [GATE LOCKED — Phase 2/4]: Awaiting Manager Sign-Off (Greenfield Sequential Gate)
+     ========================================================================
+     📄 Document in Review: prd.md (_acl-output/2-plan-workflows/acl-prd/)
+     🏷️ Current Status:      [IN REVIEW]
+
+     ⚠️ STATUS:
+        Phase 2 of 4: The PRD has been updated with functional requirements and
+        user stories for the new feature. Architecture and Epics & Stories are
+        strictly locked until the Manager approves this document.
+
+     👉 NEXT STEP:
+        Please open Markdown Studio (http://localhost:5173/markdown.html)
+        and have your Manager review and mark prd.md as 'Approved' before
+        proceeding to Phase 3A (Architecture update).
+     ========================================================================
+     ```
+
+3. **Phase 3A — Architecture Update (Gate 3/4)**:
+   - **Prerequisite Check**: The AI Agent MUST verify BOTH `brief.md` AND `prd.md` have `status: Approved`. If either does not, the AI Agent MUST output the relevant Gate Lock and halt immediately.
+   - The AI Agent **ONLY** appends component interfaces, data models, and API contracts in `_acl-output/3-solutioning/acl-architecture/architecture-spine.md`; sets frontmatter `status: In Review`.
+   - **NO OTHER DOCUMENT** (`epics.md`) is created or modified at this step.
+   - **Immediate Gate Lock 3**: The AI Agent **MUST IMMEDIATELY HALT** and output:
+
+     ```text
+     ========================================================================
+     ⏳ [GATE LOCKED — Phase 3/4]: Awaiting Manager Sign-Off (Greenfield Sequential Gate)
+     ========================================================================
+     📄 Document in Review: architecture-spine.md (_acl-output/3-solutioning/acl-architecture/)
+     🏷️ Current Status:      [IN REVIEW]
+
+     ⚠️ STATUS:
+        Phase 3 of 4: The Architecture Spine has been updated with component
+        designs and API contracts for the new feature. Epics & Stories and
+        application code are strictly locked until the Manager approves this document.
+
+     👉 NEXT STEP:
+        Please open Markdown Studio (http://localhost:5173/markdown.html)
+        and have your Manager review and mark architecture-spine.md as 'Approved'
+        before proceeding to Phase 3B (Epics & Stories update).
+     ========================================================================
+     ```
+
+4. **Phase 3B — Epics & Stories Update (Gate 4/4)**:
+   - **Prerequisite Check**: The AI Agent MUST verify `brief.md`, `prd.md`, AND `architecture-spine.md` ALL have `status: Approved`. If any does not, the AI Agent MUST output the relevant Gate Lock and halt immediately.
+   - The AI Agent **ONLY** appends the new Epic or Story with an unchecked acceptance criteria checklist (`- [ ]`) in `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`, strictly preserving all existing completed stories (`- [x]`); sets frontmatter `status: In Review`.
+   - **NO APPLICATION CODE** is generated at this step.
+   - **Immediate Gate Lock 4**: The AI Agent **MUST IMMEDIATELY HALT** and output:
+
+     ```text
+     ========================================================================
+     ⏳ [GATE LOCKED — Phase 4/4]: Awaiting Manager Sign-Off (Greenfield Sequential Gate)
+     ========================================================================
+     📄 Document in Review: epics.md (_acl-output/3-solutioning/acl-create-epics-and-stories/)
+     🏷️ Current Status:      [IN REVIEW]
+
+     ⚠️ STATUS:
+        Phase 4 of 4: Epics & Stories have been updated with the new feature's
+        acceptance criteria checklist. Application code is strictly locked until
+        the Manager approves this final document.
+
+     👉 NEXT STEP:
+        Please open Markdown Studio (http://localhost:5173/markdown.html)
+        and have your Manager review and mark epics.md as 'Approved' before
+        proceeding with code implementation.
+     ========================================================================
+     ```
+
+5. **Implementation — All Gates Cleared**:
+   - **Prerequisite Check**: The AI Agent MUST verify ALL four documents (`brief.md`, `prd.md`, `architecture-spine.md`, `epics.md`) have `status: Approved`. If ANY document remains `status: In Review`, `status: Rejected`, or missing, the AI Agent **REMAINS BLOCKED** and outputs the relevant Gate Lock banner for the earliest unapproved phase.
+   - Once all four gates are cleared, the AI Agent is **UNBLOCKED** and proceeds to implement the application code for the newly added story/epic with zero regressions on existing functionality.
    - The AI Agent marks the story checklist items as completed (`- [x]`) in `epics.md` upon verified implementation and testing.
    - Separate `_acl-output/4-implementation/story-*.md` specs are NOT required for Greenfield feature additions unless explicitly requested by the developer, preventing accidental story-gate lockouts.
 
