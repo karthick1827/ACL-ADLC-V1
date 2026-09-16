@@ -208,7 +208,12 @@ Please choose which Tier you want to proceed with:
 
 Whenever the developer asks to add a new feature, capability, or change in a completed or existing Greenfield project (`project_type: greenfield`):
 
-> ⚠️ **GREENFIELD FEATURE GOVERNANCE**: Execution tiers (Tier 1 / Tier 2) do **NOT** apply to Greenfield projects. Adding any new feature requires strict sequential, one-phase-at-a-time documentation approval. Each document must be individually reviewed and approved by the Manager before the next phase document can be created or modified. No downstream document or application code may be written until the upstream document for that phase is `status: Approved`.
+> ⚠️ **GREENFIELD FEATURE GOVERNANCE & SCOPE TEST**:
+> 1. **DO NOT BE FOOLED BY EXISTING `status: Approved` IN `_acl-output/`**: If `brief.md`, `prd.md`, and `epics.md` currently have `status: Approved`, that sign-off belongs EXCLUSIVELY to previously completed features (e.g. initial MVP). It is NOT an authorization to write code for new features!
+> 2. **SCOPE TEST BEFORE CODING**: Check `epics.md` — is the requested feature ALREADY an existing approved story in `epics.md`?
+>    - If **NO**: You are STRICTLY FORBIDDEN from writing application code! You MUST re-open Gate 1 by updating `brief.md` with the new feature and setting `status: In Review`.
+>    - If **YES**: Only then are you authorized to implement code for that approved story.
+> 3. Execution tiers (Tier 1 / Tier 2) do **NOT** apply to Greenfield projects. Adding any new feature requires strict sequential, one-phase-at-a-time documentation approval.
 
 #### Greenfield Sequential Phase-Gate Workflow:
 
