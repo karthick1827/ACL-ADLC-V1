@@ -322,6 +322,7 @@ Whenever the developer asks to add a new feature, capability, or change in a com
    - **Prerequisite Check**: The AI Agent MUST verify ALL four upstream documents (`brief.md`, `prd.md`, `architecture-spine.md`, `epics.md`) have exact `status: Approved`. If ANY document remains `status: In Review`, `status: Rejected`, or missing, the AI Agent **REMAINS BLOCKED** and outputs the relevant Gate Lock banner.
    - **Story-by-Story Execution Pipeline**:
      - Once `epics.md` is approved, the developer invokes `acl-quick-dev` (or prompts in Cursor / AGY) to implement the newly created stories.
+     - **Universal Prompt Interception**: Regardless of how the prompt is phrased (e.g., *"implement epics and stories"*, *"implement stories"*, *"implement next step"*, *"proceed with next step"*, *"start implementation"*), the AI Agent is **STRICTLY FORBIDDEN from implementing an entire epic at once or treating epic context as code**. The AI Agent **MUST AUTOMATICALLY DETECT AND SELECT THE FIRST UNCOMPLETED STORY** in `epics.md` (e.g. Story 7.1) and implement ONLY that single story.
      - Stories are implemented **strictly one story at a time** in the order defined in `epics.md` (e.g., Story 7.1, then Story 7.2, etc.).
      - **For each individual story (e.g. Story 7.1)**:
        1. **Story Specification**: The AI Agent creates `_acl-output/4-implementation/story-<epic_num>-<story_num>.md` (e.g. `story-7-1.md` or in `implementation-artifacts/`) containing:

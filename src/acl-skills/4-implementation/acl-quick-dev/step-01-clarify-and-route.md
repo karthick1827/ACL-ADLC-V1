@@ -51,7 +51,12 @@ If the spec is an epic story and `{{.sprint_status}}` exists: find the `developm
 
      **A) Epic story path** — if the intent is clearly an epic story:
 
-     1. Identify the epic number `{epic_num}` and (if present) the story number `{story_num}`. If you can't identify an epic number, use path B.
+      1. Identify the epic number `{epic_num}` and the story number `{story_num}`:
+         - If the intent specifies a story number (e.g. "Story 7.1"), use it.
+         - If the intent mentions an epic generally or is broad (e.g. "implement epics and stories", "proceed with next step", "implement next step", "start implementation"):
+           **MANDATORY SINGLE-STORY AUTO-BINDING**: Read `epics.md` (or `sprint-status.yaml`), locate the **earliest uncompleted story** in that epic (the first story with `- [ ]`), and automatically bind to that story number `{story_num}`.
+         - **STRICT PROHIBITION**: NEVER attempt to implement an entire epic, multiple stories, or an `epic-<N>-context.md` file in one run. Implementation is strictly one individual story at a time with a mandatory Manager review gate before the next story can start.
+         - If you can't identify an epic number, use path B.
 
      2. **Check for a valid cached epic context.** Look for `{{.implementation_artifacts}}/epic-<N>-context.md` (where `<N>` is the epic number). A file is **valid** when it exists, is non-empty, starts with `# Epic <N> Context:` (with the correct epic number), and no file in `{{.planning_artifacts}}` is newer.
         - **If valid:** load it as the primary planning context. Do not load raw planning docs (PRD, architecture, UX, etc.). Skip to step 5.
