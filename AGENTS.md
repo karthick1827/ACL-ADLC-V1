@@ -318,11 +318,57 @@ Whenever the developer asks to add a new feature, capability, or change in a com
      ========================================================================
      ```
 
-5. **Implementation — All Gates Cleared**:
-   - **Prerequisite Check**: The AI Agent MUST verify ALL four documents (`brief.md`, `prd.md`, `architecture-spine.md`, `epics.md`) have `status: Approved`. If ANY document remains `status: In Review`, `status: Rejected`, or missing, the AI Agent **REMAINS BLOCKED** and outputs the relevant Gate Lock banner for the earliest unapproved phase.
-   - Once all four gates are cleared, the AI Agent is **UNBLOCKED** and proceeds to implement the application code for the newly added story/epic with zero regressions on existing functionality.
-   - The AI Agent marks the story checklist items as completed (`- [x]`) in `epics.md` upon verified implementation and testing.
-   - Separate `_acl-output/4-implementation/story-*.md` specs are NOT required for Greenfield feature additions unless explicitly requested by the developer, preventing accidental story-gate lockouts.
+5. **Phase 4 — Sequential Story Implementation via Quick Dev (`acl-quick-dev`) & Per-Story Manager Review Gate**:
+   - **Prerequisite Check**: The AI Agent MUST verify ALL four upstream documents (`brief.md`, `prd.md`, `architecture-spine.md`, `epics.md`) have exact `status: Approved`. If ANY document remains `status: In Review`, `status: Rejected`, or missing, the AI Agent **REMAINS BLOCKED** and outputs the relevant Gate Lock banner.
+   - **Story-by-Story Execution Pipeline**:
+     - Once `epics.md` is approved, the developer invokes `acl-quick-dev` (or prompts in Cursor / AGY) to implement the newly created stories.
+     - Stories are implemented **strictly one story at a time** in the order defined in `epics.md` (e.g., Story 7.1, then Story 7.2, etc.).
+     - **For each individual story (e.g. Story 7.1)**:
+       1. **Story Specification**: The AI Agent creates `_acl-output/4-implementation/story-<epic_num>-<story_num>.md` (e.g. `story-7-1.md` or in `implementation-artifacts/`) containing:
+          - Frontmatter:
+            ```yaml
+            ---
+            title: '<Story Title>'
+            story_id: '<epic_num>.<story_num>'
+            status: In Review
+            type: story
+            created: <YYYY-MM-DD>
+            ---
+            ```
+          - Story description, technical implementation plan, and the acceptance criteria checklist (`- [ ]`).
+       2. **Code Implementation & Testing**: The AI Agent implements the application code and runs tests specifically for this story.
+       3. **Immediate Per-Story Gate Lock**:
+          - Upon completing the code and verifying tests for this story, the AI Agent **MUST IMMEDIATELY HALT**.
+          - The AI Agent is **STRICTLY FORBIDDEN** from proceeding to the next story (e.g. Story 7.2) until this story is officially approved!
+          - The AI Agent **MUST** output the Story Gate Lock banner:
+
+            ```text
+            ========================================================================
+            ⏳ [GATE LOCKED — Story <epic_num>.<story_num>]: Awaiting Manager Sign-Off
+            ========================================================================
+            📄 Document in Review: story-<epic_num>-<story_num>.md (_acl-output/4-implementation/)
+            🏷️ Current Status:      [IN REVIEW]
+
+            ⚠️ STATUS:
+               Implementation for Story <epic_num>.<story_num> is complete.
+               As per the ACL-ADLC Per-Story Review Gate protocol, implementation
+               of the next story is strictly locked until your Manager reviews
+               and approves this story in Markdown Studio.
+
+            👉 NEXT STEP:
+               Please open Markdown Studio (http://localhost:5173/markdown.html)
+               and have your Manager review and mark story-<epic_num>-<story_num>.md
+               as 'Approved' before proceeding to implement the next story.
+            ========================================================================
+            ```
+
+       4. **Manager Review & Next Story Unlock**:
+          - The Manager opens Markdown Studio (`markdown.html`), inspects the story deliverable and code changes, and clicks **'Approved'** on `story-<epic_num>-<story_num>.md`.
+          - When the developer next invokes `acl-quick-dev` (or asks the AI to continue):
+            - The AI verifies that `story-<epic_num>-<story_num>.md` has exact `status: Approved`.
+            - The AI marks that story's checklist item as completed (`- [x]`) in `epics.md`.
+            - The AI is **UNBLOCKED** to implement the next story in the sequence (e.g. Story 7.2).
+     - This cycle repeats story-by-story until all newly created stories are implemented, reviewed, and approved!
 
 ---
 

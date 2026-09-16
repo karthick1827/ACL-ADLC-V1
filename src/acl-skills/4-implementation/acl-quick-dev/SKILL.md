@@ -49,12 +49,19 @@ Before generating or modifying code artifacts, verify prerequisite document appr
 
 ### Greenfield Projects:
 
-1. Verify that Phase 2 (PRD), Phase 3 (Architecture Spine), and Phase 4 (Epics/Stories) are marked `status: Approved` (or execute `node tools/adlc-gate-guard.cjs phase4`).
-2. If prerequisite artifacts are `In Review`, `Pending`, or `Rejected`:
+1. Verify that Phase 1 (`brief.md`), Phase 2 (`prd.md`), Phase 3A (`architecture-spine.md`), and Phase 3B (`epics.md`) are marked `status: Approved`.
+2. If any prerequisite artifact is `In Review`, `Pending`, or `Rejected`:
    - **HALT IMMEDIATELY. DO NOT GENERATE OR MODIFY CODE.**
    - Output structured gate blocked error:
      "❌ [ADLC GATE REJECTED / BLOCKED]: Cannot proceed with Code Implementation.
-     Prerequisite artifacts in Phase 2/3/4 must be reviewed and marked 'Approved' by your manager in Markdown Studio before code generation can start."
+     Prerequisite artifacts in Phase 1/2/3 must be reviewed and marked 'Approved' by your manager in Markdown Studio before code generation can start."
+3. **Greenfield Per-Story Implementation & Review Gate**:
+   - Once `epics.md` is approved, stories are implemented **strictly one story at a time**.
+   - For each story (e.g. Story 7.1), the AI creates `_acl-output/4-implementation/story-<id>.md` (with `status: In Review` and the story's acceptance criteria checklist).
+   - After implementing the code and verifying tests for that story, `story-<id>.md` remains `status: In Review`.
+   - **HALT IMMEDIATELY.** Output the Story Gate Lock banner.
+   - The AI Agent is **STRICTLY FORBIDDEN** from proceeding to the next story until the Manager reviews and marks `story-<id>.md` as `status: Approved` in Markdown Studio (`markdown.html`).
+   - Only after `story-<id>.md` is approved does the AI mark that story as completed (`- [x]`) in `epics.md` and proceed to the next story.
 
 ### Brownfield Projects (Adaptive Tiered Gate):
 

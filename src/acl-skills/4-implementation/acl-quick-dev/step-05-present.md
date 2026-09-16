@@ -48,9 +48,9 @@ Format each stop as framing first, link on the next indented line:
 
 When there is only one concern, omit the bold label — just list the stops directly.
 
-### Mark Spec Done
+### Submit Spec for Manager Review
 
-Change `{spec_file}` status to `done` in the frontmatter.
+Ensure `{spec_file}` has `status: In Review` in its frontmatter so it enters the Markdown Studio approval queue.
 
 Follow `./sync-sprint-status.md` with `target_status` = `review`.
 
