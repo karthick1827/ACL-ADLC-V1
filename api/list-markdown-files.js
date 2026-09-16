@@ -320,8 +320,8 @@ module.exports = async function handler(req, res) {
       success: true,
       files: finalDiskList,
       activeTier: diskActiveTier,
-      frameworkVersion: '6.11.23',
-      version: '6.11.23',
+      frameworkVersion: '6.11.24',
+      version: '6.11.24',
       source: 'local-disk',
     };
 

@@ -66,6 +66,8 @@ Open source framework for structured, agent-assisted software delivery.
 
 ### 1. Brownfield Change Request Protocol (Interactive Tier Selection)
 
+> ℹ️ **PROJECT TYPE CHECK**: The AI Agent MUST first check the project type (e.g., from `_acl-output/1-analysis/acl-product-brief/brief.md` or `project-context.md`). If `project_type: greenfield`, execution tiers do NOT apply — immediately follow **Section 3 (Greenfield Feature Addition Protocol)**. Only follow the interactive tier selection below if the project is confirmed Brownfield (`project_type: brownfield`).
+
 Whenever the developer asks for a feature, bugfix, or code change in a Brownfield project:
 
 #### Case A: Tier is Explicitly Specified in the User Prompt
@@ -245,6 +247,12 @@ Whenever the developer asks to add a new feature, capability, or change in a com
    - When the developer later asks to implement the code, the AI Agent **MUST check the status of ALL updated upstream deliverables** (`brief.md`, `prd.md`, `architecture-spine.md`, `epics.md`).
    - If **ANY** document remains `status: In Review`, `status: Rejected`, or missing: The AI Agent **REMAINS BLOCKED** and refuses to write code.
    - If all documents have `status: Approved`: The AI Agent is **UNBLOCKED** and proceeds to implement the application code for the new story with zero regressions on existing functionality.
+
+4. **Story Implementation & Gate Protocol**:
+   - The AI Agent is **STRICTLY PROHIBITED** from generating or modifying application code immediately after architecture sign-off! Phase 3B (`epics.md`) MUST be updated and approved first.
+   - Once ALL upstream deliverables (`brief.md`, `prd.md`, `architecture-spine.md`, `epics.md`) have `status: Approved`, the AI Agent implements the application code for the newly added story/epic.
+   - The AI Agent marks the story checklist items as completed (`- [x]`) in `epics.md` upon verified implementation and testing.
+   - Separate `_acl-output/4-implementation/story-*.md` specs are NOT required for Greenfield feature additions unless explicitly requested by the developer, preventing accidental story-gate lockouts.
 
 ---
 
