@@ -790,6 +790,16 @@ alwaysApply: true
           await fs.copy(srcAgentsMd, claudeFile);
           this.installedFiles.add(claudeFile);
 
+          // Deploy .windsurfrules for Windsurf Cascade
+          const windsurfFile = path.join(projectRoot, '.windsurfrules');
+          await fs.copy(srcAgentsMd, windsurfFile);
+          this.installedFiles.add(windsurfFile);
+
+          // Deploy .clinerules for Cline & Roo Code
+          const clineFile = path.join(projectRoot, '.clinerules');
+          await fs.copy(srcAgentsMd, clineFile);
+          this.installedFiles.add(clineFile);
+
           // Deploy .github/copilot-instructions.md for GitHub Copilot
           const copilotDir = path.join(projectRoot, '.github');
           await fs.ensureDir(copilotDir);
