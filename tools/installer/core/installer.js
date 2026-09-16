@@ -765,6 +765,37 @@ class Installer {
         if (await fs.pathExists(srcAgentsMd)) {
           await fs.copy(srcAgentsMd, targetAgentsMd);
           this.installedFiles.add(targetAgentsMd);
+
+          // Deploy .cursorrules & .cursor/rules/adlc-governance.mdc for Cursor AI
+          const cursorRulesFile = path.join(projectRoot, '.cursorrules');
+          await fs.copy(srcAgentsMd, cursorRulesFile);
+          this.installedFiles.add(cursorRulesFile);
+
+          const cursorRulesDir = path.join(projectRoot, '.cursor', 'rules');
+          await fs.ensureDir(cursorRulesDir);
+          const cursorMdcFile = path.join(cursorRulesDir, 'adlc-governance.mdc');
+          const mdcHeader = `---
+description: ACL-ADLC Universal Phase Gate Approval & Governance Rules
+globs: ["**/*"]
+alwaysApply: true
+---
+
+`;
+          const agentsContent = await fs.readFile(srcAgentsMd, 'utf8');
+          await fs.writeFile(cursorMdcFile, mdcHeader + agentsContent, 'utf8');
+          this.installedFiles.add(cursorMdcFile);
+
+          // Deploy CLAUDE.md for Claude Code
+          const claudeFile = path.join(projectRoot, 'CLAUDE.md');
+          await fs.copy(srcAgentsMd, claudeFile);
+          this.installedFiles.add(claudeFile);
+
+          // Deploy .github/copilot-instructions.md for GitHub Copilot
+          const copilotDir = path.join(projectRoot, '.github');
+          await fs.ensureDir(copilotDir);
+          const copilotFile = path.join(copilotDir, 'copilot-instructions.md');
+          await fs.copy(srcAgentsMd, copilotFile);
+          this.installedFiles.add(copilotFile);
         }
       }
 

@@ -14,7 +14,7 @@ Open source framework for structured, agent-assisted software delivery.
 ## 🚦 Phase Gate Approval Invariants (Mandatory & Non-Negotiable)
 
 - **The Closed 3-Value Frontmatter Status Enum Rule (Strict & Non-Negotiable)**:
-  - The frontmatter `status` field across ALL deliverables, specs, and documents in `_acl-output/` is **STRICTLY AN ENUM OF ONLY THREE PERMITTED VALUES**:
+  - The frontmatter `status` field across ALL primary phase deliverables in `_acl-output/` (listed below) is **STRICTLY AN ENUM OF ONLY THREE PERMITTED VALUES**:
     1. `status: In Review` (Document generated, updated, or awaiting review)
     2. `status: Approved` (Official sign-off granted by Manager in Markdown Studio)
     3. `status: Rejected` (Manager rejected document, revisions required)
@@ -35,9 +35,10 @@ Open source framework for structured, agent-assisted software delivery.
     - Phase 3A: `_acl-output/3-solutioning/acl-architecture/architecture-spine.md` (or `architecture.md`)
     - Phase 3B: `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`
     - Phase 4: `_acl-output/4-implementation/story-<epic_num>-<story_num>.md` (Tier 2) or `_acl-output/4-implementation/spec-<feature-slug>.md` (Tier 1)
-  - **STRICT EXCLUSIONS (Internal Working Files NEVER Require Approval)**:
+  - **STRICT EXCLUSIONS & BAN ON `status` IN CHILD / INTERNAL FILES**:
     - Internal working memory logs (`.memlog.md`, `*-memlog.md`), supplementary child files (`addendum.md`, `sources.md`, `research.md`, `review-triage.md`, `patch-plan.md`, `test-summary.md`), and test directories are internal AI working artifacts.
-    - AI agents MUST NEVER evaluate internal memory logs or child files for approval status, and MUST NEVER block gates based on them. Gate evaluation applies STRICTLY to the primary deliverables listed above.
+    - **ABSOLUTE PROHIBITION**: Supplementary child files (`addendum.md`, `sources.md`, `research.md`, etc.) **MUST NEVER CONTAIN A `status` FIELD IN THEIR YAML FRONTMATTER**. They are non-gated internal reference files. AI skills and agents MUST NEVER generate or set a `status:` field on any child file.
+    - AI agents across ALL tools (Cursor, Antigravity, AGY, Claude Code, Copilot, etc.) MUST NEVER evaluate internal memory logs or child files for approval status, and MUST NEVER block gates based on them. Gate evaluation applies STRICTLY and EXCLUSIVELY to the primary deliverables listed above.
   - If **ANY** required upstream phase deliverable listed above is missing, or has ANY status other than `Approved` (e.g. `In Review`, `Rejected`):
     - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
       - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
