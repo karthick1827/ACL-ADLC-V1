@@ -1695,6 +1695,11 @@
         color: #be123c;
         border: 1px solid #fecdd3;
       }
+      .dash-status-pill.optional {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+      }
       .dash-status-pill.to-do,
       .dash-status-pill.yet-to-start {
         background: #f1f5f9;
@@ -3660,10 +3665,14 @@
         let cls = 'to-do';
         let icon = '⚪';
         let label = s;
-        if (s === 'Approved' || s === 'Not Required') {
+        if (s === 'Approved' || s === 'Accepted') {
           cls = 'approved';
-          icon = s === 'Not Required' ? '🔹' : '🟢';
-          label = s === 'Not Required' ? 'Not Required' : 'Approved';
+          icon = '🟢';
+          label = 'Approved';
+        } else if (s === 'Optional' || s === 'Not Required') {
+          cls = 'optional';
+          icon = '🔹';
+          label = 'Optional';
         } else if (s === 'In Review') {
           cls = 'in-review';
           icon = '🟡';
@@ -3895,6 +3904,12 @@
         const uxApproved = statusUx === 'Approved';
         const uxContrib = uxApproved ? 5 : 0;
         const prdContrib = prdApproved ? (hasUxDoc ? 5 : isBrownfieldTier2 ? 5 : 10) : 0;
+        const badgeUx = hasUxDoc ? statusUx : isBrownfield ? 'Optional' : 'To Do';
+        const metaUx = hasUxDoc
+          ? 'UX Design Tokens & Interactions • <code>2-plan-workflows/acl-ux/DESIGN.md</code>'
+          : isBrownfield
+            ? 'UX Design Specs • <em>Optional (covered in PRD or Spec if omitted)</em>'
+            : 'UX Design Specs • <code>2-plan-workflows/acl-ux/DESIGN.md</code>';
 
         // Phase 3A: Architecture (ARCHITECTURE-SPINE.md / architecture.md) - Weight: 5%
         const docArch = getDoc(/architecture-spine\.md|architecture\.md/);
@@ -4109,10 +4124,10 @@
                   <span class="artifact-icon">🎨</span>
                   <div class="artifact-info">
                     <span class="artifact-filename">DESIGN.md & EXPERIENCE.md</span>
-                    <span class="artifact-meta">${hasUxDoc ? 'UX Design Tokens & Interactions • <code>2-plan-workflows/acl-ux/DESIGN.md</code>' : 'UX Design Specs • <em>Covered in PRD</em>'}</span>
+                    <span class="artifact-meta">${metaUx}</span>
                   </div>
                 </div>
-                ${renderStatusBadge(hasUxDoc ? statusUx : 'Not Required')}
+                ${renderStatusBadge(badgeUx)}
               </div>
             </div>
           </div>
@@ -4364,6 +4379,17 @@
         const docEpics = getDoc(/epics\.md$/);
         const specDocs = isBrownfield ? getSpecDocs() : [];
         const approvedSpecsCount = specDocs.filter((d) => getNormStatus(d) === 'Approved').length;
+        const docPrd = getDoc('prd.md');
+        const statusPrd = docPrd ? getNormStatus(docPrd) : 'To Do';
+        const docUx = getDoc(/design\.md|experience\.md|ux\.md/);
+        const hasUxDoc = Boolean(docUx);
+        const statusUx = docUx ? getNormStatus(docUx) : 'To Do';
+        const badgeUx = hasUxDoc ? statusUx : isBrownfield ? 'Optional' : 'To Do';
+        const metaUx = hasUxDoc
+          ? 'UX Design Tokens & Interactions • <code>2-plan-workflows/acl-ux/DESIGN.md</code>'
+          : isBrownfield
+            ? 'UX Design Specs • <em>Optional (covered in PRD or Spec if omitted)</em>'
+            : 'UX Design Specs • <code>2-plan-workflows/acl-ux/DESIGN.md</code>';
         let parsedEpics = [];
         let totalStories = 0;
         let completedStories = 0;
@@ -4530,6 +4556,44 @@
 
         <!-- Implementation Epics & Stories Section -->
         <div class="dashboard-phases-container">
+          <!-- Phase 2: Planning & UX Design Deliverables -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">📋</div>
+                <div class="phase-title-text">
+                  <h3>Planning & UX Design Deliverables</h3>
+                  <span>Sprint requirements, PRD functional specifications, and UX design assets</span>
+                </div>
+              </div>
+            </div>
+            <div class="phase-card-body">
+              <!-- PRD -->
+              <div class="dashboard-artifact-row" ${docPrd ? `onclick="openDocInStudio('${docPrd.id}')" style="cursor: pointer;"` : ''}>
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">📄</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">prd.md</span>
+                    <span class="artifact-meta">Product Requirements • <code>2-plan-workflows/acl-prd/prd.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusPrd)}
+              </div>
+
+              <!-- UX Design -->
+              <div class="dashboard-artifact-row" ${docUx ? `onclick="openDocInStudio('${docUx.id}')" style="cursor: pointer;"` : ''}>
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">🎨</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">DESIGN.md & EXPERIENCE.md</span>
+                    <span class="artifact-meta">${metaUx}</span>
+                  </div>
+                </div>
+                ${renderStatusBadge(badgeUx)}
+              </div>
+            </div>
+          </div>
+
           <div class="phase-card">
             <div class="phase-card-header">
               <div class="phase-title-left">
@@ -4751,6 +4815,17 @@
 
         // Tier 2 (Brownfield) or Greenfield: Full Developer dashboard (Epics and Stories only)
         const docEpics = getDoc(/epics\.md$/);
+        const docArch = getDoc(/architecture-spine\.md|architecture\.md/);
+        const statusArch = docArch ? getNormStatus(docArch) : 'To Do';
+        const docUx = getDoc(/design\.md|experience\.md|ux\.md/);
+        const hasUxDoc = Boolean(docUx);
+        const statusUx = docUx ? getNormStatus(docUx) : 'To Do';
+        const badgeUx = hasUxDoc ? statusUx : isBrownfield ? 'Optional' : 'To Do';
+        const metaUx = hasUxDoc
+          ? 'UX Design Tokens & Interactions • <code>2-plan-workflows/acl-ux/DESIGN.md</code>'
+          : isBrownfield
+            ? 'UX Design Specs • <em>Optional (covered in PRD or Spec if omitted)</em>'
+            : 'UX Design Specs • <code>2-plan-workflows/acl-ux/DESIGN.md</code>';
         let parsedEpics = [];
         let totalStories = 0;
         let completedStories = 0;
@@ -4859,6 +4934,44 @@
 
         <!-- Implementation Epics & Stories Section (with Story-Level AC Accordion) -->
         <div class="dashboard-phases-container">
+          <!-- Phase 2B & 3A: UI/UX Design & Architecture Specifications -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">🎨</div>
+                <div class="phase-title-text">
+                  <h3>UI/UX Design & Architecture Specifications</h3>
+                  <span>Visual design tokens, interaction patterns, and system architecture contracts</span>
+                </div>
+              </div>
+            </div>
+            <div class="phase-card-body">
+              <!-- UX Design -->
+              <div class="dashboard-artifact-row" ${docUx ? `onclick="openDocInStudio('${docUx.id}')" style="cursor: pointer;"` : ''}>
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">🎨</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">DESIGN.md & EXPERIENCE.md</span>
+                    <span class="artifact-meta">${metaUx}</span>
+                  </div>
+                </div>
+                ${renderStatusBadge(badgeUx)}
+              </div>
+
+              <!-- Architecture Spine -->
+              <div class="dashboard-artifact-row" ${docArch ? `onclick="openDocInStudio('${docArch.id}')" style="cursor: pointer;"` : ''}>
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">🏛️</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">ARCHITECTURE-SPINE.md</span>
+                    <span class="artifact-meta">System Architecture Spine • <code>3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusArch)}
+              </div>
+            </div>
+          </div>
+
           <div class="phase-card">
             <div class="phase-card-header">
               <div class="phase-title-left">
