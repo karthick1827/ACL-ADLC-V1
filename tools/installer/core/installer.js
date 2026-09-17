@@ -729,7 +729,7 @@ class Installer {
           }
         }
 
-        // Deploy unified markdown.html file and markdownstudio.html alias
+        // Deploy unified markdown.html file
         const publicDir = path.join(projectRoot, 'public');
         let targetMarkdownFile;
         if (await fs.pathExists(publicDir)) {
@@ -741,6 +741,10 @@ class Installer {
           const rootStudioDup = path.join(projectRoot, 'markdownstudio.html');
           if (await fs.pathExists(rootStudioDup)) {
             await fs.remove(rootStudioDup);
+          }
+          const publicStudioDup = path.join(publicDir, 'markdownstudio.html');
+          if (await fs.pathExists(publicStudioDup)) {
+            await fs.remove(publicStudioDup);
           }
         } else {
           const isWebProject =
@@ -756,15 +760,20 @@ class Installer {
           } else {
             targetMarkdownFile = path.join(projectRoot, 'markdown.html');
           }
+          const rootStudioDup = path.join(projectRoot, 'markdownstudio.html');
+          if (await fs.pathExists(rootStudioDup)) {
+            await fs.remove(rootStudioDup);
+          }
+        }
+
+        // Clean up legacy markdownstudio.html if present
+        const legacyStudioFile = path.join(path.dirname(targetMarkdownFile), 'markdownstudio.html');
+        if (await fs.pathExists(legacyStudioFile)) {
+          await fs.remove(legacyStudioFile);
         }
 
         await fs.writeFile(targetMarkdownFile, htmlContent, 'utf8');
         this.installedFiles.add(targetMarkdownFile);
-
-        // Deploy markdownstudio.html alias alongside markdown.html
-        const targetStudioFile = path.join(path.dirname(targetMarkdownFile), 'markdownstudio.html');
-        await fs.writeFile(targetStudioFile, htmlContent, 'utf8');
-        this.installedFiles.add(targetStudioFile);
 
         // Deploy workflow SVG diagrams alongside markdown.html
         const targetDir = path.dirname(targetMarkdownFile);
