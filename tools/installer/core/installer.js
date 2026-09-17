@@ -719,10 +719,17 @@ class Installer {
         const projectMdFiles = await this._scanProjectMarkdownFiles(projectRoot);
         if (projectMdFiles.length > 0) {
           const injection = `  <script>window.__ACL_EMBEDDED_FILES__ = ${JSON.stringify(projectMdFiles)};</script>\n`;
-          htmlContent = htmlContent.replace('</head>', `${injection}</head>`);
+          if (htmlContent.includes('window.__ACL_EMBEDDED_FILES__ = [];')) {
+            htmlContent = htmlContent.replace(
+              'window.__ACL_EMBEDDED_FILES__ = [];',
+              `window.__ACL_EMBEDDED_FILES__ = ${JSON.stringify(projectMdFiles)};`,
+            );
+          } else {
+            htmlContent = htmlContent.replace('</head>', `${injection}</head>`);
+          }
         }
 
-        // Deploy exactly ONE unified markdown.html file to avoid clutter/duplication
+        // Deploy unified markdown.html file and markdownstudio.html alias
         const publicDir = path.join(projectRoot, 'public');
         let targetMarkdownFile;
         if (await fs.pathExists(publicDir)) {
@@ -731,10 +738,17 @@ class Installer {
           if (await fs.pathExists(rootDuplicate)) {
             await fs.remove(rootDuplicate);
           }
+          const rootStudioDup = path.join(projectRoot, 'markdownstudio.html');
+          if (await fs.pathExists(rootStudioDup)) {
+            await fs.remove(rootStudioDup);
+          }
         } else {
           const isWebProject =
             (await fs.pathExists(path.join(projectRoot, 'vite.config.js'))) ||
             (await fs.pathExists(path.join(projectRoot, 'vite.config.ts'))) ||
+            (await fs.pathExists(path.join(projectRoot, 'next.config.js'))) ||
+            (await fs.pathExists(path.join(projectRoot, 'next.config.mjs'))) ||
+            (await fs.pathExists(path.join(projectRoot, 'next.config.ts'))) ||
             (await fs.pathExists(path.join(projectRoot, 'package.json')));
           if (isWebProject) {
             await fs.ensureDir(publicDir);
@@ -746,6 +760,11 @@ class Installer {
 
         await fs.writeFile(targetMarkdownFile, htmlContent, 'utf8');
         this.installedFiles.add(targetMarkdownFile);
+
+        // Deploy markdownstudio.html alias alongside markdown.html
+        const targetStudioFile = path.join(path.dirname(targetMarkdownFile), 'markdownstudio.html');
+        await fs.writeFile(targetStudioFile, htmlContent, 'utf8');
+        this.installedFiles.add(targetStudioFile);
 
         // Deploy workflow SVG diagrams alongside markdown.html
         const targetDir = path.dirname(targetMarkdownFile);
@@ -812,6 +831,9 @@ alwaysApply: true
       // Auto-configure Vite middleware if Vite config exists in project
       await this._configureViteProject(projectRoot);
 
+      // Auto-configure Next.js API routes if Next.js project
+      await this._configureNextProject(projectRoot);
+
       // Auto-deploy Vercel Serverless API endpoints for Cloud GitHub Sync
       await this._deployVercelApiEndpoints(projectRoot);
     }
@@ -827,16 +849,28 @@ alwaysApply: true
           let content = await fs.readFile(configPath, 'utf8');
           if (!content.includes('save-markdown') && !content.includes('aclMarkdownSaverPlugin')) {
             const pluginCode = `
-// ACL-ADLC Markdown Studio Save Middleware
+// ACL-ADLC Markdown Studio Live Middleware for Vite
 function aclMarkdownSaverPlugin() {
   return {
     name: 'acl-markdown-saver',
     configureServer(server) {
-      server.middlewares.use('/api/list-markdown-files', (req, res, next) => {
+      // URL alias rewrite: /markdownstudio or /markdownstudio.html -> /markdown.html
+      server.middlewares.use((req, res, next) => {
+        const rawUrl = req.url ? req.url.split('?')[0] : '';
+        if (rawUrl === '/markdownstudio' || rawUrl === '/markdownstudio.html') {
+          req.url = req.url.replace(/^\\/markdownstudio(\\.html)?/, '/markdown.html');
+        }
+        next();
+      });
+
+      // API Endpoint: GET /api/list-markdown-files
+      server.middlewares.use('/api/list-markdown-files', async (req, res, next) => {
         if (req.method === 'GET') {
           try {
-            const fs = require('node:fs');
-            const path = require('node:path');
+            const fsMod = await import('node:fs');
+            const fs = fsMod.default || fsMod;
+            const pathMod = await import('node:path');
+            const path = pathMod.default || pathMod;
             const projectRoot = process.cwd();
             const mdFiles = [];
             const scanCandidates = ['_acl-output', '_acl_output', 'acl-output'];
@@ -874,15 +908,35 @@ function aclMarkdownSaverPlugin() {
                   const match = content.match(/status:\\s*([^\\n\\r]+)/i);
                   if (match && match[1]) {
                     const raw = match[1].trim().toLowerCase();
-                    if (raw.includes('approved') || raw.includes('accept')) status = 'Accepted';
+                    if (raw.includes('accept') || raw.includes('approved') || raw.includes('final') || raw.includes('updated')) status = 'Approved';
                     else if (raw.includes('reject')) status = 'Rejected';
                     else status = 'In Review';
                   }
+
+                  let projectType = null;
+                  const typeMatch = content.match(/project_type:\\s*([^\\n\\r]+)/i);
+                  if (typeMatch && typeMatch[1]) {
+                    projectType = typeMatch[1].trim().toLowerCase().replaceAll(/['"]/g, '');
+                  }
+
+                  let tier = null;
+                  const tierMatch = content.match(/tier:\\s*([^\\n\\r]+)/i);
+                  if (tierMatch && tierMatch[1]) {
+                    const rawTier = tierMatch[1].trim().toLowerCase();
+                    if (rawTier.includes('1') || rawTier.includes('spec') || rawTier.includes('self-contained')) {
+                      tier = '1';
+                    } else if (rawTier.includes('2') || rawTier.includes('major') || rawTier.includes('enterprise') || rawTier.includes('architecture')) {
+                      tier = '2';
+                    }
+                  }
+
                   mdFiles.push({
-                    id: rel.replace(/[^a-zA-Z0-9_-]/g, '_'),
-                    folderPath: path.dirname(rel).replace(/\\\\/g, '/'),
+                    id: rel.replaceAll(/[^a-zA-Z0-9_-]/g, '_'),
+                    folderPath: path.dirname(rel).replaceAll('\\\\', '/'),
                     filename: entry.name,
                     status,
+                    projectType,
+                    tier,
                     updatedAt: stat.mtime ? stat.mtime.toISOString() : new Date().toISOString(),
                     content
                   });
@@ -894,7 +948,6 @@ function aclMarkdownSaverPlugin() {
               collect(path.join(projectRoot, f), f);
             }
 
-            // Deduplicate files: prefer canonical numbered phase directories over root/duplicate paths
             const seenFiles = new Map();
             for (const item of mdFiles) {
               const key = item.filename.toLowerCase();
@@ -902,7 +955,11 @@ function aclMarkdownSaverPlugin() {
                 seenFiles.set(key, item);
               } else {
                 const existing = seenFiles.get(key);
-                if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && item.folderPath.match(/[0-4]-/))) {
+                if (key === 'project-context.md') {
+                  if (item.folderPath === '_acl-output' || item.folderPath === 'root') {
+                    seenFiles.set(key, item);
+                  }
+                } else if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && item.folderPath.match(/[0-4]-/))) {
                   seenFiles.set(key, item);
                 }
               }
@@ -910,29 +967,37 @@ function aclMarkdownSaverPlugin() {
             const uniqueFiles = Array.from(seenFiles.values());
             uniqueFiles.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
 
+            const activeTier = uniqueFiles.some(
+              (f) => (f.filename || '').toLowerCase().includes('epics.md') || (f.filename || '').toLowerCase().includes('spine') || f.tier === '2'
+            ) ? '2' : uniqueFiles.find((f) => f.tier)?.tier || '1';
+
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ files: uniqueFiles }));
+            res.end(JSON.stringify({ success: true, files: uniqueFiles, activeTier }));
           } catch (err) {
             res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ files: [], error: err.message }));
+            res.end(JSON.stringify({ success: false, files: [], error: err.message }));
           }
         } else {
           next();
         }
       });
 
+      // API Endpoint: POST /api/save-markdown
       server.middlewares.use('/api/save-markdown', (req, res, next) => {
         if (req.method === 'POST') {
           let body = '';
           req.on('data', chunk => { body += chunk; });
-          req.on('end', () => {
+          req.on('end', async () => {
             try {
               const { folderPath, filename, content, status, autoPush } = JSON.parse(body);
-              const fs = require('node:fs');
-              const path = require('node:path');
-              const { exec } = require('node:child_process');
-              let cleanFolder = (folderPath || '').replace(/\\/g, '/').trim();
+              const fsMod = await import('node:fs');
+              const fs = fsMod.default || fsMod;
+              const pathMod = await import('node:path');
+              const path = pathMod.default || pathMod;
+              const { exec } = await import('node:child_process');
+
+              let cleanFolder = (folderPath || '').replaceAll('\\\\', '/').trim();
               if (!cleanFolder.startsWith('_acl-output') && !cleanFolder.startsWith('_acl_output') && !cleanFolder.startsWith('acl-output')) {
                 cleanFolder = cleanFolder && cleanFolder !== 'root' ? path.join('_acl-output', cleanFolder) : '_acl-output';
               }
@@ -952,11 +1017,9 @@ function aclMarkdownSaverPlugin() {
               fs.writeFileSync(targetFile, content, 'utf8');
 
               if (autoPush) {
-                const gitCmd = 'git add "' + targetFile + '" && git commit -m "docs: update ' + filename + ' [' + (status || 'Accepted') + ']" && git push';
-                const env = { ...process.env, PATH: (process.env.PATH || '') + ';C:\\Users\\karthick.natarajan\\AppData\\Local\\Programs\\Git\\cmd;C:\\Program Files\\Git\\cmd' };
-                exec(gitCmd, { cwd: process.cwd(), env }, (gitErr, gitStdout, gitStderr) => {
+                const gitCmd = 'git add "' + targetFile + '" && git commit -m "docs: update ' + filename + ' [' + (status || 'Approved') + ']" && git push';
+                exec(gitCmd, { cwd: process.cwd() }, (gitErr, gitStdout, gitStderr) => {
                   if (gitErr) {
-                    console.warn('[ACL Git Auto-Push]', gitErr.message || gitStderr);
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ success: true, path: targetFile, gitPushed: false, gitError: gitErr.message }));
                   } else {
@@ -993,6 +1056,365 @@ function aclMarkdownSaverPlugin() {
           // Best-effort config wiring
         }
       }
+    }
+  }
+
+  async _configureNextProject(projectRoot) {
+    if (!projectRoot) return;
+    const isNextConfig =
+      (await fs.pathExists(path.join(projectRoot, 'next.config.js'))) ||
+      (await fs.pathExists(path.join(projectRoot, 'next.config.mjs'))) ||
+      (await fs.pathExists(path.join(projectRoot, 'next.config.ts'))) ||
+      (await fs.pathExists(path.join(projectRoot, 'next.config.cjs')));
+
+    let hasNextPkg = false;
+    const pkgPath = path.join(projectRoot, 'package.json');
+    if (await fs.pathExists(pkgPath)) {
+      try {
+        const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
+        hasNextPkg = Boolean(pkg.dependencies?.next || pkg.devDependencies?.next);
+      } catch {
+        // Ignore package parse error
+      }
+    }
+
+    if (!isNextConfig && !hasNextPkg) return;
+
+    try {
+      const hasSrcApp = await fs.pathExists(path.join(projectRoot, 'src', 'app'));
+      const hasRootApp = await fs.pathExists(path.join(projectRoot, 'app'));
+      const hasSrcPages = await fs.pathExists(path.join(projectRoot, 'src', 'pages'));
+      const hasRootPages = await fs.pathExists(path.join(projectRoot, 'pages'));
+
+      const appBaseDir = hasSrcApp ? path.join(projectRoot, 'src', 'app') : hasRootApp ? path.join(projectRoot, 'app') : null;
+
+      const pagesBaseDir = hasSrcPages ? path.join(projectRoot, 'src', 'pages') : hasRootPages ? path.join(projectRoot, 'pages') : null;
+
+      // 1. Deploy Next.js App Router API handlers
+      if (appBaseDir || (!pagesBaseDir && !appBaseDir)) {
+        const targetAppDir = appBaseDir || path.join(projectRoot, 'app');
+        const listDir = path.join(targetAppDir, 'api', 'list-markdown-files');
+        const saveDir = path.join(targetAppDir, 'api', 'save-markdown');
+        await fs.ensureDir(listDir);
+        await fs.ensureDir(saveDir);
+
+        const listRouteCode = `import fs from 'node:fs';
+import path from 'node:path';
+
+export async function GET() {
+  try {
+    const projectRoot = process.cwd();
+    const mdFiles = [];
+    const scanCandidates = ['_acl-output', '_acl_output', 'acl-output'];
+
+    const EXCLUDED = new Set([
+      'skill.md', 'agents.md', 'readme.md', 'changelog.md', 'claude.md',
+      'contributing.md', 'security.md', 'addendum.md', 'sources.md',
+      'review-triage.md', 'patch-plan.md', 'research.md', 'test-summary.md',
+      'sprint-status.md', 'memlog.md', '.memlog.md'
+    ]);
+
+    function collect(currentDir, relPrefix) {
+      if (!fs.existsSync(currentDir)) return;
+      const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        const full = path.join(currentDir, entry.name);
+        const rel = relPrefix ? relPrefix + '/' + entry.name : entry.name;
+        const lower = entry.name.toLowerCase();
+        if (entry.isDirectory()) {
+          if (entry.name.startsWith('.') || entry.name === 'node_modules' || lower.includes('memlog')) continue;
+          collect(full, rel);
+        } else if (
+          entry.isFile() &&
+          entry.name.endsWith('.md') &&
+          !entry.name.startsWith('.') &&
+          !lower.includes('memlog') &&
+          !lower.startsWith('readiness-report') &&
+          !EXCLUDED.has(lower)
+        ) {
+          const content = fs.readFileSync(full, 'utf8');
+          const stat = fs.statSync(full);
+          let status = 'In Review';
+          const match = content.match(/status:\\s*([^\\n\\r]+)/i);
+          if (match && match[1]) {
+            const raw = match[1].trim().toLowerCase();
+            if (raw.includes('accept') || raw.includes('approved') || raw.includes('final') || raw.includes('updated')) status = 'Approved';
+            else if (raw.includes('reject')) status = 'Rejected';
+          }
+
+          let projectType = null;
+          const typeMatch = content.match(/project_type:\\s*([^\\n\\r]+)/i);
+          if (typeMatch && typeMatch[1]) {
+            projectType = typeMatch[1].trim().toLowerCase().replaceAll(/['"]/g, '');
+          }
+
+          let tier = null;
+          const tierMatch = content.match(/tier:\\s*([^\\n\\r]+)/i);
+          if (tierMatch && tierMatch[1]) {
+            const rawTier = tierMatch[1].trim().toLowerCase();
+            if (rawTier.includes('1') || rawTier.includes('spec') || rawTier.includes('self-contained')) tier = '1';
+            else if (rawTier.includes('2') || rawTier.includes('major') || rawTier.includes('enterprise') || rawTier.includes('architecture')) tier = '2';
+          }
+
+          mdFiles.push({
+            id: rel.replaceAll(/[^a-zA-Z0-9_-]/g, '_'),
+            folderPath: path.dirname(rel).replaceAll('\\\\', '/'),
+            filename: entry.name,
+            status,
+            projectType,
+            tier,
+            updatedAt: stat.mtime ? stat.mtime.toISOString() : new Date().toISOString(),
+            content,
+          });
+        }
+      }
+    }
+
+    for (const f of scanCandidates) {
+      collect(path.join(projectRoot, f), f);
+    }
+
+    const seenFiles = new Map();
+    for (const item of mdFiles) {
+      const key = item.filename.toLowerCase();
+      if (!seenFiles.has(key)) {
+        seenFiles.set(key, item);
+      } else {
+        const existing = seenFiles.get(key);
+        if (key === 'project-context.md') {
+          if (item.folderPath === '_acl-output' || item.folderPath === 'root') seenFiles.set(key, item);
+        } else if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && item.folderPath.match(/[0-4]-/))) {
+          seenFiles.set(key, item);
+        }
+      }
+    }
+    const uniqueFiles = Array.from(seenFiles.values());
+    uniqueFiles.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+
+    const activeTier = uniqueFiles.some(
+      (f) => (f.filename || '').toLowerCase().includes('epics.md') || (f.filename || '').toLowerCase().includes('spine') || f.tier === '2'
+    ) ? '2' : uniqueFiles.find((f) => f.tier)?.tier || '1';
+
+    return Response.json({ success: true, files: uniqueFiles, activeTier }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    });
+  } catch (err) {
+    return Response.json({ success: false, files: [], error: err.message }, { status: 500 });
+  }
+}
+`;
+
+        const saveRouteCode = `import fs from 'node:fs';
+import path from 'node:path';
+
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { folderPath, filename, content } = body || {};
+
+    if (!filename || typeof content !== 'string') {
+      return Response.json({ success: false, error: 'Missing filename or content' }, { status: 400 });
+    }
+
+    let cleanFolder = (folderPath || '').replaceAll('\\\\', '/').trim();
+    if (!cleanFolder.startsWith('_acl-output') && !cleanFolder.startsWith('_acl_output') && !cleanFolder.startsWith('acl-output')) {
+      cleanFolder = cleanFolder && cleanFolder !== 'root' ? path.join('_acl-output', cleanFolder) : '_acl-output';
+    }
+    if (cleanFolder === '_acl-output' || cleanFolder === 'root' || cleanFolder === '.') {
+      const lowerName = filename.toLowerCase();
+      if (lowerName === 'project-context.md') cleanFolder = '_acl-output';
+      else if (lowerName === 'brief.md') cleanFolder = '_acl-output/1-analysis/acl-product-brief';
+      else if (lowerName === 'prd.md') cleanFolder = '_acl-output/2-plan-workflows/acl-prd';
+      else if (lowerName === 'architecture-spine.md' || lowerName === 'architecture.md') cleanFolder = '_acl-output/3-solutioning/acl-architecture';
+      else if (lowerName === 'epics.md') cleanFolder = '_acl-output/3-solutioning/acl-create-epics-and-stories';
+    }
+
+    const targetDir = path.resolve(process.cwd(), cleanFolder);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    const targetFile = path.join(targetDir, filename);
+    fs.writeFileSync(targetFile, content, 'utf8');
+
+    return Response.json({ success: true, path: targetFile });
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+`;
+        const targetListRoute = path.join(listDir, 'route.js');
+        const targetSaveRoute = path.join(saveDir, 'route.js');
+        await fs.writeFile(targetListRoute, listRouteCode, 'utf8');
+        await fs.writeFile(targetSaveRoute, saveRouteCode, 'utf8');
+        this.installedFiles.add(targetListRoute);
+        this.installedFiles.add(targetSaveRoute);
+      }
+
+      // 2. Deploy Next.js Pages Router API handlers if Pages Router exists
+      if (pagesBaseDir) {
+        const pagesApiDir = path.join(pagesBaseDir, 'api');
+        await fs.ensureDir(pagesApiDir);
+
+        const pagesListCode = `import fs from 'node:fs';
+import path from 'node:path';
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    res.status(405).json({ success: false, error: 'Method Not Allowed' });
+    return;
+  }
+  try {
+    const projectRoot = process.cwd();
+    const mdFiles = [];
+    const scanCandidates = ['_acl-output', '_acl_output', 'acl-output'];
+
+    const EXCLUDED = new Set([
+      'skill.md', 'agents.md', 'readme.md', 'changelog.md', 'claude.md',
+      'contributing.md', 'security.md', 'addendum.md', 'sources.md',
+      'review-triage.md', 'patch-plan.md', 'research.md', 'test-summary.md',
+      'sprint-status.md', 'memlog.md', '.memlog.md'
+    ]);
+
+    function collect(currentDir, relPrefix) {
+      if (!fs.existsSync(currentDir)) return;
+      const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        const full = path.join(currentDir, entry.name);
+        const rel = relPrefix ? relPrefix + '/' + entry.name : entry.name;
+        const lower = entry.name.toLowerCase();
+        if (entry.isDirectory()) {
+          if (entry.name.startsWith('.') || entry.name === 'node_modules' || lower.includes('memlog')) continue;
+          collect(full, rel);
+        } else if (
+          entry.isFile() &&
+          entry.name.endsWith('.md') &&
+          !entry.name.startsWith('.') &&
+          !lower.includes('memlog') &&
+          !lower.startsWith('readiness-report') &&
+          !EXCLUDED.has(lower)
+        ) {
+          const content = fs.readFileSync(full, 'utf8');
+          const stat = fs.statSync(full);
+          let status = 'In Review';
+          const match = content.match(/status:\\s*([^\\n\\r]+)/i);
+          if (match && match[1]) {
+            const raw = match[1].trim().toLowerCase();
+            if (raw.includes('accept') || raw.includes('approved') || raw.includes('final') || raw.includes('updated')) status = 'Approved';
+            else if (raw.includes('reject')) status = 'Rejected';
+          }
+
+          let projectType = null;
+          const typeMatch = content.match(/project_type:\\s*([^\\n\\r]+)/i);
+          if (typeMatch && typeMatch[1]) {
+            projectType = typeMatch[1].trim().toLowerCase().replaceAll(/['"]/g, '');
+          }
+
+          let tier = null;
+          const tierMatch = content.match(/tier:\\s*([^\\n\\r]+)/i);
+          if (tierMatch && tierMatch[1]) {
+            const rawTier = tierMatch[1].trim().toLowerCase();
+            if (rawTier.includes('1') || rawTier.includes('spec') || rawTier.includes('self-contained')) tier = '1';
+            else if (rawTier.includes('2') || rawTier.includes('major') || rawTier.includes('enterprise') || rawTier.includes('architecture')) tier = '2';
+          }
+
+          mdFiles.push({
+            id: rel.replaceAll(/[^a-zA-Z0-9_-]/g, '_'),
+            folderPath: path.dirname(rel).replaceAll('\\\\', '/'),
+            filename: entry.name,
+            status,
+            projectType,
+            tier,
+            updatedAt: stat.mtime ? stat.mtime.toISOString() : new Date().toISOString(),
+            content,
+          });
+        }
+      }
+    }
+
+    for (const f of scanCandidates) {
+      collect(path.join(projectRoot, f), f);
+    }
+
+    const seenFiles = new Map();
+    for (const item of mdFiles) {
+      const key = item.filename.toLowerCase();
+      if (!seenFiles.has(key)) {
+        seenFiles.set(key, item);
+      } else {
+        const existing = seenFiles.get(key);
+        if (key === 'project-context.md') {
+          if (item.folderPath === '_acl-output' || item.folderPath === 'root') seenFiles.set(key, item);
+        } else if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && item.folderPath.match(/[0-4]-/))) {
+          seenFiles.set(key, item);
+        }
+      }
+    }
+    const uniqueFiles = Array.from(seenFiles.values());
+    uniqueFiles.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+
+    const activeTier = uniqueFiles.some(
+      (f) => (f.filename || '').toLowerCase().includes('epics.md') || (f.filename || '').toLowerCase().includes('spine') || f.tier === '2'
+    ) ? '2' : uniqueFiles.find((f) => f.tier)?.tier || '1';
+
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.status(200).json({ success: true, files: uniqueFiles, activeTier });
+  } catch (err) {
+    res.status(500).json({ success: false, files: [], error: err.message });
+  }
+}
+`;
+
+        const pagesSaveCode = `import fs from 'node:fs';
+import path from 'node:path';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ success: false, error: 'Method Not Allowed' });
+    return;
+  }
+  try {
+    const { folderPath, filename, content } = req.body || {};
+
+    if (!filename || typeof content !== 'string') {
+      res.status(400).json({ success: false, error: 'Missing filename or content' });
+      return;
+    }
+
+    let cleanFolder = (folderPath || '').replaceAll('\\\\', '/').trim();
+    if (!cleanFolder.startsWith('_acl-output') && !cleanFolder.startsWith('_acl_output') && !cleanFolder.startsWith('acl-output')) {
+      cleanFolder = cleanFolder && cleanFolder !== 'root' ? path.join('_acl-output', cleanFolder) : '_acl-output';
+    }
+    if (cleanFolder === '_acl-output' || cleanFolder === 'root' || cleanFolder === '.') {
+      const lowerName = filename.toLowerCase();
+      if (lowerName === 'project-context.md') cleanFolder = '_acl-output';
+      else if (lowerName === 'brief.md') cleanFolder = '_acl-output/1-analysis/acl-product-brief';
+      else if (lowerName === 'prd.md') cleanFolder = '_acl-output/2-plan-workflows/acl-prd';
+      else if (lowerName === 'architecture-spine.md' || lowerName === 'architecture.md') cleanFolder = '_acl-output/3-solutioning/acl-architecture';
+      else if (lowerName === 'epics.md') cleanFolder = '_acl-output/3-solutioning/acl-create-epics-and-stories';
+    }
+
+    const targetDir = path.resolve(process.cwd(), cleanFolder);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    const targetFile = path.join(targetDir, filename);
+    fs.writeFileSync(targetFile, content, 'utf8');
+
+    res.status(200).json({ success: true, path: targetFile });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+`;
+        const targetPagesList = path.join(pagesApiDir, 'list-markdown-files.js');
+        const targetPagesSave = path.join(pagesApiDir, 'save-markdown.js');
+        await fs.writeFile(targetPagesList, pagesListCode, 'utf8');
+        await fs.writeFile(targetPagesSave, pagesSaveCode, 'utf8');
+        this.installedFiles.add(targetPagesList);
+        this.installedFiles.add(targetPagesSave);
+      }
+    } catch {
+      // Best-effort next config wiring
     }
   }
 
@@ -1137,11 +1559,35 @@ function aclMarkdownSaverPlugin() {
             else status = 'In Review';
           }
 
+          let projectType = null;
+          const typeMatch = content.match(/project_type:\s*([^\n\r]+)/i);
+          if (typeMatch && typeMatch[1]) {
+            projectType = typeMatch[1].trim().toLowerCase().replaceAll(/['"]/g, '');
+          }
+
+          let tier = null;
+          const tierMatch = content.match(/tier:\s*([^\n\r]+)/i);
+          if (tierMatch && tierMatch[1]) {
+            const rawTier = tierMatch[1].trim().toLowerCase();
+            if (rawTier.includes('1') || rawTier.includes('spec') || rawTier.includes('self-contained')) {
+              tier = '1';
+            } else if (
+              rawTier.includes('2') ||
+              rawTier.includes('major') ||
+              rawTier.includes('enterprise') ||
+              rawTier.includes('architecture')
+            ) {
+              tier = '2';
+            }
+          }
+
           list.push({
             id: relPath.replaceAll(/[^a-zA-Z0-9_-]/g, '_'),
             folderPath: path.dirname(relPath).replaceAll('\\', '/'),
             filename: entry.name,
             status,
+            projectType,
+            tier,
             updatedAt: stat.mtime ? stat.mtime.toISOString() : new Date().toISOString(),
             content,
           });

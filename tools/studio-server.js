@@ -28,6 +28,7 @@ function getDiskMarkdownFiles() {
         entry.name === 'dist' ||
         entry.name === 'build' ||
         entry.name === 'markdown.html' ||
+        entry.name === 'markdownstudio.html' ||
         entry.name === 'src' ||
         entry.name === 'tools' ||
         entry.name === 'docs' ||
@@ -1515,7 +1516,13 @@ const server = http.createServer((req, res) => {
     servePath = path.join(PROJECT_ROOT, 'markdown.html');
   }
 
-  if ((url.pathname === '/' || url.pathname === '/markdown.html') && fs.existsSync(servePath)) {
+  if (
+    (url.pathname === '/' ||
+      url.pathname === '/markdown.html' ||
+      url.pathname === '/markdownstudio.html' ||
+      url.pathname === '/markdownstudio') &&
+    fs.existsSync(servePath)
+  ) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(fs.readFileSync(servePath, 'utf8'));
     return;
