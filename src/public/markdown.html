@@ -405,27 +405,6 @@
         outline: none;
       }
 
-      .file-path-breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        font-family: 'Fira Code', monospace;
-        font-size: 0.82rem;
-        color: var(--text-secondary);
-        background: var(--bg-surface);
-        padding: 0.35rem 0.75rem;
-        border-radius: var(--radius-md);
-        border: 1px solid var(--border-color);
-        max-width: 450px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .file-path-breadcrumb span.highlight {
-        color: var(--accent-blue);
-        font-weight: 600;
-      }
-
       .view-mode-group {
         display: flex;
         align-items: center;
@@ -1922,7 +1901,6 @@
       <div class="nav-drawer-header">
         <div class="nav-drawer-brand">
           <span class="brand-badge"> VelocityONE</span>
-          <span class="nav-drawer-title">Navigation</span>
         </div>
         <button type="button" class="nav-drawer-close" onclick="closeNavDrawer()" title="Close navigation">✕</button>
       </div>
@@ -1965,7 +1943,7 @@
       </nav>
       <div class="nav-drawer-footer">
         <span>ACL-ADLC</span>
-        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.31</span>
+        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.32</span>
       </div>
     </aside>
 
@@ -1990,7 +1968,7 @@
         </button>
         <div class="brand">
           <span class="brand-badge"> VelocityONE</span>
-          <span id="appHeaderTitle">Markdown Studio</span>
+          <span id="appHeaderTitle"></span>
         </div>
       </div>
 
@@ -2076,11 +2054,6 @@
                 <option value="Rejected">🔴 Rejected</option>
               </select>
             </div>
-          </div>
-
-          <div class="file-path-breadcrumb" id="filePathBreadcrumb" title="Current File Location">
-            <span>📁</span>
-            <span id="breadcrumbPathText" class="highlight">_acl-output / (Loading...)</span>
           </div>
 
           <div class="view-mode-group">
@@ -2699,6 +2672,138 @@
         return sortedFiles[0] ? sortedFiles[0].id : null;
       }
 
+      function formatFolderDisplayName(folderPath, folderFiles = []) {
+        if (!folderPath) return 'Project Deliverables';
+        const lower = folderPath.toLowerCase();
+
+        const filenames = (folderFiles || []).map((f) => (f.filename || '').toLowerCase());
+        const hasBrief = filenames.some((n) => n === 'brief.md' || n.includes('brief'));
+        const hasPrd = filenames.some((n) => n === 'prd.md' || n.includes('prd'));
+        const hasArch = filenames.some((n) => n.includes('architecture') || n.includes('spine'));
+        const hasUx = filenames.some((n) => n.includes('ux') || n.includes('design') || n.includes('experience'));
+        const hasEpics = filenames.some((n) => n === 'epics.md' || n.includes('epics'));
+        const hasStoriesOrSpecs = filenames.some((n) => n.startsWith('story-') || n.startsWith('spec-') || n.startsWith('step-'));
+
+        if (hasBrief || lower.includes('brief') || lower.includes('1-analysis')) {
+          return 'Project Brief';
+        }
+        if (hasPrd || lower.includes('prd') || lower.includes('2-plan')) {
+          return 'Project PRD';
+        }
+        if (hasArch || lower.includes('architecture') || lower.includes('spine')) {
+          return 'Project Architecture';
+        }
+        if (hasUx || lower.includes('ux') || lower.includes('design')) {
+          return 'Project UX & Design';
+        }
+        if (hasEpics || lower.includes('epic')) {
+          return 'Project Epics & Stories';
+        }
+        if (
+          hasStoriesOrSpecs ||
+          lower.includes('implementation') ||
+          lower.includes('4-implementation') ||
+          lower.includes('dev-auto')
+        ) {
+          return 'Project Implementation';
+        }
+        if (lower.includes('context') || lower === '0-context' || lower === 'root') {
+          return 'Project Context';
+        }
+
+        const cleaned = folderPath.split('/').pop().replace(/^[0-9]+-/, '').replace(/[-_]+/g, ' ');
+        const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+        return `Project ${capitalized}`;
+      }
+
+      function formatFileDisplayName(filename, folderPath = '', doc = null) {
+        if (!filename) return '';
+        const lower = filename.toLowerCase();
+
+        // Project Brief
+        if (lower === 'brief.md' || lower.startsWith('brief-') || lower.includes('product-brief')) {
+          return 'Project Brief';
+        }
+
+        // PRD
+        if (lower === 'prd.md' || lower.startsWith('prd-')) {
+          return 'Project PRD';
+        }
+
+        // Context
+        if (lower === 'project-context.md' || lower.includes('context')) {
+          return 'Project Context';
+        }
+
+        // Architecture
+        if (lower.includes('architecture') || lower.includes('spine')) {
+          return 'Project Architecture';
+        }
+
+        // UX / Design / Experience
+        if (lower.includes('experience')) {
+          return 'Project Experience';
+        }
+        if (lower === 'ux.md' || lower.includes('ux-') || lower.includes('design')) {
+          return 'Project Design';
+        }
+
+        // Epics
+        if (lower === 'epics.md' || lower.includes('epics')) {
+          return 'Project Epics & Stories';
+        }
+
+        // Story files & Implementation specs: story-1-1.md, story-1.1.md, spec-1-2-...
+        const storyNumMatch = filename.match(/^(?:story|spec)[-_]?(\d+)[\.-](\d+)(?:[-_].*)?\.md$/i);
+        if (storyNumMatch) {
+          return `Story ${storyNumMatch[1]}.${storyNumMatch[2]}`;
+        }
+
+        const directStoryMatch = filename.match(/^story\s*(\d+)[\.-](\d+)\.md$/i);
+        if (directStoryMatch) {
+          return `Story ${directStoryMatch[1]}.${directStoryMatch[2]}`;
+        }
+
+        const singleStoryMatch = filename.match(/^story[-_]?(\d+)(?:[-_].*)?\.md$/i);
+        if (singleStoryMatch) {
+          return `Story ${singleStoryMatch[1]}`;
+        }
+
+        // Step files: step-01-scaffold.md
+        const stepMatch = filename.match(/^step[-_](\d+)(?:[-_](.*))?\.md$/i);
+        if (stepMatch) {
+          const stepNum = stepMatch[1];
+          const suffix = stepMatch[2] ? stepMatch[2].replace(/[-_]+/g, ' ').trim() : '';
+          if (suffix) {
+            const formattedSuffix = suffix
+              .split(' ')
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(' ');
+            return `Step ${stepNum}: ${formattedSuffix}`;
+          }
+          return `Step ${stepNum}`;
+        }
+
+        // Other spec files: spec-<slug>.md
+        const specMatch = filename.match(/^spec[-_](.+)\.md$/i);
+        if (specMatch) {
+          const formattedSpec = specMatch[1]
+            .replace(/[-_]+/g, ' ')
+            .split(' ')
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+          return `Spec: ${formattedSpec}`;
+        }
+
+        // Generic markdown fallback: strip .md and clean up
+        if (filename.endsWith('.md')) {
+          const base = filename.slice(0, -3).replace(/[-_]+/g, ' ');
+          return base.charAt(0).toUpperCase() + base.slice(1);
+        }
+
+        return filename;
+      }
+
       function renderFileTree() {
         const root = document.getElementById('fileTreeRoot');
         const searchQuery = (document.getElementById('searchInput').value || '').toLowerCase();
@@ -2769,7 +2874,7 @@
           headerDiv.innerHTML = `
           <div class="folder-title-left">
             <span class="folder-chevron ${isOpen ? '' : 'collapsed'}">▼</span>
-            <span>📁 ${folderPath}</span>
+            <span>📁 ${formatFolderDisplayName(folderPath, folderFiles)}</span>
           </div>
           <span class="folder-badge">${folderFiles.length}</span>
         `;
@@ -2811,7 +2916,7 @@
             fileDiv.innerHTML = `
             <div class="file-item-left">
               <span class="file-icon">📄</span>
-              <span>${file.filename}</span>
+              <span>${formatFileDisplayName(file.filename, file.folderPath, file)}</span>
             </div>
             <span class="status-pill ${statusClass}">
               <span class="dot"></span>
@@ -2855,7 +2960,6 @@
           renderFileTree();
         }
 
-        document.getElementById('breadcrumbPathText').textContent = `${file.folderPath} / ${file.filename}`;
         const statusSelect = document.getElementById('statusSelect');
         statusSelect.disabled = false;
         statusSelect.value = file.status === 'Accepted' ? 'Approved' : file.status;
@@ -2971,7 +3075,6 @@
 
       function loadEmptyState() {
         activeFileId = null;
-        document.getElementById('breadcrumbPathText').textContent = '_acl-output / (No markdown files yet)';
         document.getElementById('statusSelect').disabled = true;
         document.getElementById('markdownTextarea').value = '';
         document.getElementById('markdownTextarea').readOnly = true;
@@ -3833,7 +3936,7 @@
                   <div class="artifact-row-left">
                     <span class="artifact-icon">📄</span>
                     <div class="artifact-info">
-                      <span class="artifact-filename">${docContext ? docContext.filename : 'project-context.md'}</span>
+                      <span class="artifact-filename">${formatFileDisplayName(docContext ? docContext.filename : 'project-context.md', docContext?.folderPath)}</span>
                       <span class="artifact-meta">Project Context • <code>${docContext ? (docContext.folderPath === 'root' || !docContext.folderPath ? '_acl-output/' + docContext.filename : docContext.folderPath + '/' + docContext.filename) : '_acl-output/project-context.md'}</code></span>
                     </div>
                   </div>
@@ -3863,7 +3966,7 @@
                       <div class="artifact-row-left">
                         <span class="artifact-icon">📄</span>
                         <div class="artifact-info">
-                          <span class="artifact-filename">${doc.filename}</span>
+                          <span class="artifact-filename">${formatFileDisplayName(doc.filename, doc.folderPath)}</span>
                           <span class="artifact-meta">Feature Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
                         </div>
                       </div>
@@ -3877,7 +3980,7 @@
                       <div class="artifact-row-left">
                         <span class="artifact-icon">📄</span>
                         <div class="artifact-info">
-                          <span class="artifact-filename">spec-*.md</span>
+                          <span class="artifact-filename">Project Spec</span>
                           <span class="artifact-meta">No spec file generated yet in <code>_acl-output/4-implementation/</code></span>
                         </div>
                       </div>
@@ -4077,7 +4180,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📄</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">${docContext ? docContext.filename : 'project-context.md'}</span>
+                    <span class="artifact-filename">${docContext ? formatFileDisplayName(docContext.filename, docContext.folderPath) : 'Project Context'}</span>
                     <span class="artifact-meta">Project Context • <code>${docContext ? (docContext.folderPath === 'root' || !docContext.folderPath ? '_acl-output/' + docContext.filename : docContext.folderPath + '/' + docContext.filename) : '_acl-output/project-context.md'}</code></span>
                   </div>
                 </div>
@@ -4105,7 +4208,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📄</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">brief.md</span>
+                    <span class="artifact-filename">${docBrief ? formatFileDisplayName(docBrief.filename, docBrief.folderPath) : 'Project Brief'}</span>
                     <span class="artifact-meta">Product Brief • <code>1-analysis/acl-product-brief/brief.md</code></span>
                   </div>
                 </div>
@@ -4131,7 +4234,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📄</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">prd.md</span>
+                    <span class="artifact-filename">${docPrd ? formatFileDisplayName(docPrd.filename, docPrd.folderPath) : 'Project PRD'}</span>
                     <span class="artifact-meta">Product Requirements Document • <code>2-plan-workflows/acl-prd/prd.md</code></span>
                   </div>
                 </div>
@@ -4143,7 +4246,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">🎨</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">DESIGN.md & EXPERIENCE.md</span>
+                    <span class="artifact-filename">${docUx ? formatFileDisplayName(docUx.filename, docUx.folderPath) : 'Project Design'}</span>
                     <span class="artifact-meta">${metaUx}</span>
                   </div>
                 </div>
@@ -4169,7 +4272,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">🏛️</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">ARCHITECTURE-SPINE.md</span>
+                    <span class="artifact-filename">${docArch ? formatFileDisplayName(docArch.filename, docArch.folderPath) : 'Project Architecture'}</span>
                     <span class="artifact-meta">System Architecture Spine • <code>3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md</code></span>
                   </div>
                 </div>
@@ -4181,7 +4284,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📋</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">epics.md</span>
+                    <span class="artifact-filename">${docEpics ? formatFileDisplayName(docEpics.filename, docEpics.folderPath) : 'Project Epics & Stories'}</span>
                     <span class="artifact-meta">Epics & Stories Breakdown • <code>3-solutioning/acl-create-epics-and-stories/epics.md</code></span>
                   </div>
                 </div>
@@ -4294,7 +4397,7 @@
                   <div class="artifact-row-left">
                     <span class="artifact-icon">📄</span>
                     <div class="artifact-info">
-                      <span class="artifact-filename">${doc.filename}</span>
+                      <span class="artifact-filename">${formatFileDisplayName(doc.filename, doc.folderPath, doc)}</span>
                       <span class="artifact-meta">Standalone Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
                     </div>
                   </div>
@@ -4361,7 +4464,7 @@
                       <div class="artifact-row-left">
                         <span class="artifact-icon">📄</span>
                         <div class="artifact-info">
-                          <span class="artifact-filename">${doc.filename}</span>
+                          <span class="artifact-filename">${formatFileDisplayName(doc.filename, doc.folderPath, doc)}</span>
                           <span class="artifact-meta">Sprint Spec Deliverable • <code>${doc.folderPath}/${doc.filename}</code></span>
                         </div>
                       </div>
@@ -4375,7 +4478,7 @@
                       <div class="artifact-row-left">
                         <span class="artifact-icon">📄</span>
                         <div class="artifact-info">
-                          <span class="artifact-filename">spec-*.md</span>
+                          <span class="artifact-filename">Project Spec</span>
                           <span class="artifact-meta">No spec deliverable yet in <code>_acl-output/4-implementation/</code></span>
                         </div>
                       </div>
@@ -4493,7 +4596,7 @@
                     <div class="artifact-row-left">
                       <span class="artifact-icon">📄</span>
                       <div class="artifact-info">
-                        <span class="artifact-filename">${doc.filename}</span>
+                        <span class="artifact-filename">${formatFileDisplayName(doc.filename, doc.folderPath, doc)}</span>
                         <span class="artifact-meta">Sprint Spec Deliverable • <code>${doc.folderPath}/${doc.filename}</code></span>
                       </div>
                     </div>
@@ -4593,7 +4696,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📄</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">prd.md</span>
+                    <span class="artifact-filename">${docPrd ? formatFileDisplayName(docPrd.filename, docPrd.folderPath) : 'Project PRD'}</span>
                     <span class="artifact-meta">Product Requirements • <code>2-plan-workflows/acl-prd/prd.md</code></span>
                   </div>
                 </div>
@@ -4605,7 +4708,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">🎨</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">DESIGN.md & EXPERIENCE.md</span>
+                    <span class="artifact-filename">${docUx ? formatFileDisplayName(docUx.filename, docUx.folderPath) : 'Project Design'}</span>
                     <span class="artifact-meta">${metaUx}</span>
                   </div>
                 </div>
@@ -4688,7 +4791,7 @@
                   <div class="artifact-row-left">
                     <span class="artifact-icon">📄</span>
                     <div class="artifact-info">
-                      <span class="artifact-filename">${doc.filename}</span>
+                      <span class="artifact-filename">${formatFileDisplayName(doc.filename, doc.folderPath, doc)}</span>
                       <span class="artifact-meta">Sprint Spec Deliverable • <code>${doc.folderPath}/${doc.filename}</code></span>
                     </div>
                   </div>
@@ -4778,7 +4881,7 @@
                           <span class="story-chevron">▶</span>
                           <span class="artifact-icon" style="font-size: 1.15rem;">📄</span>
                           <div class="artifact-info">
-                            <span class="artifact-filename" style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${doc.filename}</span>
+                            <span class="artifact-filename" style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${formatFileDisplayName(doc.filename, doc.folderPath, doc)}</span>
                             <span class="artifact-meta" style="font-size: 0.76rem; color: #64748b;">Implementation Spec • <code>${doc.folderPath}/${doc.filename}</code></span>
                           </div>
                         </div>
@@ -4971,7 +5074,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">🎨</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">DESIGN.md & EXPERIENCE.md</span>
+                    <span class="artifact-filename">${docUx ? formatFileDisplayName(docUx.filename, docUx.folderPath) : 'Project Design'}</span>
                     <span class="artifact-meta">${metaUx}</span>
                   </div>
                 </div>
@@ -4983,7 +5086,7 @@
                 <div class="artifact-row-left">
                   <span class="artifact-icon">🏛️</span>
                   <div class="artifact-info">
-                    <span class="artifact-filename">ARCHITECTURE-SPINE.md</span>
+                    <span class="artifact-filename">${docArch ? formatFileDisplayName(docArch.filename, docArch.folderPath) : 'Project Architecture'}</span>
                     <span class="artifact-meta">System Architecture Spine • <code>3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md</code></span>
                   </div>
                 </div>
@@ -5039,7 +5142,7 @@
                                   story.fileId
                                     ? `
                                   <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${story.fileId}')" title="Open ${story.filename} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
-                                    <span>📄</span> <span>${story.filename}</span>
+                                    <span>📄</span> <span>${formatFileDisplayName(story.filename)}</span>
                                   </button>
                                 `
                                     : ''
