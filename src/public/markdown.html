@@ -2682,7 +2682,7 @@
         const hasBrief = filenames.some((n) => n === 'brief.md' || n.includes('brief'));
         const hasPrd = filenames.some((n) => n === 'prd.md' || n.includes('prd'));
         const hasArch = filenames.some((n) => n.includes('architecture') || n.includes('spine'));
-        const hasUx = filenames.some((n) => n.includes('ux') || n.includes('design') || n.includes('experience'));
+        const hasUx = filenames.some((n) => n.includes('ux') || n.includes('design') || n.includes('experience') || n.includes('figma'));
         const hasEpics = filenames.some((n) => n === 'epics.md' || n.includes('epics'));
         const hasStoriesOrSpecs = filenames.some((n) => n.startsWith('story-') || n.startsWith('spec-') || n.startsWith('step-'));
 
@@ -2695,7 +2695,7 @@
         if (hasArch || lower.includes('architecture') || lower.includes('spine')) {
           return 'Project Architecture';
         }
-        if (hasUx || lower.includes('ux') || lower.includes('design')) {
+        if (hasUx || lower.includes('ux') || lower.includes('design') || lower.includes('figma')) {
           return 'Project UX & Design';
         }
         if (hasEpics || lower.includes('epic')) {
@@ -2723,9 +2723,13 @@
           return 'Project Context';
         }
 
-        const cleaned = folderPath
-          .split('/')
-          .pop()
+        // Extract top-level domain folder under _acl-output or planning-artifacts
+        const pathParts = folderPath.replace(/^.*(?:_acl-output|acl-output)\/?/, '').split('/').filter(Boolean);
+        let domainFolder = pathParts[0] || folderPath.split('/').pop();
+        if (domainFolder === 'planning-artifacts' && pathParts.length > 1) {
+          domainFolder = pathParts[1];
+        }
+        const cleaned = domainFolder
           .replace(/^[0-9]+-/, '')
           .replace(/^[_]+/, '')
           .replace(/[-_]+/g, ' ')
@@ -2736,6 +2740,34 @@
         const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
         return `Project ${capitalized}`;
       }
+
+      function getFileFolderGroup(file) {
+        if (!file) return 'Project Context';
+        return formatFolderDisplayName(file.folderPath, [file]);
+      }
+
+      function getSubfolderTag(file, primaryFolder) {
+        if (!file || !file.folderPath || file.folderPath === 'root') return '';
+        const normFile = file.folderPath.replace(/\\/g, '/');
+        const normPrimary = (primaryFolder || '').replace(/\\/g, '/');
+        if (normPrimary && normFile.startsWith(normPrimary) && normFile.length > normPrimary.length) {
+          const sub = normFile.slice(normPrimary.length).replace(/^\/+/, '');
+          if (sub) return sub;
+        }
+        const match = normFile.match(/\/(imports|assets|diagrams|sources|specs|mockups|research|components|data)$/i);
+        if (match) return match[1].toLowerCase();
+        return '';
+      }
+
+      const CANONICAL_FOLDER_ORDER = [
+        'Project Context',
+        'Project Brief',
+        'Project PRD',
+        'Project Architecture',
+        'Project UX & Design',
+        'Project Epics & Stories',
+        'Project Implementation',
+      ];
 
       function formatFileDisplayName(filename, folderPath = '', doc = null) {
         if (!filename) return '';
@@ -2852,16 +2884,32 @@
         // Sort FILES directly (filter and sort applies to files, not folders)
         filtered = sortFilesList(filtered);
 
-        // Group into folders based on sorted files order
+        // Group into folders based on resolved display name (Option 1 aggregation)
         const groups = {};
         const folderOrder = [];
+        const groupMeta = {};
+
         filtered.forEach((file) => {
-          const pathKey = file.folderPath || 'root';
-          if (!groups[pathKey]) {
-            groups[pathKey] = [];
-            folderOrder.push(pathKey);
+          const groupName = getFileFolderGroup(file);
+          if (!groups[groupName]) {
+            groups[groupName] = [];
+            folderOrder.push(groupName);
+            groupMeta[groupName] = {
+              displayName: groupName,
+              primaryFolderPath: file.folderPath || 'root',
+            };
           }
-          groups[pathKey].push(file);
+          groups[groupName].push(file);
+        });
+
+        // Canonical lifecycle ordering
+        folderOrder.sort((a, b) => {
+          const indexA = CANONICAL_FOLDER_ORDER.indexOf(a);
+          const indexB = CANONICAL_FOLDER_ORDER.indexOf(b);
+          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+          if (indexA !== -1) return -1;
+          if (indexB !== -1) return 1;
+          return a.localeCompare(b);
         });
 
         // The first file in the sorted list is the primary default
@@ -2869,14 +2917,21 @@
           activeFileId = filtered[0].id;
         }
 
-        folderOrder.forEach((folderPath) => {
+        // Auto-open active file folder if no folder is open yet
+        const currentActiveDoc = files.find((f) => f.id === activeFileId);
+        if (currentActiveDoc && openFolders.size === 0) {
+          const activeGroup = getFileFolderGroup(currentActiveDoc);
+          if (activeGroup) openFolders.add(activeGroup);
+        }
+
+        folderOrder.forEach((folderName) => {
           const folderDiv = document.createElement('div');
           folderDiv.className = 'folder-item';
 
           const headerDiv = document.createElement('div');
           headerDiv.className = 'folder-header';
 
-          const folderFiles = groups[folderPath];
+          const folderFiles = groups[folderName];
           folderFiles.sort(compareStoriesAndFiles);
           const fileCountText = folderFiles.length === 1 ? '1 file' : `${folderFiles.length} files`;
           const latestDate = folderFiles.reduce((latest, f) => {
@@ -2884,18 +2939,20 @@
             return d > latest ? d : latest;
           }, new Date(0));
           const formattedFolderTime = formatFileDateTime(latestDate.toISOString());
+          const meta = groupMeta[folderName] || {};
+          const primaryPath = meta.primaryFolderPath || folderName;
 
           headerDiv.setAttribute(
             'title',
-            `Folder: ${folderPath}\nLocation: _acl-output/${folderPath}\nContains: ${fileCountText}\nLast Updated: ${formattedFolderTime}`,
+            `Folder: ${folderName}\nLocation: _acl-output/${primaryPath}\nContains: ${fileCountText}\nLast Updated: ${formattedFolderTime}`,
           );
 
-          const isOpen = searchQuery !== '' ? true : openFolders.has(folderPath);
+          const isOpen = searchQuery !== '' ? true : openFolders.has(folderName);
 
           headerDiv.innerHTML = `
           <div class="folder-title-left">
             <span class="folder-chevron ${isOpen ? '' : 'collapsed'}">▼</span>
-            <span>📁 ${formatFolderDisplayName(folderPath, folderFiles)}</span>
+            <span>📁 ${folderName}</span>
           </div>
           <span class="folder-badge">${folderFiles.length}</span>
         `;
@@ -2907,9 +2964,9 @@
             const isCurrentlyHidden = filesDiv.classList.contains('hidden');
             if (isCurrentlyHidden) {
               openFolders.clear();
-              openFolders.add(folderPath);
+              openFolders.add(folderName);
             } else {
-              openFolders.delete(folderPath);
+              openFolders.delete(folderName);
             }
             renderFileTree();
           });
@@ -2928,6 +2985,7 @@
             const fullPath =
               file.fullPath || (file.folderPath && file.folderPath !== 'root' ? `${file.folderPath}/${file.filename}` : file.filename);
             const formattedTime = formatFileDateTime(file.createdAt || file.updatedAt);
+            const subfolderTag = getSubfolderTag(file, primaryPath);
 
             fileDiv.setAttribute(
               'title',
@@ -2938,6 +2996,7 @@
             <div class="file-item-left">
               <span class="file-icon">📄</span>
               <span>${formatFileDisplayName(file.filename, file.folderPath, file)}</span>
+              ${subfolderTag ? `<span class="subfolder-tag" style="font-size: 0.65rem; font-weight: 600; opacity: 0.65; margin-left: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(148, 163, 184, 0.2); text-transform: uppercase; letter-spacing: 0.4px;">${subfolderTag}</span>` : ''}
             </div>
             <span class="status-pill ${statusClass}">
               <span class="dot"></span>
@@ -2977,7 +3036,7 @@
         activeFileId = file.id;
         if (openFolder) {
           openFolders.clear();
-          openFolders.add(file.folderPath || 'root');
+          openFolders.add(getFileFolderGroup(file));
           renderFileTree();
         }
 
