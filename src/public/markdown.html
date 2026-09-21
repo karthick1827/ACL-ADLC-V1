@@ -1133,8 +1133,10 @@
         will-change: transform;
       }
       .workflow-svg-wrapper img {
+        width: 100%;
         max-width: 95%;
-        max-height: 95%;
+        max-height: 90vh;
+        aspect-ratio: 960 / 540;
         object-fit: contain;
         pointer-events: none;
         filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
@@ -1943,7 +1945,7 @@
       </nav>
       <div class="nav-drawer-footer">
         <span>ACL-ADLC</span>
-        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.32</span>
+        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.33</span>
       </div>
     </aside>
 
@@ -2673,7 +2675,7 @@
       }
 
       function formatFolderDisplayName(folderPath, folderFiles = []) {
-        if (!folderPath) return 'Project Deliverables';
+        if (!folderPath) return 'Project Context';
         const lower = folderPath.toLowerCase();
 
         const filenames = (folderFiles || []).map((f) => (f.filename || '').toLowerCase());
@@ -2707,11 +2709,30 @@
         ) {
           return 'Project Implementation';
         }
-        if (lower.includes('context') || lower === '0-context' || lower === 'root') {
+        if (
+          lower.includes('context') ||
+          lower === '0-context' ||
+          lower === 'root' ||
+          lower === '_acl-output' ||
+          lower === 'acl-output' ||
+          lower === '_acl_output' ||
+          lower.endsWith('/_acl-output') ||
+          lower.endsWith('/acl-output') ||
+          filenames.some((n) => n.includes('context'))
+        ) {
           return 'Project Context';
         }
 
-        const cleaned = folderPath.split('/').pop().replace(/^[0-9]+-/, '').replace(/[-_]+/g, ' ');
+        const cleaned = folderPath
+          .split('/')
+          .pop()
+          .replace(/^[0-9]+-/, '')
+          .replace(/^[_]+/, '')
+          .replace(/[-_]+/g, ' ')
+          .trim();
+        if (!cleaned || cleaned.toLowerCase() === 'acl output' || cleaned.toLowerCase() === 'acl coutput' || cleaned.toLowerCase() === 'deliverables') {
+          return 'Project Context';
+        }
         const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
         return `Project ${capitalized}`;
       }
@@ -3104,11 +3125,13 @@
       const WORKFLOW_SVGS = {
         greenfield: {
           title: 'Greenfield Delivery Workflow',
-          url: '/greenfield.svg',
+          url: './greenfield.svg',
+          fallbackUrl: '/greenfield.svg',
         },
         brownfield: {
           title: 'Brownfield Delivery Workflow',
-          url: '/brownfield.svg',
+          url: './brownfield.svg',
+          fallbackUrl: '/brownfield.svg',
         },
       };
 
@@ -3161,6 +3184,16 @@
         const img = document.getElementById('workflowSvgImg');
 
         if (img) {
+          img.onerror = function () {
+            try {
+              const fallbackFull = new URL(data.fallbackUrl, window.location.href).href;
+              if (this.src !== fallbackFull) {
+                this.src = data.fallbackUrl;
+              }
+            } catch {
+              this.src = data.fallbackUrl;
+            }
+          };
           img.src = data.url;
           img.alt = data.title;
         }
@@ -3364,7 +3397,7 @@
           document.body.classList.add('view-studio');
           if (dashboardView) dashboardView.style.display = 'none';
           if (studioView) studioView.style.display = 'flex';
-          if (headerTitle) headerTitle.textContent = 'Markdown Studio';
+          if (headerTitle) headerTitle.textContent = '';
           clearNavActive();
           if (navStudio) navStudio.classList.add('active');
           if (btnSave) btnSave.style.display = 'flex';
@@ -4198,7 +4231,7 @@
               <div class="phase-title-left">
                 <div class="phase-icon-badge">🔍</div>
                 <div class="phase-title-text">
-                  <h3>Phase 1: Analysis & Discovery</h3>
+                  <h3>Phase 1: Discovery</h3>
                   <span>Product brief, stakeholder goals, and initial problem discovery</span>
                 </div>
               </div>
@@ -4217,13 +4250,13 @@
             </div>
           </div>
 
-          <!-- Phase 2: Planning & UX Design -->
+          <!-- Phase 2: Planning -->
           <div class="phase-card">
             <div class="phase-card-header">
               <div class="phase-title-left">
                 <div class="phase-icon-badge">📋</div>
                 <div class="phase-title-text">
-                  <h3>Phase 2: Planning & UX Design</h3>
+                  <h3>Phase 2: Planning</h3>
                   <span>Functional requirements, user journeys, and visual design specifications</span>
                 </div>
               </div>
@@ -4261,7 +4294,7 @@
               <div class="phase-title-left">
                 <div class="phase-icon-badge">🏛️</div>
                 <div class="phase-title-text">
-                  <h3>Phase 3: Solutioning & Backlog Scoping</h3>
+                  <h3>Phase 3: Solutioning</h3>
                   <span>System architecture contracts, technical spines, and epics breakdown</span>
                 </div>
               </div>
@@ -4679,13 +4712,13 @@
 
         <!-- Implementation Epics & Stories Section -->
         <div class="dashboard-phases-container">
-          <!-- Phase 2: Planning & UX Design Deliverables -->
+          <!-- Phase 2: Planning Deliverables -->
           <div class="phase-card">
             <div class="phase-card-header">
               <div class="phase-title-left">
                 <div class="phase-icon-badge">📋</div>
                 <div class="phase-title-text">
-                  <h3>Planning & UX Design Deliverables</h3>
+                  <h3>Phase 2: Planning</h3>
                   <span>Sprint requirements, PRD functional specifications, and UX design assets</span>
                 </div>
               </div>
@@ -4722,7 +4755,7 @@
               <div class="phase-title-left">
                 <div class="phase-icon-badge">💻</div>
                 <div class="phase-title-text">
-                  <h3>Implementation Backlog</h3>
+                  <h3>Phase 4: Implementation</h3>
                   <span>User stories, task execution, tests, and deliverable status</span>
                 </div>
               </div>
@@ -5057,13 +5090,13 @@
 
         <!-- Implementation Epics & Stories Section (with Story-Level AC Accordion) -->
         <div class="dashboard-phases-container">
-          <!-- Phase 2B & 3A: UI/UX Design & Architecture Specifications -->
+          <!-- Phase 2 & 3: Planning & Solutioning Specifications -->
           <div class="phase-card">
             <div class="phase-card-header">
               <div class="phase-title-left">
                 <div class="phase-icon-badge">🎨</div>
                 <div class="phase-title-text">
-                  <h3>UI/UX Design & Architecture Specifications</h3>
+                  <h3>Phase 2 & 3: Planning & Solutioning</h3>
                   <span>Visual design tokens, interaction patterns, and system architecture contracts</span>
                 </div>
               </div>
@@ -5100,7 +5133,7 @@
               <div class="phase-title-left">
                 <div class="phase-icon-badge">💻</div>
                 <div class="phase-title-text">
-                  <h3>Implementation Backlog</h3>
+                  <h3>Phase 4: Implementation</h3>
                   <span>User stories, technical contracts, and acceptance criteria</span>
                 </div>
               </div>

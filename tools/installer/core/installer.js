@@ -784,6 +784,11 @@ class Installer {
             const targetSvg = path.join(targetDir, svgName);
             await fs.copy(svgSrc, targetSvg);
             this.installedFiles.add(targetSvg);
+            if (publicDir && targetDir !== publicDir && (await fs.pathExists(publicDir))) {
+              const publicSvg = path.join(publicDir, svgName);
+              await fs.copy(svgSrc, publicSvg);
+              this.installedFiles.add(publicSvg);
+            }
           }
         }
 
@@ -868,6 +873,41 @@ function aclMarkdownSaverPlugin() {
         const rawUrl = req.url ? req.url.split('?')[0] : '';
         if (rawUrl === '/markdownstudio' || rawUrl === '/markdownstudio.html') {
           req.url = req.url.replace(/^\\/markdownstudio(\\.html)?/, '/markdown.html');
+        }
+        next();
+      });
+
+      // Workflow SVGs static serve
+      server.middlewares.use(async (req, res, next) => {
+        const rawUrl = req.url ? req.url.split('?')[0] : '';
+        if (rawUrl === '/greenfield.svg' || rawUrl === '/brownfield.svg') {
+          try {
+            const svgName = rawUrl.slice(1);
+            const fsMod = await import('node:fs');
+            const fs = fsMod.default || fsMod;
+            const pathMod = await import('node:path');
+            const path = pathMod.default || pathMod;
+            const projectRoot = process.cwd();
+            const candidates = [
+              path.join(projectRoot, 'public', svgName),
+              path.join(projectRoot, 'dist', svgName),
+              path.join(projectRoot, 'src', 'public', svgName),
+              path.join(projectRoot, svgName),
+              path.join(projectRoot, 'node_modules', 'acl-adlc', 'src', 'public', svgName),
+            ];
+            for (const cand of candidates) {
+              if (fs.existsSync(cand)) {
+                res.writeHead(200, {
+                  'Content-Type': 'image/svg+xml',
+                  'Cache-Control': 'no-cache',
+                });
+                res.end(fs.readFileSync(cand));
+                return;
+              }
+            }
+          } catch {
+            // Fall through to next middleware
+          }
         }
         next();
       });
