@@ -16,6 +16,7 @@ const GATES = {
     key: 'phase2',
     name: 'Phase 2: Planning (PRD)',
     artifact: '2-plan-workflows/acl-prd/prd.md',
+    conditionalArtifact: '2-plan-workflows/acl-prd/reconcile-brief.md',
     prerequisites: ['phase1'],
   },
   phase3_arch: {
@@ -98,12 +99,38 @@ function evaluateAllGates() {
   const results = {};
   for (const [gateKey, gate] of Object.entries(GATES)) {
     const fileInfo = getArtifactStatus(gate.artifact, gate.altArtifact);
+    let isAccepted = fileInfo.status === 'Accepted';
+    let isRejected = fileInfo.status === 'Rejected';
+    let isInReview = fileInfo.status === 'In Review' || fileInfo.status === 'Missing';
+    let gateStatus = fileInfo.status;
+
+    // Conditional artifact check (e.g., reconcile-brief.md in Phase 2)
+    let conditionalInfo = null;
+    if (gate.conditionalArtifact) {
+      conditionalInfo = getArtifactStatus(gate.conditionalArtifact);
+      if (conditionalInfo.exists) {
+        if (conditionalInfo.status === 'Rejected') {
+          isRejected = true;
+          isAccepted = false;
+          gateStatus = 'Rejected (Reconcile-Brief)';
+        } else if (conditionalInfo.status !== 'Accepted') {
+          isAccepted = false;
+          isInReview = true;
+          if (fileInfo.status === 'Accepted') {
+            gateStatus = 'In Review (Reconcile-Brief)';
+          }
+        }
+      }
+    }
+
     results[gateKey] = {
       ...gate,
       ...fileInfo,
-      isAccepted: fileInfo.status === 'Accepted',
-      isRejected: fileInfo.status === 'Rejected',
-      isInReview: fileInfo.status === 'In Review' || fileInfo.status === 'Missing',
+      conditionalInfo,
+      status: gateStatus,
+      isAccepted,
+      isRejected,
+      isInReview,
     };
   }
   return results;
@@ -141,12 +168,20 @@ function checkGate(targetName) {
   for (const prereqKey of target.prerequisites) {
     const prereq = gates[prereqKey];
     if (!prereq.isAccepted) {
+      const isCondPending =
+        prereq.conditionalInfo?.exists &&
+        prereq.conditionalInfo?.status !== 'Accepted' &&
+        String(prereq.status).includes('Reconcile-Brief');
+      const docName = isCondPending ? 'Project Reconcile-Brief' : prereq.name;
+      const docPath = isCondPending ? prereq.conditionalArtifact : prereq.artifact;
+      const statusLabel = prereq.isRejected ? '[REJECTED]' : '[IN REVIEW / PENDING]';
+
       if (prereq.isRejected) {
         console.error(`\n========================================================================`);
         console.error(`🛑 [GATE BLOCKED]: Document Rejected by Manager`);
         console.error(`========================================================================`);
-        console.error(`📄 Document:       ${prereq.name} (_acl-output/${prereq.artifact})`);
-        console.error(`🏷️ Current Status: [REJECTED]`);
+        console.error(`📄 Document:       ${docName} (_acl-output/${docPath})`);
+        console.error(`🏷️ Current Status: ${statusLabel}`);
         console.error(`\n⚠️ STATUS:`);
         console.error(`   This prerequisite document was marked 'Rejected' by your Manager.`);
         console.error(`   Please review manager feedback, revise the document, and wait for re-review`);
@@ -156,14 +191,14 @@ function checkGate(targetName) {
         console.error(`\n========================================================================`);
         console.error(`⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)`);
         console.error(`========================================================================`);
-        console.error(`📄 Document in Review: ${prereq.name} (_acl-output/${prereq.artifact})`);
-        console.error(`🏷️ Current Status:      [IN REVIEW / PENDING]`);
+        console.error(`📄 Document in Review: ${docName} (_acl-output/${docPath})`);
+        console.error(`🏷️ Current Status:      ${statusLabel}`);
         console.error(`\n⚠️ STATUS:`);
         console.error(`   As per the ACL-ADLC sequential delivery framework, this document`);
         console.error(`   is currently awaiting official review and sign-off by your Manager.`);
         console.error(`\n👉 NEXT STEP:`);
         console.error(`   Please wait for your manager to review and mark this document as`);
-        console.error(`   'Accepted' or 'Rejected' in Markdown Studio before proceeding with`);
+        console.error(`   'Approved' or 'Rejected' in Markdown Studio before proceeding with`);
         console.error(`   ${target.name}.`);
         console.error(`========================================================================\n`);
       }

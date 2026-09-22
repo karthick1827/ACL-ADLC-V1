@@ -31,7 +31,7 @@ Open source framework for structured, agent-assisted software delivery.
   - EVERY single agent (Sally UX Designer, Winston Architect, Amelia Developer, Mary Analyst, etc.) and EVERY skill (`acl-architecture`, `acl-ux`, `acl-create-epics-and-stories`, `acl-quick-dev`, `acl-figma-bridge`, etc.) across ALL AI tools (Cursor, Antigravity, AGY, GitHub Copilot, Claude Code, Windsurf, Roo Code, etc.) MUST FIRST verify that all applicable upstream phase deliverables in `_acl-output/` have `status: Approved`.
   - **Prerequisite Deliverables Scope (What Requires Approval)**:
     - Phase 1: `_acl-output/1-analysis/acl-product-brief/brief.md`
-    - Phase 2: `_acl-output/2-plan-workflows/acl-prd/prd.md`
+    - Phase 2: `_acl-output/2-plan-workflows/acl-prd/prd.md` (and `_acl-output/2-plan-workflows/acl-prd/reconcile-brief.md` if generated against an upstream brief)
     - Phase 3A: `_acl-output/3-solutioning/acl-architecture/architecture-spine.md` (or `architecture.md`)
     - Phase 3B: `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`
     - Phase 4: `_acl-output/4-implementation/story-<epic_num>-<story_num>.md` (Tier 2) or `_acl-output/4-implementation/spec-<feature-slug>.md` (Tier 1)

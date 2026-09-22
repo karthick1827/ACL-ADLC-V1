@@ -1945,7 +1945,7 @@
       </nav>
       <div class="nav-drawer-footer">
         <span>ACL-ADLC</span>
-        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.35</span>
+        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.36</span>
       </div>
     </aside>
 
@@ -2679,34 +2679,50 @@
         const lower = folderPath.toLowerCase();
 
         const filenames = (folderFiles || []).map((f) => (f.filename || '').toLowerCase());
-        const hasBrief = filenames.some((n) => n === 'brief.md' || n.includes('brief'));
-        const hasPrd = filenames.some((n) => n === 'prd.md' || n.includes('prd'));
+        const hasBrief = filenames.some((n) => n === 'brief.md' || n.startsWith('brief-') || n.includes('product-brief'));
+        const hasPrd = filenames.some((n) => n === 'prd.md' || n.startsWith('prd-') || n.startsWith('reconcile-'));
         const hasArch = filenames.some((n) => n.includes('architecture') || n.includes('spine'));
         const hasUx = filenames.some((n) => n.includes('ux') || n.includes('design') || n.includes('experience') || n.includes('figma'));
         const hasEpics = filenames.some((n) => n === 'epics.md' || n.includes('epics'));
         const hasStoriesOrSpecs = filenames.some((n) => n.startsWith('story-') || n.startsWith('spec-') || n.startsWith('step-'));
 
-        if (hasBrief || lower.includes('brief') || lower.includes('1-analysis')) {
+        // 1. Folder Path Precedence (Physical location wins)
+        if (lower.includes('1-analysis') || lower.includes('acl-product-brief') || (lower.includes('brief') && !lower.includes('reconcile'))) {
           return 'Project Brief';
         }
-        if (hasPrd || lower.includes('prd') || lower.includes('2-plan')) {
+        if (lower.includes('2-plan') || lower.includes('acl-prd') || lower.includes('prd')) {
           return 'Project PRD';
         }
-        if (hasArch || lower.includes('architecture') || lower.includes('spine')) {
+        if (lower.includes('3-solutioning/acl-architecture') || lower.includes('acl-architecture') || lower.includes('architecture')) {
           return 'Project Architecture';
         }
-        if (hasUx || lower.includes('ux') || lower.includes('design') || lower.includes('figma')) {
+        if (lower.includes('3-solutioning/acl-ux') || lower.includes('acl-ux') || lower.includes('acl-design') || lower.includes('ux') || lower.includes('design')) {
           return 'Project UX & Design';
         }
-        if (hasEpics || lower.includes('epic')) {
+        if (lower.includes('3-solutioning/acl-create-epics') || lower.includes('acl-create-epics-and-stories') || lower.includes('epic')) {
           return 'Project Epics & Stories';
         }
-        if (
-          hasStoriesOrSpecs ||
-          lower.includes('implementation') ||
-          lower.includes('4-implementation') ||
-          lower.includes('dev-auto')
-        ) {
+        if (lower.includes('4-implementation') || lower.includes('implementation') || lower.includes('dev-auto')) {
+          return 'Project Implementation';
+        }
+
+        // 2. Filename Fallback (when files are evaluated outside standard directory structure)
+        if (hasBrief) {
+          return 'Project Brief';
+        }
+        if (hasPrd) {
+          return 'Project PRD';
+        }
+        if (hasArch) {
+          return 'Project Architecture';
+        }
+        if (hasUx) {
+          return 'Project UX & Design';
+        }
+        if (hasEpics) {
+          return 'Project Epics & Stories';
+        }
+        if (hasStoriesOrSpecs) {
           return 'Project Implementation';
         }
         if (
@@ -2772,6 +2788,16 @@
       function formatFileDisplayName(filename, folderPath = '', doc = null) {
         if (!filename) return '';
         const lower = filename.toLowerCase();
+
+        // Project Reconcile-Brief (and general Reconcile files)
+        if (lower === 'reconcile-brief.md' || lower.startsWith('reconcile-brief')) {
+          return 'Project Reconcile-Brief';
+        }
+        if (lower.startsWith('reconcile-')) {
+          const slug = lower.replace(/^reconcile-/, '').replace(/\.md$/, '');
+          const cleanSlug = slug.charAt(0).toUpperCase() + slug.slice(1);
+          return `Project Reconcile-${cleanSlug}`;
+        }
 
         // Project Brief
         if (lower === 'brief.md' || lower.startsWith('brief-') || lower.includes('product-brief')) {
@@ -4112,6 +4138,12 @@
         const statusPrd = docPrd ? getNormStatus(docPrd) : 'To Do';
         const prdApproved = statusPrd === 'Approved';
 
+        // Project Reconcile-Brief (reconcile-brief.md) - Conditional audit deliverable
+        const docReconcileBrief = getDoc(/reconcile-brief\.md/);
+        const hasReconcileBrief = Boolean(docReconcileBrief);
+        const statusReconcileBrief = docReconcileBrief ? getNormStatus(docReconcileBrief) : null;
+        const reconcileBriefApproved = !hasReconcileBrief || statusReconcileBrief === 'Approved';
+
         // Phase 2B: UX Design (DESIGN.md / EXPERIENCE.md / ux.md) - Weight: 5%
         const docUx = getDoc(/design\.md|experience\.md|ux\.md/);
         const hasUxDoc = Boolean(docUx);
@@ -4178,7 +4210,7 @@
         const totalPhasesCount = isBrownfieldTier2 ? (hasStandaloneSpecs ? 6 : 5) : 4;
         if (isBrownfieldTier2 && statusContext === 'Approved') completedPhasesCount++;
         if (statusBrief === 'Approved') completedPhasesCount++;
-        if (statusPrd === 'Approved' && (!hasUxDoc || statusUx === 'Approved')) completedPhasesCount++;
+        if (statusPrd === 'Approved' && reconcileBriefApproved && (!hasUxDoc || statusUx === 'Approved')) completedPhasesCount++;
         if (statusArch === 'Approved' && statusEpics === 'Approved') completedPhasesCount++;
         if (totalStories > 0 && completedStories === totalStories) completedPhasesCount++;
         if (hasStandaloneSpecs && allSpecsApproved) completedPhasesCount++;
@@ -4187,6 +4219,7 @@
         if (isBrownfieldTier2 && (statusContext === 'Rejected' || statusContext === 'Need Action')) needActionCount++;
         if (statusBrief === 'Rejected' || statusBrief === 'Need Action') needActionCount++;
         if (statusPrd === 'Rejected' || statusPrd === 'Need Action') needActionCount++;
+        if (hasReconcileBrief && (statusReconcileBrief === 'Rejected' || statusReconcileBrief === 'Need Action')) needActionCount++;
         if (statusUx === 'Rejected' || statusUx === 'Need Action') needActionCount++;
         if (statusArch === 'Rejected' || statusArch === 'Need Action') needActionCount++;
         if (statusEpics === 'Rejected' || statusEpics === 'Need Action') needActionCount++;
@@ -4332,6 +4365,24 @@
                 </div>
                 ${renderStatusBadge(statusPrd)}
               </div>
+
+              <!-- Project Reconcile-Brief (Conditional: only shown when generated) -->
+              ${
+                docReconcileBrief
+                  ? `
+              <div class="dashboard-artifact-row" onclick="openDocInStudio('${docReconcileBrief.id}')" style="cursor: pointer;">
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">📋</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">${formatFileDisplayName(docReconcileBrief.filename, docReconcileBrief.folderPath)}</span>
+                    <span class="artifact-meta">Brief Reconciliation Audit • <code>2-plan-workflows/acl-prd/reconcile-brief.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusReconcileBrief)}
+              </div>
+              `
+                  : ''
+              }
 
               <!-- UX Design -->
               <div class="dashboard-artifact-row" ${docUx ? `onclick="openDocInStudio('${docUx.id}')" style="cursor: pointer;"` : ''}>
@@ -4596,6 +4647,8 @@
         const approvedSpecsCount = specDocs.filter((d) => getNormStatus(d) === 'Approved').length;
         const docPrd = getDoc('prd.md');
         const statusPrd = docPrd ? getNormStatus(docPrd) : 'To Do';
+        const docReconcileBrief = getDoc(/reconcile-brief\.md/);
+        const statusReconcileBrief = docReconcileBrief ? getNormStatus(docReconcileBrief) : null;
         const docUx = getDoc(/design\.md|experience\.md|ux\.md/);
         const hasUxDoc = Boolean(docUx);
         const statusUx = docUx ? getNormStatus(docUx) : 'To Do';
@@ -4608,22 +4661,25 @@
         let parsedEpics = [];
         let totalStories = 0;
         let completedStories = 0;
-        let completedEpicsCount = 0;
+        let isPhase4Locked = false;
 
-        if (docEpics && docEpics.content) {
+        const epicsApproved = docEpics && (docEpics.status === 'Accepted' || docEpics.status === 'Approved');
+        isPhase4Locked = !epicsApproved;
+
+        if (epicsApproved && docEpics && docEpics.content) {
           parsedEpics = parseEpicsAndStoriesFromMarkdown(docEpics.content, files);
           parsedEpics.forEach((ep) => {
-            let epicStoriesTotal = 0;
-            let epicStoriesDone = 0;
             ep.stories.forEach((st) => {
               totalStories++;
-              epicStoriesTotal++;
-              if (st.isCompleted || st.status === 'Approved') {
-                completedStories++;
-                epicStoriesDone++;
-              }
+              if (st.isCompleted || st.status === 'Approved') completedStories++;
             });
-            if (epicStoriesTotal > 0 && epicStoriesDone === epicStoriesTotal) {
+          });
+        }
+
+        let completedEpicsCount = 0;
+        if (parsedEpics.length > 0) {
+          parsedEpics.forEach((ep) => {
+            if (ep.stories.length > 0 && ep.stories.every((st) => st.isCompleted || st.status === 'Approved')) {
               completedEpicsCount++;
             }
           });
@@ -4794,6 +4850,24 @@
                 </div>
                 ${renderStatusBadge(statusPrd)}
               </div>
+
+              <!-- Project Reconcile-Brief (Conditional: only shown when generated) -->
+              ${
+                docReconcileBrief
+                  ? `
+              <div class="dashboard-artifact-row" onclick="openDocInStudio('${docReconcileBrief.id}')" style="cursor: pointer;">
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">📋</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">${formatFileDisplayName(docReconcileBrief.filename, docReconcileBrief.folderPath)}</span>
+                    <span class="artifact-meta">Brief Reconciliation • <code>2-plan-workflows/acl-prd/reconcile-brief.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusReconcileBrief)}
+              </div>
+              `
+                  : ''
+              }
 
               <!-- UX Design -->
               <div class="dashboard-artifact-row" ${docUx ? `onclick="openDocInStudio('${docUx.id}')" style="cursor: pointer;"` : ''}>
