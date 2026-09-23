@@ -1528,18 +1528,19 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/greenfield.svg' || url.pathname === '/brownfield.svg') {
-    const svgFile = url.pathname.slice(1);
-    let svgPath = path.join(__dirname, '..', 'src', 'public', svgFile);
-    if (!fs.existsSync(svgPath)) {
-      svgPath = path.join(PROJECT_ROOT, 'src', 'public', svgFile);
+  if (url.pathname === '/greenfield.svg' || url.pathname === '/brownfield.svg' || url.pathname === '/velocityone-studio-logo.png') {
+    const assetFile = url.pathname.slice(1);
+    let assetPath = path.join(__dirname, '..', 'src', 'public', assetFile);
+    if (!fs.existsSync(assetPath)) {
+      assetPath = path.join(PROJECT_ROOT, 'src', 'public', assetFile);
     }
-    if (!fs.existsSync(svgPath)) {
-      svgPath = path.join(PROJECT_ROOT, 'public', svgFile);
+    if (!fs.existsSync(assetPath)) {
+      assetPath = path.join(PROJECT_ROOT, 'public', assetFile);
     }
-    if (fs.existsSync(svgPath)) {
-      res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
-      res.end(fs.readFileSync(svgPath));
+    if (fs.existsSync(assetPath)) {
+      const mime = assetFile.endsWith('.png') ? 'image/png' : 'image/svg+xml';
+      res.writeHead(200, { 'Content-Type': mime });
+      res.end(fs.readFileSync(assetPath));
       return;
     }
   }

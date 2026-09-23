@@ -775,10 +775,10 @@ class Installer {
         await fs.writeFile(targetMarkdownFile, htmlContent, 'utf8');
         this.installedFiles.add(targetMarkdownFile);
 
-        // Deploy workflow SVG diagrams alongside markdown.html
+        // Deploy workflow SVG diagrams and Studio logo alongside markdown.html
         const targetDir = path.dirname(targetMarkdownFile);
         const svgSrcDir = path.dirname(srcMarkdown);
-        for (const svgName of ['greenfield.svg', 'brownfield.svg']) {
+        for (const svgName of ['greenfield.svg', 'brownfield.svg', 'velocityone-studio-logo.png']) {
           const svgSrc = path.join(svgSrcDir, svgName);
           if (await fs.pathExists(svgSrc)) {
             const targetSvg = path.join(targetDir, svgName);
@@ -877,10 +877,10 @@ function aclMarkdownSaverPlugin() {
         next();
       });
 
-      // Workflow SVGs static serve
+      // Workflow SVGs and Studio logo static serve
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url ? req.url.split('?')[0] : '';
-        if (rawUrl === '/greenfield.svg' || rawUrl === '/brownfield.svg') {
+        if (rawUrl === '/greenfield.svg' || rawUrl === '/brownfield.svg' || rawUrl === '/velocityone-studio-logo.png') {
           try {
             const svgName = rawUrl.slice(1);
             const fsMod = await import('node:fs');
@@ -897,8 +897,9 @@ function aclMarkdownSaverPlugin() {
             ];
             for (const cand of candidates) {
               if (fs.existsSync(cand)) {
+                const mime = svgName.endsWith('.png') ? 'image/png' : 'image/svg+xml';
                 res.writeHead(200, {
-                  'Content-Type': 'image/svg+xml',
+                  'Content-Type': mime,
                   'Cache-Control': 'no-cache',
                 });
                 res.end(fs.readFileSync(cand));

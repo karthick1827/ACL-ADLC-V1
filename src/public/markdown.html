@@ -78,11 +78,11 @@
       header {
         background: var(--bg-surface);
         border-bottom: 1px solid var(--border-color);
-        padding: 0.6rem 1.5rem;
+        padding: 0.5rem 1.5rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        height: 56px;
+        height: 64px;
         flex-shrink: 0;
         z-index: 100;
       }
@@ -90,25 +90,35 @@
       .brand {
         display: flex;
         align-items: center;
-        gap: 0.65rem;
+        gap: 0.75rem;
         font-size: 1.05rem;
         font-weight: 700;
         color: var(--text-primary);
       }
 
-      .brand-badge {
-        background: var(--text-primary);
-        color: #ffffff;
-        padding: 0.2rem 0.5rem;
-        border-radius: var(--radius-sm);
-        font-size: 20px;
-        font-weight: 800;
+      .brand-logo {
+        display: block;
+        height: 36px;
+        width: auto;
+        max-width: 200px;
+        object-fit: contain;
+        margin: 0;
       }
 
       .header-actions {
         display: flex;
         align-items: center;
         gap: 1rem;
+      }
+
+      body.view-studio .header-actions {
+        flex: 1;
+        justify-content: flex-end;
+      }
+
+      body.view-studio #workflowDropdownWrapper {
+        order: 10;
+        margin-left: 0.25rem;
       }
 
       .file-sync-indicator {
@@ -572,28 +582,35 @@
         display: inline-block;
       }
       .btn-workflow {
-        background: #0969da;
-        color: #ffffff;
-        border: 1px solid #0858b7;
-        padding: 0.45rem 1.1rem;
-        border-radius: var(--radius-md);
-        font-size: 0.84rem;
-        font-weight: 600;
+        background: transparent;
+        color: #9ca3af;
+        border: none;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 9999px;
+        font-size: 0.95rem;
+        font-weight: 700;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.15s ease;
-        box-shadow: 0 1px 3px rgba(9, 105, 218, 0.3);
+        transition: color 0.15s ease, background 0.15s ease;
+        box-shadow: none;
         user-select: none;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+      .btn-workflow svg {
+        display: block;
       }
       .btn-workflow:hover,
       .btn-workflow.active {
-        background: #0858b7;
-        border-color: #064796;
-        color: #ffffff;
-        transform: translateY(-1px);
-        box-shadow: 0 3px 8px rgba(9, 105, 218, 0.4);
+        background: transparent;
+        border: none;
+        color: #6b7280;
+        transform: none;
+        box-shadow: none;
       }
 
       /* Generic Modals (Branching & Help) */
@@ -969,7 +986,8 @@
       .workflow-menu {
         position: absolute;
         top: calc(100% + 6px);
-        left: 0;
+        left: auto;
+        right: 0;
         background: #ffffff;
         border: 1px solid rgba(0, 0, 0, 0.12);
         border-radius: var(--radius-md);
@@ -1211,17 +1229,23 @@
       }
 
       .nav-drawer-header {
-        padding: 1rem 1.25rem;
+        padding: 0.85rem 1.25rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
         border-bottom: 1px solid #e2e8f0;
-        background: #f8fafc;
+        background: #ffffff;
+        min-height: 72px;
       }
       .nav-drawer-brand {
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        min-width: 0;
+      }
+      .nav-drawer-brand .brand-logo {
+        height: 42px;
+        max-width: 200px;
       }
       .nav-drawer-title {
         font-size: 0.88rem;
@@ -1896,13 +1920,17 @@
       }
     </style>
   </head>
-  <body>
+  <body class="view-studio">
     <!-- Slide-out Navigation Drawer -->
     <div class="nav-drawer-backdrop" id="navDrawerBackdrop" onclick="closeNavDrawer()"></div>
     <aside class="nav-drawer" id="navDrawer">
       <div class="nav-drawer-header">
         <div class="nav-drawer-brand">
-          <span class="brand-badge"> VelocityONE</span>
+          <img
+            class="brand-logo"
+            src="/velocityone-studio-logo.png"
+            alt="VelocityONE Studio"
+          />
         </div>
         <button type="button" class="nav-drawer-close" onclick="closeNavDrawer()" title="Close navigation">✕</button>
       </div>
@@ -1945,7 +1973,7 @@
       </nav>
       <div class="nav-drawer-footer">
         <span>ACL-ADLC</span>
-        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.36</span>
+        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.35</span>
       </div>
     </aside>
 
@@ -1969,16 +1997,31 @@
           </svg>
         </button>
         <div class="brand">
-          <span class="brand-badge"> VelocityONE</span>
+          <img
+            class="brand-logo"
+            src="/velocityone-studio-logo.png"
+            alt="VelocityONE Studio"
+          />
           <span id="appHeaderTitle"></span>
         </div>
       </div>
 
       <div class="header-actions">
-        <!-- Workflow Mode Dropdown -->
+        <!-- Help: Delivery Workflow dropdown -->
         <div class="workflow-dropdown-wrapper" id="workflowDropdownWrapper">
-          <button type="button" class="btn-workflow" id="btnWorkflow" onclick="toggleWorkflowDropdown(event)" title="Delivery Workflow">
-            Workflow
+          <button
+            type="button"
+            class="btn-workflow"
+            id="btnWorkflow"
+            onclick="toggleWorkflowDropdown(event)"
+            title="Delivery Workflow"
+            aria-label="Delivery Workflow"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
           </button>
           <div class="workflow-menu" id="workflowMenu">
             <button type="button" class="workflow-menu-item" onclick="openWorkflowModal('greenfield', event)">Greenfield</button>
@@ -2160,6 +2203,7 @@
         if (lower.startsWith('.')) return true;
         if (lower.includes('memlog')) return true;
         if (lower.startsWith('readiness-report')) return true;
+        if (isTestDeliverable(filename, folderPath)) return false;
         if (lowerFolder.includes('/tests') || lowerFolder.endsWith('tests') || lowerFolder === 'tests') return true;
 
         const EXCLUDED_CHILDREN = new Set([
@@ -2679,52 +2723,41 @@
         const lower = folderPath.toLowerCase();
 
         const filenames = (folderFiles || []).map((f) => (f.filename || '').toLowerCase());
-        const hasBrief = filenames.some((n) => n === 'brief.md' || n.startsWith('brief-') || n.includes('product-brief'));
-        const hasPrd = filenames.some((n) => n === 'prd.md' || n.startsWith('prd-') || n.startsWith('reconcile-'));
+        const hasBrief = filenames.some((n) => n === 'brief.md' || n.includes('brief'));
+        const hasPrd = filenames.some((n) => n === 'prd.md' || n.includes('prd'));
         const hasArch = filenames.some((n) => n.includes('architecture') || n.includes('spine'));
         const hasUx = filenames.some((n) => n.includes('ux') || n.includes('design') || n.includes('experience') || n.includes('figma'));
         const hasEpics = filenames.some((n) => n === 'epics.md' || n.includes('epics'));
         const hasStoriesOrSpecs = filenames.some((n) => n.startsWith('story-') || n.startsWith('spec-') || n.startsWith('step-'));
+        const hasQA = filenames.some((n) => n === 'e2e-testing.md' || n === 'qa.md' || n.includes('e2e') || n.includes('testing') || n.startsWith('test-'));
 
-        // 1. Folder Path Precedence (Physical location wins)
-        if (lower.includes('1-analysis') || lower.includes('acl-product-brief') || (lower.includes('brief') && !lower.includes('reconcile'))) {
+        if (hasBrief || lower.includes('brief') || lower.includes('1-analysis')) {
           return 'Project Brief';
         }
-        if (lower.includes('2-plan') || lower.includes('acl-prd') || lower.includes('prd')) {
+        if (hasPrd || lower.includes('prd') || lower.includes('2-plan')) {
           return 'Project PRD';
         }
-        if (lower.includes('3-solutioning/acl-architecture') || lower.includes('acl-architecture') || lower.includes('architecture')) {
+        if (hasArch || lower.includes('architecture') || lower.includes('spine')) {
           return 'Project Architecture';
         }
-        if (lower.includes('3-solutioning/acl-ux') || lower.includes('acl-ux') || lower.includes('acl-design') || lower.includes('ux') || lower.includes('design')) {
+        if (hasUx || lower.includes('ux') || lower.includes('design') || lower.includes('figma')) {
           return 'Project UX & Design';
         }
-        if (lower.includes('3-solutioning/acl-create-epics') || lower.includes('acl-create-epics-and-stories') || lower.includes('epic')) {
+        if (hasEpics || lower.includes('epic')) {
           return 'Project Epics & Stories';
         }
-        if (lower.includes('4-implementation') || lower.includes('implementation') || lower.includes('dev-auto')) {
+        if (
+          hasStoriesOrSpecs ||
+          lower.includes('implementation') ||
+          lower.includes('4-implementation') ||
+          lower.includes('dev-auto')
+        ) {
           return 'Project Implementation';
+        }
+        if (hasQA || lower.includes('qa') || lower.includes('testing') || lower.includes('e2e') || lower.includes('validate')) {
+          return 'Project QA';
         }
 
-        // 2. Filename Fallback (when files are evaluated outside standard directory structure)
-        if (hasBrief) {
-          return 'Project Brief';
-        }
-        if (hasPrd) {
-          return 'Project PRD';
-        }
-        if (hasArch) {
-          return 'Project Architecture';
-        }
-        if (hasUx) {
-          return 'Project UX & Design';
-        }
-        if (hasEpics) {
-          return 'Project Epics & Stories';
-        }
-        if (hasStoriesOrSpecs) {
-          return 'Project Implementation';
-        }
         if (
           lower.includes('context') ||
           lower === '0-context' ||
@@ -2783,21 +2816,12 @@
         'Project UX & Design',
         'Project Epics & Stories',
         'Project Implementation',
+        'Project QA',
       ];
 
       function formatFileDisplayName(filename, folderPath = '', doc = null) {
         if (!filename) return '';
         const lower = filename.toLowerCase();
-
-        // Project Reconcile-Brief (and general Reconcile files)
-        if (lower === 'reconcile-brief.md' || lower.startsWith('reconcile-brief')) {
-          return 'Project Reconcile-Brief';
-        }
-        if (lower.startsWith('reconcile-')) {
-          const slug = lower.replace(/^reconcile-/, '').replace(/\.md$/, '');
-          const cleanSlug = slug.charAt(0).toUpperCase() + slug.slice(1);
-          return `Project Reconcile-${cleanSlug}`;
-        }
 
         // Project Brief
         if (lower === 'brief.md' || lower.startsWith('brief-') || lower.includes('product-brief')) {
@@ -2817,6 +2841,11 @@
         // Architecture
         if (lower.includes('architecture') || lower.includes('spine')) {
           return 'Project Architecture';
+        }
+
+        // Project QA / E2E Testing
+        if (lower === 'e2e-testing.md' || lower === 'qa.md' || lower.includes('e2e') || lower.includes('testing')) {
+          return 'Project QA';
         }
 
         // UX / Design / Experience
@@ -3570,8 +3599,8 @@
                 sTitle = sTitle.replace(/[\(\[](?:done|completed)[\)\]]$/i, '').trim();
               }
 
-              let status = isCheckboxDone ? 'Approved' : 'To Do';
-              let isCompleted = isCheckboxDone;
+              let status = 'To Do';
+              let isCompleted = false;
               let matchFile = null;
 
               // Cross-reference with live files in _acl-output
@@ -3586,31 +3615,12 @@
                   return (
                     pattern.test(fn) ||
                     pattern.test(fp) ||
-                    fn.startsWith(`${numSlug}-`) ||
-                    fn.startsWith(`${dotSlug}-`) ||
                     fn.includes(`story-${numSlug}`) ||
                     fn.includes(`story-${dotSlug}`) ||
                     fn.includes(`spec-${numSlug}`) ||
                     fn.includes(`spec-${dotSlug}`)
                   );
                 });
-
-                // If no single story file matched, check if an approved implementation spec in 4-implementation references epics.md and has completed tasks
-                if (!matchFile && !isCompleted) {
-                  const approvedSpec = allFiles.find((f) => {
-                    const fn = (f.filename || '').toLowerCase();
-                    const fp = (f.fullPath || f.folderPath || f.path || '').toLowerCase();
-                    if (!fn.startsWith('spec-') && !fp.includes('4-implementation')) return false;
-                    const raw = (f.status || '').trim().toLowerCase();
-                    const isAppr = raw.includes('accept') || raw.includes('approved') || raw.includes('final');
-                    if (!isAppr) return false;
-                    const fc = (f.content || '').toLowerCase();
-                    return fc.includes('epics.md') && (fc.includes('- [x]') || fc.includes('- [X]'));
-                  });
-                  if (approvedSpec) {
-                    matchFile = approvedSpec;
-                  }
-                }
 
                 if (matchFile) {
                   const raw = (matchFile.status || '').trim().toLowerCase();
@@ -3856,6 +3866,135 @@
           if (typeof pattern === 'string') return fn.includes(pattern) || full.includes(pattern);
           return pattern.test(fn) || pattern.test(full);
         });
+      }
+
+      function isTestDeliverable(filename, folderPath) {
+        const fn = (filename || '').toLowerCase();
+        const folder = (folderPath || '').toLowerCase();
+        if (!fn.endsWith('.md')) return false;
+        if (fn === 'brief.md' || fn === 'prd.md' || fn === 'epics.md' || fn === 'design.md' || fn === 'experience.md' || fn === 'ux.md') {
+          return false;
+        }
+        if (fn.startsWith('spec-') || fn.startsWith('story-') || fn.includes('architecture')) return false;
+        const folderHit = /(^|\/)(tests?|e2e|qa|validate(?:-and-release)?)(\/|$)/.test(folder);
+        const nameHit =
+          /(e2e|testing|test-summary|qa-tests?)/.test(fn) || /^tests?[-_].+\.md$/.test(fn) || /[-_](e2e|tests?)\.md$/.test(fn);
+        return folderHit || nameHit;
+      }
+
+      function getTestDocs() {
+        return (files || []).filter((f) => isTestDeliverable(f.filename, f.folderPath));
+      }
+
+      function renderPlanPhaseCard(docBrief, statusBrief, docPrd, statusPrd) {
+        return `
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">🔍</div>
+                <div class="phase-title-text">
+                  <h3>Phase 1: Plan</h3>
+                  <span>Product brief and requirements</span>
+                </div>
+              </div>
+            </div>
+            <div class="phase-card-body">
+              <div class="dashboard-artifact-row" ${docBrief ? `onclick="openDocInStudio('${docBrief.id}')" style="cursor: pointer;"` : ''}>
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">📄</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">${docBrief ? formatFileDisplayName(docBrief.filename, docBrief.folderPath) : 'Project Brief'}</span>
+                    <span class="artifact-meta">Product Brief • <code>1-analysis/acl-product-brief/brief.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusBrief)}
+              </div>
+              <div class="dashboard-artifact-row" ${docPrd ? `onclick="openDocInStudio('${docPrd.id}')" style="cursor: pointer;"` : ''}>
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">📄</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">${docPrd ? formatFileDisplayName(docPrd.filename, docPrd.folderPath) : 'Project PRD'}</span>
+                    <span class="artifact-meta">Product Requirements Document • <code>2-plan-workflows/acl-prd/prd.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusPrd)}
+              </div>
+            </div>
+          </div>`;
+      }
+
+      function renderDesignPhaseCard(docUx, badgeUx, metaUx, docArch, statusArch) {
+        return `
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">🎨</div>
+                <div class="phase-title-text">
+                  <h3>Phase 2: Design</h3>
+                  <span>UX design and system architecture</span>
+                </div>
+              </div>
+            </div>
+            <div class="phase-card-body">
+              <div class="dashboard-artifact-row" ${docUx ? `onclick="openDocInStudio('${docUx.id}')" style="cursor: pointer;"` : ''}>
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">🎨</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">${docUx ? formatFileDisplayName(docUx.filename, docUx.folderPath) : 'Project Design'}</span>
+                    <span class="artifact-meta">${metaUx}</span>
+                  </div>
+                </div>
+                ${renderStatusBadge(badgeUx)}
+              </div>
+              <div class="dashboard-artifact-row" ${docArch ? `onclick="openDocInStudio('${docArch.id}')" style="cursor: pointer;"` : ''}>
+                <div class="artifact-row-left">
+                  <span class="artifact-icon">🏛️</span>
+                  <div class="artifact-info">
+                    <span class="artifact-filename">${docArch ? formatFileDisplayName(docArch.filename, docArch.folderPath) : 'Project Architecture'}</span>
+                    <span class="artifact-meta">System Architecture Spine • <code>3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md</code></span>
+                  </div>
+                </div>
+                ${renderStatusBadge(statusArch)}
+              </div>
+            </div>
+          </div>`;
+      }
+
+      function renderValidateAndReleasePhaseCard(testDocs) {
+        const docs = Array.isArray(testDocs) ? testDocs : [];
+        const rows =
+          docs.length === 0
+            ? '<div style="padding: 1rem 1.25rem; color: #94a3b8; font-size: 0.85rem; font-style: italic;">No QA or test deliverables present. Once <code>e2e-testing.md</code> is created in VS Code, it will automatically appear here.</div>'
+            : docs
+                .map((doc) => {
+                  const pathLabel = `${doc.folderPath || '_acl-output'}/${doc.filename}`;
+                  return `
+                <div class="dashboard-artifact-row" onclick="openDocInStudio('${doc.id}')" style="cursor: pointer;">
+                  <div class="artifact-row-left">
+                    <span class="artifact-icon">🧪</span>
+                    <div class="artifact-info">
+                      <span class="artifact-filename">${formatFileDisplayName(doc.filename, doc.folderPath, doc)}</span>
+                      <span class="artifact-meta">Testing • <code>${pathLabel}</code></span>
+                    </div>
+                  </div>
+                  ${renderStatusBadge(getNormStatus(doc))}
+                </div>`;
+                })
+                .join('');
+        return `
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">🧪</div>
+                <div class="phase-title-text">
+                  <h3>Phase 4: Validate & Release</h3>
+                  <span>Testing docs and e2e coverage when present</span>
+                </div>
+              </div>
+              ${docs.length > 0 ? `<span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Tests: ${docs.length}</span>` : ''}
+            </div>
+            <div class="phase-card-body">${rows}</div>
+          </div>`;
       }
 
       function getSpecDocs() {
@@ -4138,12 +4277,6 @@
         const statusPrd = docPrd ? getNormStatus(docPrd) : 'To Do';
         const prdApproved = statusPrd === 'Approved';
 
-        // Project Reconcile-Brief (reconcile-brief.md) - Conditional audit deliverable
-        const docReconcileBrief = getDoc(/reconcile-brief\.md/);
-        const hasReconcileBrief = Boolean(docReconcileBrief);
-        const statusReconcileBrief = docReconcileBrief ? getNormStatus(docReconcileBrief) : null;
-        const reconcileBriefApproved = !hasReconcileBrief || statusReconcileBrief === 'Approved';
-
         // Phase 2B: UX Design (DESIGN.md / EXPERIENCE.md / ux.md) - Weight: 5%
         const docUx = getDoc(/design\.md|experience\.md|ux\.md/);
         const hasUxDoc = Boolean(docUx);
@@ -4172,6 +4305,7 @@
 
         // Standalone Specs (Tier 1 specs present alongside Tier 2)
         const specDocs = getSpecDocs();
+        const testDocs = getTestDocs();
         const hasStandaloneSpecs = isBrownfieldTier2 && specDocs.length > 0;
         const approvedSpecDocsCount = specDocs.filter((d) => getNormStatus(d) === 'Approved').length;
         const allSpecsApproved = specDocs.length > 0 && approvedSpecDocsCount === specDocs.length;
@@ -4205,21 +4339,19 @@
           contextContrib + briefContrib + prdContrib + uxContrib + archContrib + epicsContrib + specContrib + phase4Contrib,
         );
 
-        // Summary Counts (6 phases if standalone specs exist in Tier 2, 5 for standard Tier 2, 4 for Greenfield)
+        // Summary Counts: Plan, Design, Build, Validate & Release (+ context for Brownfield Tier 2)
         let completedPhasesCount = 0;
-        const totalPhasesCount = isBrownfieldTier2 ? (hasStandaloneSpecs ? 6 : 5) : 4;
+        const totalPhasesCount = isBrownfieldTier2 ? 5 : 4;
         if (isBrownfieldTier2 && statusContext === 'Approved') completedPhasesCount++;
-        if (statusBrief === 'Approved') completedPhasesCount++;
-        if (statusPrd === 'Approved' && reconcileBriefApproved && (!hasUxDoc || statusUx === 'Approved')) completedPhasesCount++;
-        if (statusArch === 'Approved' && statusEpics === 'Approved') completedPhasesCount++;
-        if (totalStories > 0 && completedStories === totalStories) completedPhasesCount++;
-        if (hasStandaloneSpecs && allSpecsApproved) completedPhasesCount++;
+        if (statusBrief === 'Approved' && statusPrd === 'Approved') completedPhasesCount++;
+        if ((!hasUxDoc || statusUx === 'Approved') && statusArch === 'Approved') completedPhasesCount++;
+        if (epicsApproved && totalStories > 0 && completedStories === totalStories) completedPhasesCount++;
+        if (testDocs.length > 0 && testDocs.every((d) => getNormStatus(d) === 'Approved')) completedPhasesCount++;
 
         let needActionCount = 0;
         if (isBrownfieldTier2 && (statusContext === 'Rejected' || statusContext === 'Need Action')) needActionCount++;
         if (statusBrief === 'Rejected' || statusBrief === 'Need Action') needActionCount++;
         if (statusPrd === 'Rejected' || statusPrd === 'Need Action') needActionCount++;
-        if (hasReconcileBrief && (statusReconcileBrief === 'Rejected' || statusReconcileBrief === 'Need Action')) needActionCount++;
         if (statusUx === 'Rejected' || statusUx === 'Need Action') needActionCount++;
         if (statusArch === 'Rejected' || statusArch === 'Need Action') needActionCount++;
         if (statusEpics === 'Rejected' || statusEpics === 'Need Action') needActionCount++;
@@ -4230,6 +4362,10 @@
             if (s === 'Rejected' || s === 'Need Action') needActionCount++;
           });
         }
+        testDocs.forEach((d) => {
+          const s = getNormStatus(d);
+          if (s === 'Rejected' || s === 'Need Action') needActionCount++;
+        });
 
         if (parsedEpics.length > 0) {
           parsedEpics.forEach((ep) => {
@@ -4317,14 +4453,14 @@
               : ''
           }
 
-          <!-- Phase 1: Analysis -->
+          <!-- Phase 1: Plan -->
           <div class="phase-card">
             <div class="phase-card-header">
               <div class="phase-title-left">
                 <div class="phase-icon-badge">🔍</div>
                 <div class="phase-title-text">
-                  <h3>Phase 1: Discovery</h3>
-                  <span>Product brief, stakeholder goals, and initial problem discovery</span>
+                  <h3>Phase 1: Plan</h3>
+                  <span>Product brief and requirements</span>
                 </div>
               </div>
             </div>
@@ -4339,22 +4475,6 @@
                 </div>
                 ${renderStatusBadge(statusBrief)}
               </div>
-            </div>
-          </div>
-
-          <!-- Phase 2: Planning -->
-          <div class="phase-card">
-            <div class="phase-card-header">
-              <div class="phase-title-left">
-                <div class="phase-icon-badge">📋</div>
-                <div class="phase-title-text">
-                  <h3>Phase 2: Planning</h3>
-                  <span>Functional requirements, user journeys, and visual design specifications</span>
-                </div>
-              </div>
-            </div>
-            <div class="phase-card-body">
-              <!-- PRD -->
               <div class="dashboard-artifact-row" ${docPrd ? `onclick="openDocInStudio('${docPrd.id}')" style="cursor: pointer;"` : ''}>
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📄</span>
@@ -4365,26 +4485,21 @@
                 </div>
                 ${renderStatusBadge(statusPrd)}
               </div>
+            </div>
+          </div>
 
-              <!-- Project Reconcile-Brief (Conditional: only shown when generated) -->
-              ${
-                docReconcileBrief
-                  ? `
-              <div class="dashboard-artifact-row" onclick="openDocInStudio('${docReconcileBrief.id}')" style="cursor: pointer;">
-                <div class="artifact-row-left">
-                  <span class="artifact-icon">📋</span>
-                  <div class="artifact-info">
-                    <span class="artifact-filename">${formatFileDisplayName(docReconcileBrief.filename, docReconcileBrief.folderPath)}</span>
-                    <span class="artifact-meta">Brief Reconciliation Audit • <code>2-plan-workflows/acl-prd/reconcile-brief.md</code></span>
-                  </div>
+          <!-- Phase 2: Design -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">🎨</div>
+                <div class="phase-title-text">
+                  <h3>Phase 2: Design</h3>
+                  <span>UX design and system architecture</span>
                 </div>
-                ${renderStatusBadge(statusReconcileBrief)}
               </div>
-              `
-                  : ''
-              }
-
-              <!-- UX Design -->
+            </div>
+            <div class="phase-card-body">
               <div class="dashboard-artifact-row" ${docUx ? `onclick="openDocInStudio('${docUx.id}')" style="cursor: pointer;"` : ''}>
                 <div class="artifact-row-left">
                   <span class="artifact-icon">🎨</span>
@@ -4395,22 +4510,6 @@
                 </div>
                 ${renderStatusBadge(badgeUx)}
               </div>
-            </div>
-          </div>
-
-          <!-- Phase 3: Solutioning -->
-          <div class="phase-card">
-            <div class="phase-card-header">
-              <div class="phase-title-left">
-                <div class="phase-icon-badge">🏛️</div>
-                <div class="phase-title-text">
-                  <h3>Phase 3: Solutioning</h3>
-                  <span>System architecture contracts, technical spines, and epics breakdown</span>
-                </div>
-              </div>
-            </div>
-            <div class="phase-card-body">
-              <!-- Architecture -->
               <div class="dashboard-artifact-row" ${docArch ? `onclick="openDocInStudio('${docArch.id}')" style="cursor: pointer;"` : ''}>
                 <div class="artifact-row-left">
                   <span class="artifact-icon">🏛️</span>
@@ -4421,8 +4520,22 @@
                 </div>
                 ${renderStatusBadge(statusArch)}
               </div>
+            </div>
+          </div>
 
-              <!-- Epics & Stories Breakdown -->
+          <!-- Phase 3: Build -->
+          <div class="phase-card">
+            <div class="phase-card-header">
+              <div class="phase-title-left">
+                <div class="phase-icon-badge">💻</div>
+                <div class="phase-title-text">
+                  <h3>Phase 3: Build</h3>
+                  <span>Epics, stories, and implementation backlog</span>
+                </div>
+              </div>
+              ${parsedEpics.length > 0 ? `<span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Epics: ${parsedEpics.length}</span>` : ''}
+            </div>
+            <div class="phase-card-body">
               <div class="dashboard-artifact-row" ${docEpics ? `onclick="openDocInStudio('${docEpics.id}')" style="cursor: pointer;"` : ''}>
                 <div class="artifact-row-left">
                   <span class="artifact-icon">📋</span>
@@ -4433,22 +4546,6 @@
                 </div>
                 ${renderStatusBadge(statusEpics)}
               </div>
-            </div>
-          </div>
-
-          <!-- Phase 4: Implementation (Dynamic Backlog) -->
-          <div class="phase-card">
-            <div class="phase-card-header">
-              <div class="phase-title-left">
-                <div class="phase-icon-badge">💻</div>
-                <div class="phase-title-text">
-                  <h3>Phase 4: Implementation</h3>
-                  <span>Autonomous development, story execution, tests, and verification</span>
-                </div>
-              </div>
-              ${parsedEpics.length > 0 ? `<span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Epics: ${parsedEpics.length}</span>` : ''}
-            </div>
-            <div class="phase-card-body">
               ${
                 isPhase4Locked
                   ? `
@@ -4457,7 +4554,7 @@
                     <div class="phase4-callout-content">
                       <h4>Epics and stories need to be created to implement</h4>
                       <p>
-                        Implementation is currently in To Do because Phase 3B (<code>epics.md</code>) has not yet been approved.
+                        Implementation is currently in To Do because <code>epics.md</code> has not yet been approved.
                         Once your manager approves the Epics & Stories breakdown in Markdown Studio, all individual epics and
                         stories will automatically populate here with real-time status and completion tracking.
                       </p>
@@ -4466,7 +4563,7 @@
                   `
                   : parsedEpics.length > 0
                     ? `
-                  <div style="margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; color: #475569;">
+                  <div style="margin: 0.75rem 0; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; color: #475569;">
                     <span>Implementation Progress: <strong>${completedStories} / ${totalStories} Stories Completed</strong></span>
                     <span style="font-size: 0.75rem; color: #64748b;">Click an Epic to view its stories</span>
                   </div>
@@ -4507,7 +4604,7 @@
                   <div class="phase4-callout-card" style="background: #f0fdf4; border-color: #bbf7d0;">
                     <span class="phase4-callout-icon" style="color: #16a34a;">✔</span>
                     <div class="phase4-callout-content">
-                      <h4 style="color: #15803d;">Phase 3B Approved — Ready for Story Dispatch</h4>
+                      <h4 style="color: #15803d;">Epics approved — Ready for Story Dispatch</h4>
                       <p style="color: #166534;">
                         <code>epics.md</code> is Approved! As implementation stories are executed and checked off, they will appear here dynamically.
                       </p>
@@ -4515,27 +4612,11 @@
                   </div>
                   `
               }
-          </div>
-
-          ${
-            hasStandaloneSpecs
-              ? `
-          <!-- Standalone Spec Implementation (Below Phase 4) -->
-          <div class="phase-card">
-            <div class="phase-card-header">
-              <div class="phase-title-left">
-                <div class="phase-icon-badge">⚡</div>
-                <div class="phase-title-text">
-                  <h3>Standalone Spec Implementation</h3>
-                  <span>Self-contained feature specifications and technical deliverables</span>
-                </div>
-              </div>
-              <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
-            </div>
-            <div class="phase-card-body">
-              ${specDocs
-                .map(
-                  (doc) => `
+              ${
+                hasStandaloneSpecs
+                  ? specDocs
+                      .map(
+                        (doc) => `
                 <div class="dashboard-artifact-row" onclick="openDocInStudio('${doc.id}')" style="cursor: pointer;">
                   <div class="artifact-row-left">
                     <span class="artifact-icon">📄</span>
@@ -4547,13 +4628,14 @@
                   ${renderStatusBadge(getNormStatus(doc))}
                 </div>
               `,
-                )
-                .join('')}
+                      )
+                      .join('')
+                  : ''
+              }
             </div>
           </div>
-          `
-              : ''
-          }
+
+          ${renderValidateAndReleasePhaseCard(testDocs)}
         </div>
 
         <!-- Footer -->
@@ -4641,59 +4723,35 @@
           return;
         }
 
-        // Tier 2 (Brownfield) or Greenfield: Full Scrum Master dashboard
+        // Tier 2 (Brownfield) or Greenfield: Scrum Master — epics and stories only
         const docEpics = getDoc(/epics\.md$/);
-        const specDocs = isBrownfield ? getSpecDocs() : [];
-        const approvedSpecsCount = specDocs.filter((d) => getNormStatus(d) === 'Approved').length;
-        const docPrd = getDoc('prd.md');
-        const statusPrd = docPrd ? getNormStatus(docPrd) : 'To Do';
-        const docReconcileBrief = getDoc(/reconcile-brief\.md/);
-        const statusReconcileBrief = docReconcileBrief ? getNormStatus(docReconcileBrief) : null;
-        const docUx = getDoc(/design\.md|experience\.md|ux\.md/);
-        const hasUxDoc = Boolean(docUx);
-        const statusUx = docUx ? getNormStatus(docUx) : 'To Do';
-        const badgeUx = hasUxDoc ? statusUx : isBrownfield ? 'Optional' : 'To Do';
-        const metaUx = hasUxDoc
-          ? 'UX Design Tokens & Interactions • <code>2-plan-workflows/acl-ux/DESIGN.md</code>'
-          : isBrownfield
-            ? 'UX Design Specs • <em>Optional (covered in PRD or Spec if omitted)</em>'
-            : 'UX Design Specs • <code>2-plan-workflows/acl-ux/DESIGN.md</code>';
         let parsedEpics = [];
         let totalStories = 0;
         let completedStories = 0;
-        let isPhase4Locked = false;
+        let completedEpicsCount = 0;
 
-        const epicsApproved = docEpics && (docEpics.status === 'Accepted' || docEpics.status === 'Approved');
-        isPhase4Locked = !epicsApproved;
-
-        if (epicsApproved && docEpics && docEpics.content) {
+        if (docEpics && docEpics.content) {
           parsedEpics = parseEpicsAndStoriesFromMarkdown(docEpics.content, files);
           parsedEpics.forEach((ep) => {
+            let epicStoriesTotal = 0;
+            let epicStoriesDone = 0;
             ep.stories.forEach((st) => {
               totalStories++;
-              if (st.isCompleted || st.status === 'Approved') completedStories++;
+              epicStoriesTotal++;
+              if (st.isCompleted || st.status === 'Approved') {
+                completedStories++;
+                epicStoriesDone++;
+              }
             });
-          });
-        }
-
-        let completedEpicsCount = 0;
-        if (parsedEpics.length > 0) {
-          parsedEpics.forEach((ep) => {
-            if (ep.stories.length > 0 && ep.stories.every((st) => st.isCompleted || st.status === 'Approved')) {
+            if (epicStoriesTotal > 0 && epicStoriesDone === epicStoriesTotal) {
               completedEpicsCount++;
             }
           });
         }
 
         let implementationProgress = 0;
-        if (totalStories > 0 && specDocs.length > 0) {
-          implementationProgress = Math.round(
-            ((completedStories / totalStories) * 0.7 + (approvedSpecsCount / specDocs.length) * 0.3) * 100,
-          );
-        } else if (totalStories > 0) {
+        if (totalStories > 0) {
           implementationProgress = Math.round((completedStories / totalStories) * 100);
-        } else if (specDocs.length > 0) {
-          implementationProgress = Math.round((approvedSpecsCount / specDocs.length) * 100);
         }
 
         if (!docEpics || parsedEpics.length === 0) {
@@ -4715,50 +4773,10 @@
               <h3 style="font-size: 1rem; font-weight: 800; color: #92400e; margin-bottom: 0.35rem;">epics.md needs to be generated in order to display the epics and stories</h3>
               <p style="font-size: 0.85rem; color: #b45309; line-height: 1.5;">
                 No epics or user stories were found in <code>_acl-output/</code>.
-                Once Phase 3B (<code>epics.md</code>) is generated and approved in Markdown Studio, all epics, stories, and implementation velocity metrics will automatically populate here.
+                Once <code>epics.md</code> is generated and approved in Markdown Studio, all epics and stories will automatically populate here.
               </p>
             </div>
           </div>
-
-          ${
-            specDocs.length > 0
-              ? `
-          <!-- Standalone Spec Implementation (Below Backlog notice) -->
-          <div class="dashboard-phases-container" style="margin-top: 1rem;">
-            <div class="phase-card">
-              <div class="phase-card-header">
-                <div class="phase-title-left">
-                  <div class="phase-icon-badge">⚡</div>
-                  <div class="phase-title-text">
-                    <h3>Standalone Spec Implementation</h3>
-                    <span>Self-contained feature specifications and sprint deliverable tracking</span>
-                  </div>
-                </div>
-                <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
-              </div>
-              <div class="phase-card-body">
-                ${specDocs
-                  .map(
-                    (doc) => `
-                  <div class="dashboard-artifact-row" onclick="openDocInStudio('${doc.id}')" style="cursor: pointer;">
-                    <div class="artifact-row-left">
-                      <span class="artifact-icon">📄</span>
-                      <div class="artifact-info">
-                        <span class="artifact-filename">${formatFileDisplayName(doc.filename, doc.folderPath, doc)}</span>
-                        <span class="artifact-meta">Sprint Spec Deliverable • <code>${doc.folderPath}/${doc.filename}</code></span>
-                      </div>
-                    </div>
-                    ${renderStatusBadge(getNormStatus(doc))}
-                  </div>
-                `,
-                  )
-                  .join('')}
-              </div>
-            </div>
-          </div>
-          `
-              : ''
-          }
 
           <!-- Footer -->
           <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1.5rem;">
@@ -4789,11 +4807,11 @@
             </div>
             <div class="progress-bar-subtext">
               <span>Total Deliverables Progress</span>
-              <span>${completedStories} of ${totalStories} Stories${specDocs.length > 0 ? ` • ${approvedSpecsCount} of ${specDocs.length} Standalone Specs Approved` : ' Completed'}</span>
+              <span>${completedStories} of ${totalStories} Stories Completed</span>
             </div>
           </div>
 
-          <!-- Quick Summary Stats Grid (Epics, Stories, and Standalone Specs if present) -->
+          <!-- Quick Summary Stats Grid (Epics and Stories only) -->
           <div class="dashboard-stats-grid">
             <div class="stat-card">
               <div class="stat-card-label">Epics</div>
@@ -4809,94 +4827,25 @@
                 <span class="stat-unit">Completed</span>
               </div>
             </div>
-            ${
-              specDocs.length > 0
-                ? `
-            <div class="stat-card">
-              <div class="stat-card-label">Specs</div>
-              <div class="stat-card-value-col">
-                <span class="stat-number" style="color: #0891b2;">${approvedSpecsCount}/${specDocs.length}</span>
-                <span class="stat-unit">Approved</span>
-              </div>
-            </div>
-            `
-                : ''
-            }
           </div>
         </div>
 
-        <!-- Implementation Epics & Stories Section -->
+        <!-- Epics & Stories -->
         <div class="dashboard-phases-container">
-          <!-- Phase 2: Planning Deliverables -->
           <div class="phase-card">
             <div class="phase-card-header">
               <div class="phase-title-left">
-                <div class="phase-icon-badge">📋</div>
+                <div class="phase-icon-badge">📦</div>
                 <div class="phase-title-text">
-                  <h3>Phase 2: Planning</h3>
-                  <span>Sprint requirements, PRD functional specifications, and UX design assets</span>
-                </div>
-              </div>
-            </div>
-            <div class="phase-card-body">
-              <!-- PRD -->
-              <div class="dashboard-artifact-row" ${docPrd ? `onclick="openDocInStudio('${docPrd.id}')" style="cursor: pointer;"` : ''}>
-                <div class="artifact-row-left">
-                  <span class="artifact-icon">📄</span>
-                  <div class="artifact-info">
-                    <span class="artifact-filename">${docPrd ? formatFileDisplayName(docPrd.filename, docPrd.folderPath) : 'Project PRD'}</span>
-                    <span class="artifact-meta">Product Requirements • <code>2-plan-workflows/acl-prd/prd.md</code></span>
-                  </div>
-                </div>
-                ${renderStatusBadge(statusPrd)}
-              </div>
-
-              <!-- Project Reconcile-Brief (Conditional: only shown when generated) -->
-              ${
-                docReconcileBrief
-                  ? `
-              <div class="dashboard-artifact-row" onclick="openDocInStudio('${docReconcileBrief.id}')" style="cursor: pointer;">
-                <div class="artifact-row-left">
-                  <span class="artifact-icon">📋</span>
-                  <div class="artifact-info">
-                    <span class="artifact-filename">${formatFileDisplayName(docReconcileBrief.filename, docReconcileBrief.folderPath)}</span>
-                    <span class="artifact-meta">Brief Reconciliation • <code>2-plan-workflows/acl-prd/reconcile-brief.md</code></span>
-                  </div>
-                </div>
-                ${renderStatusBadge(statusReconcileBrief)}
-              </div>
-              `
-                  : ''
-              }
-
-              <!-- UX Design -->
-              <div class="dashboard-artifact-row" ${docUx ? `onclick="openDocInStudio('${docUx.id}')" style="cursor: pointer;"` : ''}>
-                <div class="artifact-row-left">
-                  <span class="artifact-icon">🎨</span>
-                  <div class="artifact-info">
-                    <span class="artifact-filename">${docUx ? formatFileDisplayName(docUx.filename, docUx.folderPath) : 'Project Design'}</span>
-                    <span class="artifact-meta">${metaUx}</span>
-                  </div>
-                </div>
-                ${renderStatusBadge(badgeUx)}
-              </div>
-            </div>
-          </div>
-
-          <div class="phase-card">
-            <div class="phase-card-header">
-              <div class="phase-title-left">
-                <div class="phase-icon-badge">💻</div>
-                <div class="phase-title-text">
-                  <h3>Phase 4: Implementation</h3>
-                  <span>User stories, task execution, tests, and deliverable status</span>
+                  <h3>Epics & Stories</h3>
+                  <span>Sprint delivery backlog</span>
                 </div>
               </div>
               <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Epics: ${parsedEpics.length}</span>
             </div>
             <div class="phase-card-body">
               <div style="margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; color: #475569;">
-                <span>Implementation Progress: <strong>${completedStories} / ${totalStories} Stories Completed</strong></span>
+                <span>Progress: <strong>${completedStories} / ${totalStories} Stories Completed</strong></span>
                 <span style="font-size: 0.75rem; color: #64748b;">Click an Epic to view its stories</span>
               </div>
               <div class="epics-tree-container">
@@ -4933,44 +4882,6 @@
               </div>
             </div>
           </div>
-
-          ${
-            specDocs.length > 0
-              ? `
-          <!-- Standalone Spec Implementation (Below Implementation Backlog) -->
-          <div class="phase-card">
-            <div class="phase-card-header">
-              <div class="phase-title-left">
-                <div class="phase-icon-badge">⚡</div>
-                <div class="phase-title-text">
-                  <h3>Standalone Spec Implementation</h3>
-                  <span>Self-contained feature specifications and sprint deliverable tracking</span>
-                </div>
-              </div>
-              <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Specs: ${specDocs.length}</span>
-            </div>
-            <div class="phase-card-body">
-              ${specDocs
-                .map(
-                  (doc) => `
-                <div class="dashboard-artifact-row" onclick="openDocInStudio('${doc.id}')" style="cursor: pointer;">
-                  <div class="artifact-row-left">
-                    <span class="artifact-icon">📄</span>
-                    <div class="artifact-info">
-                      <span class="artifact-filename">${formatFileDisplayName(doc.filename, doc.folderPath, doc)}</span>
-                      <span class="artifact-meta">Sprint Spec Deliverable • <code>${doc.folderPath}/${doc.filename}</code></span>
-                    </div>
-                  </div>
-                  ${renderStatusBadge(getNormStatus(doc))}
-                </div>
-              `,
-                )
-                .join('')}
-            </div>
-          </div>
-          `
-              : ''
-          }
         </div>
 
         <!-- Footer -->
@@ -5102,19 +5013,8 @@
           return;
         }
 
-        // Tier 2 (Brownfield) or Greenfield: Full Developer dashboard (Epics and Stories only)
+        // Tier 2 (Brownfield) or Greenfield: Developer — epics, stories, and acceptance criteria
         const docEpics = getDoc(/epics\.md$/);
-        const docArch = getDoc(/architecture-spine\.md|architecture\.md/);
-        const statusArch = docArch ? getNormStatus(docArch) : 'To Do';
-        const docUx = getDoc(/design\.md|experience\.md|ux\.md/);
-        const hasUxDoc = Boolean(docUx);
-        const statusUx = docUx ? getNormStatus(docUx) : 'To Do';
-        const badgeUx = hasUxDoc ? statusUx : isBrownfield ? 'Optional' : 'To Do';
-        const metaUx = hasUxDoc
-          ? 'UX Design Tokens & Interactions • <code>2-plan-workflows/acl-ux/DESIGN.md</code>'
-          : isBrownfield
-            ? 'UX Design Specs • <em>Optional (covered in PRD or Spec if omitted)</em>'
-            : 'UX Design Specs • <code>2-plan-workflows/acl-ux/DESIGN.md</code>';
         let parsedEpics = [];
         let totalStories = 0;
         let completedStories = 0;
@@ -5164,7 +5064,7 @@
               <h3 style="font-size: 1rem; font-weight: 800; color: #92400e; margin-bottom: 0.35rem;">epics.md needs to be generated in order to display the epics and stories</h3>
               <p style="font-size: 0.85rem; color: #b45309; line-height: 1.5;">
                 No epics or user stories were found in <code>_acl-output/</code>.
-                Once Phase 3B (<code>epics.md</code>) is generated and approved in Markdown Studio, all epics, stories, and engineering acceptance criteria will automatically populate here.
+                Once <code>epics.md</code> is generated and approved in Markdown Studio, all epics, stories, and acceptance criteria will automatically populate here.
               </p>
             </div>
           </div>
@@ -5221,60 +5121,22 @@
           </div>
         </div>
 
-        <!-- Implementation Epics & Stories Section (with Story-Level AC Accordion) -->
+        <!-- Epics, Stories & Acceptance Criteria -->
         <div class="dashboard-phases-container">
-          <!-- Phase 2 & 3: Planning & Solutioning Specifications -->
-          <div class="phase-card">
-            <div class="phase-card-header">
-              <div class="phase-title-left">
-                <div class="phase-icon-badge">🎨</div>
-                <div class="phase-title-text">
-                  <h3>Phase 2 & 3: Planning & Solutioning</h3>
-                  <span>Visual design tokens, interaction patterns, and system architecture contracts</span>
-                </div>
-              </div>
-            </div>
-            <div class="phase-card-body">
-              <!-- UX Design -->
-              <div class="dashboard-artifact-row" ${docUx ? `onclick="openDocInStudio('${docUx.id}')" style="cursor: pointer;"` : ''}>
-                <div class="artifact-row-left">
-                  <span class="artifact-icon">🎨</span>
-                  <div class="artifact-info">
-                    <span class="artifact-filename">${docUx ? formatFileDisplayName(docUx.filename, docUx.folderPath) : 'Project Design'}</span>
-                    <span class="artifact-meta">${metaUx}</span>
-                  </div>
-                </div>
-                ${renderStatusBadge(badgeUx)}
-              </div>
-
-              <!-- Architecture Spine -->
-              <div class="dashboard-artifact-row" ${docArch ? `onclick="openDocInStudio('${docArch.id}')" style="cursor: pointer;"` : ''}>
-                <div class="artifact-row-left">
-                  <span class="artifact-icon">🏛️</span>
-                  <div class="artifact-info">
-                    <span class="artifact-filename">${docArch ? formatFileDisplayName(docArch.filename, docArch.folderPath) : 'Project Architecture'}</span>
-                    <span class="artifact-meta">System Architecture Spine • <code>3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md</code></span>
-                  </div>
-                </div>
-                ${renderStatusBadge(statusArch)}
-              </div>
-            </div>
-          </div>
-
           <div class="phase-card">
             <div class="phase-card-header">
               <div class="phase-title-left">
                 <div class="phase-icon-badge">💻</div>
                 <div class="phase-title-text">
-                  <h3>Phase 4: Implementation</h3>
-                  <span>User stories, technical contracts, and acceptance criteria</span>
+                  <h3>Epics & Stories</h3>
+                  <span>Click a story to view its acceptance criteria</span>
                 </div>
               </div>
               <span style="font-size: 0.8rem; font-weight: 700; color: #475569; background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #cbd5e1;">Total Epics: ${parsedEpics.length}</span>
             </div>
             <div class="phase-card-body">
               <div style="margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; color: #475569;">
-                <span>Implementation Progress: <strong>${completedStories} / ${totalStories} Stories Completed</strong></span>
+                <span>Progress: <strong>${completedStories} / ${totalStories} Stories Completed</strong></span>
                 <span style="font-size: 0.75rem; color: #64748b;">Click a Story to view its Acceptance Criteria</span>
               </div>
               <div class="epics-tree-container">
