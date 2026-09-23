@@ -2722,41 +2722,93 @@
         if (!folderPath) return 'Project Context';
         const lower = folderPath.toLowerCase();
 
-        const filenames = (folderFiles || []).map((f) => (f.filename || '').toLowerCase());
-        const hasBrief = filenames.some((n) => n === 'brief.md' || n.includes('brief'));
-        const hasPrd = filenames.some((n) => n === 'prd.md' || n.includes('prd'));
-        const hasArch = filenames.some((n) => n.includes('architecture') || n.includes('spine'));
-        const hasUx = filenames.some((n) => n.includes('ux') || n.includes('design') || n.includes('experience') || n.includes('figma'));
-        const hasEpics = filenames.some((n) => n === 'epics.md' || n.includes('epics'));
-        const hasStoriesOrSpecs = filenames.some((n) => n.startsWith('story-') || n.startsWith('spec-') || n.startsWith('step-'));
-        const hasQA = filenames.some((n) => n === 'e2e-testing.md' || n === 'qa.md' || n.includes('e2e') || n.includes('testing') || n.startsWith('test-'));
-
-        if (hasBrief || lower.includes('brief') || lower.includes('1-analysis')) {
-          return 'Project Brief';
-        }
-        if (hasPrd || lower.includes('prd') || lower.includes('2-plan')) {
-          return 'Project PRD';
-        }
-        if (hasArch || lower.includes('architecture') || lower.includes('spine')) {
-          return 'Project Architecture';
-        }
-        if (hasUx || lower.includes('ux') || lower.includes('design') || lower.includes('figma')) {
-          return 'Project UX & Design';
-        }
-        if (hasEpics || lower.includes('epic')) {
-          return 'Project Epics & Stories';
-        }
+        // 1. PHYSICAL FOLDER PATH PRIORITY (Option 1)
+        // If the file lives in the implementation folder, it ALWAYS belongs to Project Implementation
         if (
-          hasStoriesOrSpecs ||
           lower.includes('implementation') ||
           lower.includes('4-implementation') ||
           lower.includes('dev-auto')
         ) {
           return 'Project Implementation';
         }
-        if (hasQA || lower.includes('qa') || lower.includes('testing') || lower.includes('e2e') || lower.includes('validate')) {
+
+        // If the file lives in QA / Testing folder, it ALWAYS belongs to Project QA
+        if (
+          lower.includes('qa') ||
+          lower.includes('e2e') ||
+          lower.includes('test') ||
+          lower.includes('validate')
+        ) {
           return 'Project QA';
         }
+
+        // If the file lives in Solutioning / Epics folder, it ALWAYS belongs to Project Epics & Stories
+        if (
+          lower.includes('acl-create-epics') ||
+          lower.includes('epics-and-stories') ||
+          lower.includes('3b-') ||
+          (lower.includes('3-solutioning') && !lower.includes('architecture'))
+        ) {
+          return 'Project Epics & Stories';
+        }
+
+        // If the file lives in Architecture folder, it ALWAYS belongs to Project Architecture
+        if (
+          lower.includes('acl-architecture') ||
+          lower.includes('architecture') ||
+          lower.includes('3a-') ||
+          lower.includes('spine')
+        ) {
+          return 'Project Architecture';
+        }
+
+        // If the file lives in UX / Design folder, it ALWAYS belongs to Project UX & Design
+        if (
+          lower.includes('ux-designs') ||
+          lower.includes('ux') ||
+          lower.includes('design') ||
+          lower.includes('figma') ||
+          lower.includes('experience')
+        ) {
+          return 'Project UX & Design';
+        }
+
+        // If the file lives in PRD / Planning folder, it ALWAYS belongs to Project PRD
+        if (
+          lower.includes('acl-prd') ||
+          lower.includes('prd') ||
+          lower.includes('2-plan')
+        ) {
+          return 'Project PRD';
+        }
+
+        // If the file lives in Analysis / Product Brief folder, it ALWAYS belongs to Project Brief
+        if (
+          lower.includes('acl-product-brief') ||
+          lower.includes('product-brief') ||
+          lower.includes('1-analysis') ||
+          lower.includes('brief')
+        ) {
+          return 'Project Brief';
+        }
+
+        // 2. FALLBACK BY FILENAME (for root _acl-output/ or flat folder structures)
+        const filenames = (folderFiles || []).map((f) => (f.filename || '').toLowerCase());
+        const hasBrief = filenames.some((n) => n === 'brief.md' || n.startsWith('brief-') || n.includes('product-brief'));
+        const hasPrd = filenames.some((n) => n === 'prd.md' || n.startsWith('prd-') || n.includes('reconcile-brief'));
+        const hasArch = filenames.some((n) => n.includes('architecture') || n.includes('spine'));
+        const hasUx = filenames.some((n) => n === 'ux.md' || n.startsWith('ux-') || n === 'design.md' || n.includes('experience') || n.includes('figma'));
+        const hasEpics = filenames.some((n) => n === 'epics.md' || n.startsWith('epics-'));
+        const hasStoriesOrSpecs = filenames.some((n) => n.startsWith('story-') || n.startsWith('spec-') || n.startsWith('step-'));
+        const hasQA = filenames.some((n) => n === 'e2e-testing.md' || n === 'qa.md' || n.startsWith('test-'));
+
+        if (hasStoriesOrSpecs) return 'Project Implementation';
+        if (hasQA) return 'Project QA';
+        if (hasEpics) return 'Project Epics & Stories';
+        if (hasArch) return 'Project Architecture';
+        if (hasUx) return 'Project UX & Design';
+        if (hasPrd) return 'Project PRD';
+        if (hasBrief) return 'Project Brief';
 
         if (
           lower.includes('context') ||
@@ -2822,43 +2874,51 @@
       function formatFileDisplayName(filename, folderPath = '', doc = null) {
         if (!filename) return '';
         const lower = filename.toLowerCase();
+        const folderLower = (folderPath || '').toLowerCase();
+        const isImplementationFolder =
+          folderLower.includes('implementation') ||
+          folderLower.includes('4-implementation') ||
+          folderLower.includes('dev-auto');
 
-        // Project Brief
-        if (lower === 'brief.md' || lower.startsWith('brief-') || lower.includes('product-brief')) {
-          return 'Project Brief';
-        }
+        // If inside implementation folder, prevent accidental hijacking by UX/Architecture/Brief/PRD keywords
+        if (!isImplementationFolder) {
+          // Project Brief
+          if (lower === 'brief.md' || lower.startsWith('brief-') || lower.includes('product-brief')) {
+            return 'Project Brief';
+          }
 
-        // PRD
-        if (lower === 'prd.md' || lower.startsWith('prd-')) {
-          return 'Project PRD';
-        }
+          // PRD
+          if (lower === 'prd.md' || lower.startsWith('prd-')) {
+            return 'Project PRD';
+          }
 
-        // Context
-        if (lower === 'project-context.md' || lower.includes('context')) {
-          return 'Project Context';
-        }
+          // Context - only exact project-context.md or context.md
+          if (lower === 'project-context.md' || lower === 'context.md') {
+            return 'Project Context';
+          }
 
-        // Architecture
-        if (lower.includes('architecture') || lower.includes('spine')) {
-          return 'Project Architecture';
-        }
+          // Architecture
+          if (lower.includes('architecture') || lower.includes('spine')) {
+            return 'Project Architecture';
+          }
 
-        // Project QA / E2E Testing
-        if (lower === 'e2e-testing.md' || lower === 'qa.md' || lower.includes('e2e') || lower.includes('testing')) {
-          return 'Project QA';
-        }
+          // Project QA / E2E Testing
+          if (lower === 'e2e-testing.md' || lower === 'qa.md' || lower.includes('e2e') || lower.includes('testing')) {
+            return 'Project QA';
+          }
 
-        // UX / Design / Experience
-        if (lower.includes('experience')) {
-          return 'Project Experience';
-        }
-        if (lower === 'ux.md' || lower.includes('ux-') || lower.includes('design')) {
-          return 'Project Design';
-        }
+          // UX / Design / Experience
+          if (lower.includes('experience')) {
+            return 'Project Experience';
+          }
+          if (lower === 'ux.md' || lower.startsWith('ux-') || lower.includes('design')) {
+            return 'Project Design';
+          }
 
-        // Epics
-        if (lower === 'epics.md' || lower.includes('epics')) {
-          return 'Project Epics & Stories';
+          // Epics
+          if (lower === 'epics.md' || lower.includes('epics')) {
+            return 'Project Epics & Stories';
+          }
         }
 
         // Story files & Implementation specs: story-1-1.md, story-1.1.md, spec-1-2-...
@@ -2903,10 +2963,14 @@
           return `Spec: ${formattedSpec}`;
         }
 
-        // Generic markdown fallback: strip .md and clean up
+        // Generic markdown fallback: strip .md and title-case words
         if (filename.endsWith('.md')) {
           const base = filename.slice(0, -3).replace(/[-_]+/g, ' ');
-          return base.charAt(0).toUpperCase() + base.slice(1);
+          return base
+            .split(' ')
+            .filter(Boolean)
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
         }
 
         return filename;
