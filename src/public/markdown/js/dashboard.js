@@ -713,19 +713,25 @@ function renderDeliveryDashboard() {
                         </div>
                         <div class="stories-list">
                           ${epic.stories
-                            .map(
-                              (story) => `
-                            <div class="story-item" ${story.fileId ? `onclick="openDocInStudio('${story.fileId}')" style="cursor: pointer;"` : ''}>
+                            .map((story) => {
+                              const targetFileId = story.fileId || (docEpics ? docEpics.id : '');
+                              const targetLabel = story.fileId
+                                ? formatFileDisplayName(story.filename)
+                                : story.num
+                                  ? `Story ${story.num}`
+                                  : 'Studio';
+                              return `
+                            <div class="story-item" ${targetFileId ? `onclick="openDocInStudio('${targetFileId}')" style="cursor: pointer;"` : ''}>
                               <div class="story-item-left">
                                 <span>${story.isCompleted ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' || story.status === 'Need Action' ? '🔴' : '🔹'}</span>
                                 <span style="font-weight: 600; color: #1e293b;">${story.num ? `Story ${story.num}: ` : ''}${formatStoryTitle(story.title)}</span>
                               </div>
                               <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 ${
-                                  story.fileId
+                                  targetFileId
                                     ? `
-                                  <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${story.fileId}')" title="Open ${story.filename} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
-                                    <span>📄</span> <span>${formatFileDisplayName(story.filename)}</span>
+                                  <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${targetFileId}')" title="Open ${story.filename || 'epics.md'} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
+                                    <span>📄</span> <span>${targetLabel}</span>
                                   </button>
                                 `
                                     : ''
@@ -733,8 +739,8 @@ function renderDeliveryDashboard() {
                                 ${renderStatusBadge(story.status)}
                               </div>
                             </div>
-                          `,
-                            )
+                          `;
+                            })
                             .join('')}
                         </div>
                       </div>
@@ -1005,19 +1011,25 @@ function renderScrumMasterDashboard() {
                     </div>
                     <div class="stories-list">
                       ${epic.stories
-                        .map(
-                          (story) => `
-                        <div class="story-item" ${story.fileId ? `onclick="openDocInStudio('${story.fileId}')" style="cursor: pointer;"` : ''}>
+                        .map((story) => {
+                          const targetFileId = story.fileId || (docEpics ? docEpics.id : '');
+                          const targetLabel = story.fileId
+                            ? formatFileDisplayName(story.filename)
+                            : story.num
+                              ? `Story ${story.num}`
+                              : 'Studio';
+                          return `
+                        <div class="story-item" ${targetFileId ? `onclick="openDocInStudio('${targetFileId}')" style="cursor: pointer;"` : ''}>
                           <div class="story-item-left">
                             <span>${story.isCompleted || story.status === 'Approved' ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' || story.status === 'Need Action' ? '🔴' : '🔹'}</span>
                             <span style="font-weight: 600; color: #1e293b;">${story.num ? `Story ${story.num}: ` : ''}${formatStoryTitle(story.title)}</span>
                           </div>
                           <div style="display: flex; align-items: center; gap: 0.5rem;">
                             ${
-                              story.fileId
+                              targetFileId
                                 ? `
-                              <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${story.fileId}')" title="Open ${story.filename} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
-                                <span>📄</span> <span>${formatFileDisplayName(story.filename)}</span>
+                              <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${targetFileId}')" title="Open ${story.filename || 'epics.md'} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
+                                <span>📄</span> <span>${targetLabel}</span>
                               </button>
                             `
                                 : ''
@@ -1025,8 +1037,8 @@ function renderScrumMasterDashboard() {
                             ${renderStatusBadge(story.status)}
                           </div>
                         </div>
-                      `,
-                        )
+                      `;
+                        })
                         .join('')}
                     </div>
                   </div>
@@ -1311,6 +1323,12 @@ function renderDeveloperDashboard() {
                           const sKey = `epic-${eIdx}-story-${sIdx}`;
                           const hasAC = Array.isArray(story.acceptanceCriteria) && story.acceptanceCriteria.length > 0;
                           const isOpen = openStoryKey === sKey;
+                          const targetFileId = story.fileId || (docEpics ? docEpics.id : '');
+                          const targetLabel = story.fileId
+                            ? formatFileDisplayName(story.filename)
+                            : story.num
+                              ? `Story ${story.num}`
+                              : 'Studio';
                           return `
                           <div class="story-accordion-item ${isOpen ? 'open' : ''}" data-story-key="${sKey}">
                             <div class="story-accordion-header" onclick="toggleStoryAccordion('${sKey}')">
@@ -1321,10 +1339,10 @@ function renderDeveloperDashboard() {
                               </div>
                               <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 ${
-                                  story.fileId
+                                  targetFileId
                                     ? `
-                                  <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${story.fileId}')" title="Open ${story.filename} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
-                                    <span>📄</span> <span>${formatFileDisplayName(story.filename)}</span>
+                                  <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${targetFileId}')" title="Open ${story.filename || 'epics.md'} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
+                                    <span>📄</span> <span>${targetLabel}</span>
                                   </button>
                                 `
                                     : ''
@@ -1340,10 +1358,10 @@ function renderDeveloperDashboard() {
                                     <span style="font-weight: 700; color: #1e293b;">Acceptance Criteria Checklist</span>
                                   </div>
                                   ${
-                                    story.fileId
+                                    targetFileId
                                       ? `
-                                    <a href="javascript:void(0)" onclick="openDocInStudio('${story.fileId}')" style="font-size: 0.74rem; color: #2563eb; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">
-                                      <span>📝</span> Manager Sign-Off (Studio) &rarr;
+                                    <a href="javascript:void(0)" onclick="openDocInStudio('${targetFileId}')" style="font-size: 0.74rem; color: #2563eb; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">
+                                      <span>📝</span> ${story.fileId ? 'Manager Sign-Off (Studio)' : 'View in epics.md (Studio)'} &rarr;
                                     </a>
                                   `
                                       : `
