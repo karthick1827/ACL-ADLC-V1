@@ -39,24 +39,57 @@ function compareStoriesAndFiles(a, b) {
   return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
 }
 
-function sortFilesList(fileList) {
-  const sortSelect = document.getElementById('sortSelect');
-  const sortType = (sortSelect && sortSelect.value) || 'alpha-asc';
-  return [...fileList].sort((a, b) => {
-    if (sortType === 'alpha-asc') {
-      return compareStoriesAndFiles(a, b);
-    }
-    if (sortType === 'alpha-desc') {
-      return compareStoriesAndFiles(b, a);
-    }
-    if (sortType === 'date-desc') {
-      return new Date(b.createdAt || b.updatedAt) - new Date(a.createdAt || a.updatedAt) || compareStoriesAndFiles(a, b);
-    }
-    if (sortType === 'date-asc') {
-      return new Date(a.createdAt || a.updatedAt) - new Date(b.createdAt || b.updatedAt) || compareStoriesAndFiles(a, b);
-    }
+function sortFilesComparator(a, b, sortType) {
+  if (!a || !b) return 0;
+  if (sortType === 'default') {
     return compareStoriesAndFiles(a, b);
-  });
+  }
+  if (sortType === 'alpha-asc') {
+    const nameA = formatFileDisplayName(a.filename, a.folderPath, a);
+    const nameB = formatFileDisplayName(b.filename, b.folderPath, b);
+    return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' }) || compareStoriesAndFiles(a, b);
+  }
+  if (sortType === 'alpha-desc') {
+    const nameA = formatFileDisplayName(a.filename, a.folderPath, a);
+    const nameB = formatFileDisplayName(b.filename, b.folderPath, b);
+    return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: 'base' }) || compareStoriesAndFiles(b, a);
+  }
+  if (sortType === 'date-desc') {
+    const dateA = new Date(a.updatedAt || a.createdAt).getTime() || 0;
+    const dateB = new Date(b.updatedAt || b.createdAt).getTime() || 0;
+    return dateB - dateA || compareStoriesAndFiles(a, b);
+  }
+  if (sortType === 'date-asc') {
+    const dateA = new Date(a.updatedAt || a.createdAt).getTime() || 0;
+    const dateB = new Date(b.updatedAt || b.createdAt).getTime() || 0;
+    return dateA - dateB || compareStoriesAndFiles(a, b);
+  }
+  return compareStoriesAndFiles(a, b);
+}
+
+function sortFilesList(fileList, explicitSortType = null) {
+  const sortSelect = document.getElementById('sortSelect');
+  const sortType = explicitSortType || (sortSelect && sortSelect.value) || 'default';
+  return [...fileList].sort((a, b) => sortFilesComparator(a, b, sortType));
+}
+
+function extractMarkdownTitle(file) {
+  if (!file) return '';
+  if (file._parsedTitle !== undefined) return file._parsedTitle;
+  let title = '';
+  if (file.content) {
+    const titleMatch = file.content.match(/^title:\s*["']?([^"'\r\n]+)["']?/m);
+    if (titleMatch && titleMatch[1]) {
+      title = titleMatch[1].trim();
+    } else {
+      const h1Match = file.content.match(/^#\s+([^\r\n]+)/m);
+      if (h1Match && h1Match[1]) {
+        title = h1Match[1].trim();
+      }
+    }
+  }
+  file._parsedTitle = title;
+  return title;
 }
 
 function getInitialActiveFileId(fileList) {
@@ -313,8 +346,10 @@ function formatFileDisplayName(filename, folderPath = '', doc = null) {
 
 function renderFileTree() {
   const root = document.getElementById('fileTreeRoot');
-  const searchQuery = (document.getElementById('searchInput').value || '').toLowerCase();
+  const searchQuery = (document.getElementById('searchInput').value || '').trim().toLowerCase();
   const filterStatus = document.getElementById('filterStatusSelect').value;
+  const sortSelect = document.getElementById('sortSelect');
+  const sortType = (sortSelect && sortSelect.value) || 'default';
 
   root.innerHTML = '';
 
@@ -322,7 +357,20 @@ function renderFileTree() {
     if (isChildFile(file.filename, file.folderPath)) {
       return false;
     }
-    const matchesSearch = file.filename.toLowerCase().includes(searchQuery) || (file.folderPath || '').toLowerCase().includes(searchQuery);
+    const fileDisplayName = formatFileDisplayName(file.filename, file.folderPath, file).toLowerCase();
+    const fileTitle = extractMarkdownTitle(file).toLowerCase();
+    const folderDisplayName = getFileFolderGroup(file).toLowerCase();
+    const rawFilename = (file.filename || '').toLowerCase();
+    const rawFolderPath = (file.folderPath || '').toLowerCase();
+
+    const matchesSearch =
+      !searchQuery ||
+      fileDisplayName.includes(searchQuery) ||
+      fileTitle.includes(searchQuery) ||
+      folderDisplayName.includes(searchQuery) ||
+      rawFilename.includes(searchQuery) ||
+      rawFolderPath.includes(searchQuery);
+
     const currentNormStatus = file.status === 'Accepted' ? 'Approved' : file.status;
     const matchesStatus = filterStatus === 'all' || currentNormStatus === filterStatus || file.status === filterStatus;
     return matchesSearch && matchesStatus;
@@ -334,29 +382,56 @@ function renderFileTree() {
     return;
   }
 
-  // Sort FILES directly (filter and sort applies to files, not folders)
-  filtered = sortFilesList(filtered);
+  // Sort filtered files list
+  filtered = sortFilesList(filtered, sortType);
 
-  // Group into folders based on resolved display name (Option 1 aggregation)
+  // Group into folders based on resolved display name
   const groups = {};
   const folderOrder = [];
   const groupMeta = {};
 
   filtered.forEach((file) => {
     const groupName = getFileFolderGroup(file);
+    const fUpdated = new Date(file.updatedAt || file.createdAt).getTime() || 0;
+    const fCreated = new Date(file.createdAt || file.updatedAt).getTime() || 0;
+
     if (!groups[groupName]) {
       groups[groupName] = [];
       folderOrder.push(groupName);
       groupMeta[groupName] = {
         displayName: groupName,
         primaryFolderPath: file.folderPath || 'root',
+        latestDate: fUpdated,
+        earliestDate: fCreated,
       };
+    } else {
+      if (fUpdated > groupMeta[groupName].latestDate) groupMeta[groupName].latestDate = fUpdated;
+      if (fCreated < groupMeta[groupName].earliestDate) groupMeta[groupName].earliestDate = fCreated;
     }
     groups[groupName].push(file);
   });
 
-  // Canonical lifecycle ordering
+  // Dynamic folder ordering based on sort filter
   folderOrder.sort((a, b) => {
+    if (sortType === 'alpha-asc') {
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    if (sortType === 'alpha-desc') {
+      return b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    if (sortType === 'date-desc') {
+      const dateA = groupMeta[a]?.latestDate || 0;
+      const dateB = groupMeta[b]?.latestDate || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    if (sortType === 'date-asc') {
+      const dateA = groupMeta[a]?.earliestDate || 0;
+      const dateB = groupMeta[b]?.earliestDate || 0;
+      if (dateA !== dateB) return dateA - dateB;
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    // Default: Canonical delivery sequence
     const indexA = CANONICAL_FOLDER_ORDER.indexOf(a);
     const indexB = CANONICAL_FOLDER_ORDER.indexOf(b);
     if (indexA !== -1 && indexB !== -1) return indexA - indexB;
@@ -385,7 +460,7 @@ function renderFileTree() {
     headerDiv.className = 'folder-header';
 
     const folderFiles = groups[folderName];
-    folderFiles.sort(compareStoriesAndFiles);
+    folderFiles.sort((a, b) => sortFilesComparator(a, b, sortType));
     const fileCountText = folderFiles.length === 1 ? '1 file' : `${folderFiles.length} files`;
     const latestDate = folderFiles.reduce((latest, f) => {
       const d = new Date(f.updatedAt || f.createdAt);

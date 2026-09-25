@@ -715,12 +715,23 @@ function renderDeliveryDashboard() {
                           ${epic.stories
                             .map(
                               (story) => `
-                            <div class="story-item">
+                            <div class="story-item" ${story.fileId ? `onclick="openDocInStudio('${story.fileId}')" style="cursor: pointer;"` : ''}>
                               <div class="story-item-left">
                                 <span>${story.isCompleted ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' || story.status === 'Need Action' ? '🔴' : '🔹'}</span>
                                 <span style="font-weight: 600; color: #1e293b;">${story.num ? `Story ${story.num}: ` : ''}${formatStoryTitle(story.title)}</span>
                               </div>
-                              ${renderStatusBadge(story.status)}
+                              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                ${
+                                  story.fileId
+                                    ? `
+                                  <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${story.fileId}')" title="Open ${story.filename} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
+                                    <span>📄</span> <span>${formatFileDisplayName(story.filename)}</span>
+                                  </button>
+                                `
+                                    : ''
+                                }
+                                ${renderStatusBadge(story.status)}
+                              </div>
                             </div>
                           `,
                             )
@@ -996,12 +1007,23 @@ function renderScrumMasterDashboard() {
                       ${epic.stories
                         .map(
                           (story) => `
-                        <div class="story-item">
+                        <div class="story-item" ${story.fileId ? `onclick="openDocInStudio('${story.fileId}')" style="cursor: pointer;"` : ''}>
                           <div class="story-item-left">
                             <span>${story.isCompleted || story.status === 'Approved' ? '✅' : story.status === 'In Review' ? '🟡' : story.status === 'Rejected' || story.status === 'Need Action' ? '🔴' : '🔹'}</span>
                             <span style="font-weight: 600; color: #1e293b;">${story.num ? `Story ${story.num}: ` : ''}${formatStoryTitle(story.title)}</span>
                           </div>
-                          ${renderStatusBadge(story.status)}
+                          <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            ${
+                              story.fileId
+                                ? `
+                              <button type="button" class="action-btn-sm" onclick="event.stopPropagation(); openDocInStudio('${story.fileId}')" title="Open ${story.filename} in Markdown Studio" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600;">
+                                <span>📄</span> <span>${formatFileDisplayName(story.filename)}</span>
+                              </button>
+                            `
+                                : ''
+                            }
+                            ${renderStatusBadge(story.status)}
+                          </div>
                         </div>
                       `,
                         )

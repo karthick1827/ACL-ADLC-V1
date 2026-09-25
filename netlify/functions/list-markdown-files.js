@@ -167,7 +167,7 @@ export async function handler(event) {
       }
     }
 
-    let frameworkVersion = '6.11.39';
+    let frameworkVersion = '6.11.40';
     try {
       const pkgPath = path.join(process.cwd(), 'package.json');
       if (fs.existsSync(pkgPath)) {

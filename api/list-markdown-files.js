@@ -165,7 +165,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    let frameworkVersion = '6.11.39';
+    let frameworkVersion = '6.11.40';
     if (!owner || !repo) {
       try {
         const pkgPath = path.join(process.cwd(), 'package.json');

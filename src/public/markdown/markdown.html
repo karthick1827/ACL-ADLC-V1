@@ -83,7 +83,7 @@
       </nav>
       <div class="nav-drawer-footer">
         <span>ACL-ADLC</span>
-        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.37</span>
+        <span id="drawerVersionLabel" style="font-weight: 700">v6.11.40</span>
       </div>
     </aside>
 
@@ -179,11 +179,12 @@
         <div class="sidebar-controls">
           <div class="search-input-wrapper">
             <span class="search-icon">🔍</span>
-            <input type="text" id="searchInput" class="search-input" placeholder="Search files or paths..." oninput="renderFileTree()" />
+            <input type="text" id="searchInput" class="search-input" placeholder="Search files, titles, or paths..." oninput="renderFileTree()" />
           </div>
 
           <div class="filter-grid">
-            <select id="sortSelect" class="select-control" onchange="handleSortChange()" title="Sort Files">
+            <select id="sortSelect" class="select-control" onchange="handleSortChange()" title="Sort Folders & Files">
+              <option value="default" selected>⚡ Default</option>
               <option value="alpha-asc">🔤 Name (A → Z)</option>
               <option value="alpha-desc">🔤 Name (Z → A)</option>
               <option value="date-desc">🕒 Date (Newest)</option>
