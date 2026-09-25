@@ -1,8 +1,8 @@
-// Netlify Function: save-markdown.cjs (Self-contained CommonJS for "type": "module" compatibility)
-const fs = require('node:fs');
-const path = require('node:path');
+// Netlify Serverless Function: save-markdown.js (ES Module for "type": "module")
+import fs from 'node:fs';
+import path from 'node:path';
 
-exports.handler = async function (event) {
+export async function handler(event) {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -61,7 +61,8 @@ exports.handler = async function (event) {
           cleanFolder = '1-analysis/acl-product-brief';
           break;
         }
-        case 'prd.md': {
+        case 'prd.md':
+        case 'reconcile-brief.md': {
           cleanFolder = '2-plan-workflows/acl-prd';
           break;
         }
@@ -75,37 +76,42 @@ exports.handler = async function (event) {
           break;
         }
         default: {
-          if (/^story-\d+/i.test(lowerName) || /^spec-/i.test(lowerName)) {
+          if (lowerName.startsWith('spec-') || lowerName.startsWith('story-')) {
             cleanFolder = '4-implementation';
-          } else {
-            cleanFolder = '';
           }
           break;
         }
       }
     }
 
-    const repoFilePath = cleanFolder ? `_acl-output/${cleanFolder}/${cleanFilename}` : `_acl-output/${cleanFilename}`;
+    const relativeAclPath = cleanFolder ? `${cleanFolder}/${cleanFilename}` : cleanFilename;
+    const githubFilePath = `_acl-output/${relativeAclPath}`;
+
+    // Environment and Query / Header resolution for GitHub API
+    const qParams = event.queryStringParameters || {};
+    const qOwner = qParams.owner;
+    const qRepo = qParams.repo;
+    const qBranch = qParams.branch;
+    const qToken = qParams.token;
 
     const headers = event.headers || {};
     const rawHeaderAuth = headers['authorization'] || headers['Authorization'] || '';
     const rawCustomToken = headers['x-github-token'] || headers['X-GitHub-Token'] || '';
-    const rawBodyToken = (payload && payload.githubToken) || '';
 
     const token = (
       rawCustomToken ||
       rawHeaderAuth.replace(/^Bearer\s+/i, '').replace(/^token\s+/i, '') ||
-      rawBodyToken ||
+      qToken ||
       process.env.GITHUB_TOKEN ||
       process.env.GH_TOKEN ||
       process.env.GITHUB_PAT ||
       ''
     ).trim();
 
-    let owner = ((payload && payload.githubOwner) || process.env.GITHUB_OWNER || process.env.VERCEL_GIT_REPO_OWNER || '').trim();
-    let repo = ((payload && payload.githubRepo) || process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG || '').trim();
+    let owner = (qOwner || process.env.GITHUB_OWNER || process.env.VERCEL_GIT_REPO_OWNER || '').trim();
+    let repo = (qRepo || process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG || '').trim();
     const branch = (
-      (payload && payload.githubBranch) ||
+      qBranch ||
       process.env.GITHUB_BRANCH ||
       process.env.VERCEL_GIT_COMMIT_REF ||
       process.env.BRANCH ||
@@ -144,70 +150,49 @@ exports.handler = async function (event) {
       }
     }
 
-    if (!owner) owner = 'karthick1827';
-    if (!repo) repo = 'jira-clone';
-
-    // 1. Commit to GitHub via REST API
-    if (token) {
-      const authHeader =
-        token.startsWith('Bearer ') || token.startsWith('token ') ? token : token.startsWith('ghp_') ? `token ${token}` : `Bearer ${token}`;
-
+    // 1. Commit directly to GitHub repository if token, owner, and repo are provided
+    if (token && owner && repo) {
       const ghHeaders = {
         Accept: 'application/vnd.github.v3+json',
-        Authorization: authHeader,
+        Authorization:
+          token.startsWith('Bearer ') || token.startsWith('token ')
+            ? token
+            : token.startsWith('ghp_')
+              ? `token ${token}`
+              : `Bearer ${token}`,
         'User-Agent': 'ACL-ADLC-Markdown-Studio',
+        'Content-Type': 'application/json',
       };
 
-      let sha;
-      const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${repoFilePath}?ref=${encodeURIComponent(branch)}`;
+      const fileUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(githubFilePath).replaceAll('%2F', '/')}?ref=${encodeURIComponent(branch)}`;
+
+      let sha = null;
       try {
-        const getRes = await fetch(getUrl, { headers: ghHeaders });
+        const getRes = await fetch(fileUrl, { headers: ghHeaders });
         if (getRes.ok) {
-          const fileData = await getRes.json();
-          sha = fileData.sha;
-        } else if (getRes.status === 401) {
-          return {
-            statusCode: 401,
-            headers: corsHeaders,
-            body: JSON.stringify({
-              success: false,
-              error: 'GitHub Token is invalid or expired. Please check your token or re-enter it in Cloud Sync Settings.',
-            }),
-          };
-        } else if (getRes.status === 403) {
-          const errBody = await getRes.text();
-          return {
-            statusCode: 403,
-            headers: corsHeaders,
-            body: JSON.stringify({
-              success: false,
-              error: `GitHub token lacks permission: ${errBody}`,
-              hint: 'Token needs repo or contents:write permissions.',
-            }),
-          };
+          const getData = await getRes.json();
+          sha = getData.sha;
         }
       } catch {
-        // Network or fetch error
+        // File may be new, SHA stays null
       }
 
-      const cleanStatus = (status || '').trim();
-      const commitMsg = cleanStatus
-        ? `docs(review): update ${cleanFilename} status to [${cleanStatus}] via Markdown Studio`
-        : `docs(${cleanFilename}): update content via Markdown Studio`;
+      const statusTag = status ? ` [${status}]` : '';
+      const commitMessage = `docs(review): update ${cleanFilename}${statusTag} via Markdown Studio`;
 
-      const putUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${repoFilePath}`;
-      const putRes = await fetch(putUrl, {
+      const commitBody = {
+        message: commitMessage,
+        content: Buffer.from(content, 'utf8').toString('base64'),
+        branch: branch,
+      };
+      if (sha) {
+        commitBody.sha = sha;
+      }
+
+      const putRes = await fetch(fileUrl, {
         method: 'PUT',
-        headers: {
-          ...ghHeaders,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: commitMsg,
-          content: Buffer.from(content, 'utf8').toString('base64'),
-          branch: branch,
-          ...(sha ? { sha } : {}),
-        }),
+        headers: ghHeaders,
+        body: JSON.stringify(commitBody),
       });
 
       if (!putRes.ok) {
@@ -217,69 +202,64 @@ exports.handler = async function (event) {
           headers: corsHeaders,
           body: JSON.stringify({
             success: false,
-            error: `GitHub Commit failed (${putRes.status}): ${errText}`,
-            hint: 'Verify GITHUB_TOKEN has write access to ' + owner + '/' + repo,
+            error: `GitHub commit failed (${putRes.status}): ${errText}`,
           }),
         };
       }
 
-      const commitResult = await putRes.json();
-
-      try {
-        const localTarget = path.join(process.cwd(), repoFilePath);
-        fs.mkdirSync(path.dirname(localTarget), { recursive: true });
-        fs.writeFileSync(localTarget, content, 'utf8');
-      } catch {
-        // Local write is optional
-      }
-
+      const putData = await putRes.json();
       return {
         statusCode: 200,
         headers: corsHeaders,
         body: JSON.stringify({
           success: true,
-          mode: 'github',
-          repo: `${owner}/${repo}`,
+          message: 'Saved directly to GitHub repository',
+          commitSha: putData.commit?.sha,
+          filePath: githubFilePath,
           branch: branch,
-          path: repoFilePath,
-          commitSha: commitResult.commit?.sha || commitResult.sha,
-          status: status,
-          message: `Successfully committed ${cleanFilename} to ${owner}/${repo}@${branch}`,
         }),
       };
     }
 
-    // 2. Fallback: Save to local disk
+    // 2. Fallback: Save to local filesystem if running in local development
+    const localDir = path.join(process.cwd(), '_acl-output', cleanFolder);
+    const localFile = path.join(localDir, cleanFilename);
+
     try {
-      const localTarget = path.join(process.cwd(), repoFilePath);
-      fs.mkdirSync(path.dirname(localTarget), { recursive: true });
-      fs.writeFileSync(localTarget, content, 'utf8');
+      if (!fs.existsSync(localDir)) {
+        fs.mkdirSync(localDir, { recursive: true });
+      }
+      fs.writeFileSync(localFile, content, 'utf8');
 
       return {
         statusCode: 200,
         headers: corsHeaders,
         body: JSON.stringify({
           success: true,
-          mode: 'local-disk',
-          path: repoFilePath,
-          status: status,
+          message: 'Saved to local filesystem',
+          filePath: localFile,
         }),
       };
     } catch {
-      return {
-        statusCode: 500,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          success: false,
-          error: 'GITHUB_TOKEN is missing. Please add GITHUB_TOKEN in Netlify Site configuration > Environment variables.',
-        }),
-      };
+      // Local write failed (e.g. read-only serverless filesystem)
+      if (!token) {
+        return {
+          statusCode: 401,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: false,
+            error:
+              'Read-only cloud environment detected. A GitHub Personal Access Token (GITHUB_TOKEN) is required to commit changes to the repository.',
+          }),
+        };
+      }
+      throw new Error('Failed to persist file both remotely and locally.');
     }
-  } catch (err) {
+  } catch (error) {
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ success: false, error: err.message }),
+      body: JSON.stringify({ success: false, error: error.message }),
     };
   }
-};
+}

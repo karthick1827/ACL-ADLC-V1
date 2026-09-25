@@ -1,6 +1,6 @@
-// Netlify Function: list-markdown-files.cjs (Self-contained CommonJS for "type": "module" compatibility)
-const fs = require('node:fs');
-const path = require('node:path');
+// Netlify Serverless Function: list-markdown-files.js (ES Module for "type": "module")
+import fs from 'node:fs';
+import path from 'node:path';
 
 const EXCLUDED_FILENAMES = new Set([
   'skill.md',
@@ -110,7 +110,7 @@ function compareStoriesAndFiles(a, b) {
   return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
 }
 
-exports.handler = async function (event) {
+export async function handler(event) {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -353,4 +353,4 @@ exports.handler = async function (event) {
       body: JSON.stringify({ success: false, files: [], error: err.message }),
     };
   }
-};
+}

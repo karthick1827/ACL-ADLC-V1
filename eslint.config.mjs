@@ -136,6 +136,14 @@ export default [
     },
   },
 
+  // Netlify Functions are ESM modules
+  {
+    files: ['netlify/**/*.js'],
+    languageOptions: {
+      sourceType: 'module',
+    },
+  },
+
   // ESLint config file should not be checked for publish-related Node rules
   {
     files: ['eslint.config.mjs'],
