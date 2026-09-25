@@ -165,11 +165,13 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    let frameworkVersion = '6.11.39';
     if (!owner || !repo) {
       try {
         const pkgPath = path.join(process.cwd(), 'package.json');
         if (fs.existsSync(pkgPath)) {
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          if (pkg.version) frameworkVersion = pkg.version;
           const repoUrl = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url;
           if (repoUrl) {
             const match = repoUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
@@ -265,8 +267,8 @@ module.exports = async function handler(req, res) {
             success: true,
             files: deduplicated,
             activeTier: activeTier,
-            frameworkVersion: '6.11.36',
-            version: '6.11.36',
+            frameworkVersion: frameworkVersion,
+            version: frameworkVersion,
             source: 'github',
             repo: `${owner}/${repo}`,
             branch: branch,
@@ -339,8 +341,8 @@ module.exports = async function handler(req, res) {
       success: true,
       files: finalDiskList,
       activeTier: diskActiveTier,
-      frameworkVersion: '6.11.36',
-      version: '6.11.36',
+      frameworkVersion: frameworkVersion,
+      version: frameworkVersion,
       source: 'local-disk',
     };
 

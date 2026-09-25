@@ -1618,8 +1618,45 @@ export default async function handler(req, res) {
         await fs.writeFile(targetVercelJson, JSON.stringify(vercelConfig, null, 2) + '\n', 'utf8');
         this.installedFiles.add(targetVercelJson);
       }
+
+      // Deploy netlify.toml and netlify/functions if not present
+      const netlifyDir = path.join(projectRoot, 'netlify', 'functions');
+      const srcNetlifyDirCandidates = [
+        path.join(__dirname, '..', '..', '..', 'netlify', 'functions'),
+        path.join(process.cwd(), 'netlify', 'functions'),
+      ];
+      let srcNetlifyDir = null;
+      for (const cand of srcNetlifyDirCandidates) {
+        if (await fs.pathExists(cand)) {
+          srcNetlifyDir = cand;
+          break;
+        }
+      }
+      if (srcNetlifyDir) {
+        await fs.ensureDir(netlifyDir);
+        for (const endpointFile of ['adapter-utils.js', 'save-markdown.js', 'list-markdown-files.js']) {
+          const srcFile = path.join(srcNetlifyDir, endpointFile);
+          const targetFile = path.join(netlifyDir, endpointFile);
+          if (await fs.pathExists(srcFile)) {
+            await fs.copy(srcFile, targetFile);
+            this.installedFiles.add(targetFile);
+          }
+        }
+      }
+
+      const targetNetlifyToml = path.join(projectRoot, 'netlify.toml');
+      const srcNetlifyTomlCandidates = [path.join(__dirname, '..', '..', '..', 'netlify.toml'), path.join(process.cwd(), 'netlify.toml')];
+      for (const cand of srcNetlifyTomlCandidates) {
+        if (await fs.pathExists(cand)) {
+          if (!(await fs.pathExists(targetNetlifyToml))) {
+            await fs.copy(cand, targetNetlifyToml);
+            this.installedFiles.add(targetNetlifyToml);
+          }
+          break;
+        }
+      }
     } catch {
-      // Best-effort vercel endpoints deployment
+      // Best-effort vercel and netlify endpoints deployment
     }
   }
 
