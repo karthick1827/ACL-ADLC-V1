@@ -1505,23 +1505,33 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  let servePath = path.join(ACL_OUTPUT_DIR, 'markdown.html');
-  if (!fs.existsSync(servePath)) {
-    servePath = path.join(PROJECT_ROOT, 'src', 'public', 'markdown.html');
-  }
-  if (!fs.existsSync(servePath)) {
-    servePath = path.join(__dirname, '..', 'src', 'public', 'markdown.html');
-  }
-  if (!fs.existsSync(servePath)) {
-    servePath = path.join(PROJECT_ROOT, 'markdown.html');
+  const candidateMarkdownPaths = [
+    path.join(ACL_OUTPUT_DIR, 'markdown.html'),
+    path.join(PROJECT_ROOT, 'public', 'markdown', 'markdown.html'),
+    path.join(PROJECT_ROOT, 'src', 'public', 'markdown', 'markdown.html'),
+    path.join(__dirname, '..', 'src', 'public', 'markdown', 'markdown.html'),
+    path.join(PROJECT_ROOT, 'src', 'public', 'markdown.html'),
+    path.join(__dirname, '..', 'src', 'public', 'markdown.html'),
+    path.join(PROJECT_ROOT, 'public', 'markdown.html'),
+    path.join(PROJECT_ROOT, 'markdown.html'),
+  ];
+  let servePath = null;
+  for (const p of candidateMarkdownPaths) {
+    if (fs.existsSync(p)) {
+      servePath = p;
+      break;
+    }
   }
 
   if (
     (url.pathname === '/' ||
       url.pathname === '/markdown.html' ||
+      url.pathname === '/markdown' ||
+      url.pathname === '/markdown/' ||
+      url.pathname === '/markdown/markdown.html' ||
       url.pathname === '/markdownstudio.html' ||
       url.pathname === '/markdownstudio') &&
-    fs.existsSync(servePath)
+    servePath
   ) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(fs.readFileSync(servePath, 'utf8'));
@@ -1542,6 +1552,30 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': mime });
       res.end(fs.readFileSync(assetPath));
       return;
+    }
+  }
+
+  if (url.pathname.startsWith('/markdown/')) {
+    const relAsset = url.pathname.slice(1);
+    const candidateDirs = [
+      path.join(__dirname, '..', 'src', 'public'),
+      path.join(PROJECT_ROOT, 'src', 'public'),
+      path.join(PROJECT_ROOT, 'public'),
+      PROJECT_ROOT,
+      ACL_OUTPUT_DIR,
+    ];
+    for (const dir of candidateDirs) {
+      const filePath = path.join(dir, relAsset);
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        const mime = filePath.endsWith('.css')
+          ? 'text/css; charset=utf-8'
+          : filePath.endsWith('.js')
+            ? 'application/javascript; charset=utf-8'
+            : 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': mime });
+        res.end(fs.readFileSync(filePath));
+        return;
+      }
     }
   }
 

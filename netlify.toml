@@ -1,0 +1,40 @@
+[build]
+  publish = "src/public"
+  functions = "netlify/functions"
+
+# Route /api/save-markdown directly to Netlify function
+[[redirects]]
+  from = "/api/save-markdown"
+  to = "/.netlify/functions/save-markdown"
+  status = 200
+  force = true
+
+# Route /api/list-markdown-files directly to Netlify function
+[[redirects]]
+  from = "/api/list-markdown-files"
+  to = "/.netlify/functions/list-markdown-files"
+  status = 200
+  force = true
+
+# Fallback for any other /api/* calls
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true
+
+# Markdown Studio web interface rewrites
+[[redirects]]
+  from = "/"
+  to = "/markdown/markdown.html"
+  status = 200
+
+[[redirects]]
+  from = "/markdown"
+  to = "/markdown/markdown.html"
+  status = 200
+
+[[redirects]]
+  from = "/markdown.html"
+  to = "/markdown/markdown.html"
+  status = 200

@@ -39,6 +39,7 @@ export default [
       // are dictated by Augment and can't be changed, so exclude
       // the entire directory from linting
       '.augment/**',
+      'src/public/**',
     ],
   },
 
@@ -95,6 +96,8 @@ export default [
       'src/scripts/**/*.mjs',
       'api/**/*.js',
       'api/**/*.mjs',
+      'netlify/**/*.js',
+      'netlify/**/*.mjs',
     ],
     rules: {
       // Allow CommonJS patterns for Node CLI scripts

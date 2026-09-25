@@ -111,9 +111,27 @@ module.exports = async function handler(req, res) {
 
     let repo = ((payload && payload.githubRepo) || process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG || '').trim();
 
-    const branch = ((payload && payload.githubBranch) || process.env.GITHUB_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || 'main').trim();
+    const branch = (
+      (payload && payload.githubBranch) ||
+      process.env.GITHUB_BRANCH ||
+      process.env.VERCEL_GIT_COMMIT_REF ||
+      process.env.BRANCH ||
+      process.env.HEAD ||
+      'main'
+    ).trim();
 
-    // Auto-detect owner and repo from package.json if not explicitly provided
+    // Auto-detect owner and repo from Netlify REPOSITORY_URL or package.json if not explicitly provided
+    if (!owner || !repo) {
+      const netlifyRepoUrl = process.env.REPOSITORY_URL || '';
+      if (netlifyRepoUrl) {
+        const match = netlifyRepoUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
+        if (match) {
+          if (!owner) owner = match[1];
+          if (!repo) repo = match[2].replace(/\.git$/, '');
+        }
+      }
+    }
+
     if (!owner || !repo) {
       try {
         const pkgPath = path.join(process.cwd(), 'package.json');

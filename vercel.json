@@ -7,12 +7,20 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/markdown/(.*)",
+      "destination": "/src/public/markdown/$1"
+    },
+    {
       "source": "/markdown.html",
-      "destination": "/src/public/markdown.html"
+      "destination": "/src/public/markdown/markdown.html"
+    },
+    {
+      "source": "/markdown",
+      "destination": "/src/public/markdown/markdown.html"
     },
     {
       "source": "/",
-      "destination": "/src/public/markdown.html"
+      "destination": "/src/public/markdown/markdown.html"
     }
   ]
 }

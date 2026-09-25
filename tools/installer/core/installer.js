@@ -699,6 +699,9 @@ class Installer {
     const projectRoot = paths?.projectRoot;
     if (projectRoot) {
       const candidatePaths = [
+        path.join(paths.srcDir || getProjectRoot(), 'src', 'public', 'markdown', 'markdown.html'),
+        path.join(getProjectRoot(), 'src', 'public', 'markdown', 'markdown.html'),
+        path.join(__dirname, '..', '..', '..', 'src', 'public', 'markdown', 'markdown.html'),
         path.join(paths.srcDir || getProjectRoot(), 'src', 'public', 'markdown.html'),
         path.join(getProjectRoot(), 'src', 'public', 'markdown.html'),
         path.join(__dirname, '..', '..', '..', 'src', 'public', 'markdown.html'),
@@ -729,11 +732,19 @@ class Installer {
           }
         }
 
-        // Deploy unified markdown.html file
+        // Deploy unified markdown.html file into markdown folder
         const publicDir = path.join(projectRoot, 'public');
         let targetMarkdownFile;
+        let targetMarkdownDir;
         if (await fs.pathExists(publicDir)) {
-          targetMarkdownFile = path.join(publicDir, 'markdown.html');
+          targetMarkdownDir = path.join(publicDir, 'markdown');
+          await fs.ensureDir(targetMarkdownDir);
+          targetMarkdownFile = path.join(targetMarkdownDir, 'markdown.html');
+
+          const publicDuplicate = path.join(publicDir, 'markdown.html');
+          if (await fs.pathExists(publicDuplicate)) {
+            await fs.remove(publicDuplicate);
+          }
           const rootDuplicate = path.join(projectRoot, 'markdown.html');
           if (await fs.pathExists(rootDuplicate)) {
             await fs.remove(rootDuplicate);
@@ -755,10 +766,17 @@ class Installer {
             (await fs.pathExists(path.join(projectRoot, 'next.config.ts'))) ||
             (await fs.pathExists(path.join(projectRoot, 'package.json')));
           if (isWebProject) {
-            await fs.ensureDir(publicDir);
-            targetMarkdownFile = path.join(publicDir, 'markdown.html');
+            targetMarkdownDir = path.join(publicDir, 'markdown');
+            await fs.ensureDir(targetMarkdownDir);
+            targetMarkdownFile = path.join(targetMarkdownDir, 'markdown.html');
           } else {
-            targetMarkdownFile = path.join(projectRoot, 'markdown.html');
+            targetMarkdownDir = path.join(projectRoot, 'markdown');
+            await fs.ensureDir(targetMarkdownDir);
+            targetMarkdownFile = path.join(targetMarkdownDir, 'markdown.html');
+          }
+          const rootDuplicate = path.join(projectRoot, 'markdown.html');
+          if (await fs.pathExists(rootDuplicate)) {
+            await fs.remove(rootDuplicate);
           }
           const rootStudioDup = path.join(projectRoot, 'markdownstudio.html');
           if (await fs.pathExists(rootStudioDup)) {
@@ -777,17 +795,51 @@ class Installer {
 
         // Deploy workflow SVG diagrams and Studio logo alongside markdown.html
         const targetDir = path.dirname(targetMarkdownFile);
-        const svgSrcDir = path.dirname(srcMarkdown);
+        const svgSrcDirs = [path.dirname(srcMarkdown), path.join(path.dirname(srcMarkdown), '..')];
         for (const svgName of ['greenfield.svg', 'brownfield.svg', 'velocityone-studio-logo.png']) {
-          const svgSrc = path.join(svgSrcDir, svgName);
-          if (await fs.pathExists(svgSrc)) {
-            const targetSvg = path.join(targetDir, svgName);
-            await fs.copy(svgSrc, targetSvg);
-            this.installedFiles.add(targetSvg);
-            if (publicDir && targetDir !== publicDir && (await fs.pathExists(publicDir))) {
-              const publicSvg = path.join(publicDir, svgName);
-              await fs.copy(svgSrc, publicSvg);
-              this.installedFiles.add(publicSvg);
+          for (const sDir of svgSrcDirs) {
+            const svgSrc = path.join(sDir, svgName);
+            if (await fs.pathExists(svgSrc)) {
+              const targetSvg = path.join(targetDir, svgName);
+              await fs.copy(svgSrc, targetSvg);
+              this.installedFiles.add(targetSvg);
+              if (publicDir && (await fs.pathExists(publicDir))) {
+                const publicSvg = path.join(publicDir, svgName);
+                if (publicSvg !== targetSvg) {
+                  await fs.copy(svgSrc, publicSvg);
+                  this.installedFiles.add(publicSvg);
+                }
+              }
+              break;
+            }
+          }
+        }
+
+        // Deploy modular markdown assets (css and js) alongside markdown.html
+        const markdownSrcDir = srcMarkdown.includes(path.join('markdown', 'markdown.html'))
+          ? path.dirname(srcMarkdown)
+          : path.join(path.dirname(srcMarkdown), 'markdown');
+
+        if (await fs.pathExists(markdownSrcDir)) {
+          const trackDirFiles = async (dir) => {
+            const entries = await fs.readdir(dir);
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry);
+              const stat = await fs.stat(fullPath);
+              if (stat.isDirectory()) {
+                await trackDirFiles(fullPath);
+              } else {
+                this.installedFiles.add(fullPath);
+              }
+            }
+          };
+
+          for (const sub of ['css', 'js']) {
+            const subSrc = path.join(markdownSrcDir, sub);
+            if (await fs.pathExists(subSrc)) {
+              const subDest = path.join(targetMarkdownDir, sub);
+              await fs.copy(subSrc, subDest);
+              await trackDirFiles(subDest);
             }
           }
         }
@@ -868,11 +920,37 @@ function aclMarkdownSaverPlugin() {
   return {
     name: 'acl-markdown-saver',
     configureServer(server) {
-      // URL alias rewrite: /markdownstudio or /markdownstudio.html -> /markdown.html
+      // URL alias rewrite & direct markdown serving
       server.middlewares.use((req, res, next) => {
         const rawUrl = req.url ? req.url.split('?')[0] : '';
         if (rawUrl === '/markdownstudio' || rawUrl === '/markdownstudio.html') {
           req.url = req.url.replace(/^\\/markdownstudio(\\.html)?/, '/markdown.html');
+        }
+        if (
+          rawUrl === '/markdown.html' ||
+          rawUrl === '/markdown' ||
+          rawUrl === '/markdown/' ||
+          rawUrl === '/markdown/markdown.html'
+        ) {
+          try {
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const candidates = [
+              path.resolve(process.cwd(), 'public/markdown/markdown.html'),
+              path.resolve(process.cwd(), 'public/markdown.html'),
+              path.resolve(process.cwd(), 'markdown/markdown.html'),
+              path.resolve(process.cwd(), 'markdown.html'),
+            ];
+            for (const cand of candidates) {
+              if (fs.existsSync(cand)) {
+                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                res.end(fs.readFileSync(cand, 'utf8'));
+                return;
+              }
+            }
+          } catch {
+            // Fall through
+          }
         }
         next();
       });
