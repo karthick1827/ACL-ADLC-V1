@@ -98,6 +98,7 @@ export default [
       'api/**/*.mjs',
       'netlify/**/*.js',
       'netlify/**/*.mjs',
+      'netlify/**/*.cjs',
     ],
     rules: {
       // Allow CommonJS patterns for Node CLI scripts

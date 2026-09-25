@@ -1634,7 +1634,7 @@ export default async function handler(req, res) {
       }
       if (srcNetlifyDir) {
         await fs.ensureDir(netlifyDir);
-        for (const endpointFile of ['adapter-utils.js', 'save-markdown.js', 'list-markdown-files.js']) {
+        for (const endpointFile of ['save-markdown.cjs', 'list-markdown-files.cjs']) {
           const srcFile = path.join(srcNetlifyDir, endpointFile);
           const targetFile = path.join(netlifyDir, endpointFile);
           if (await fs.pathExists(srcFile)) {
