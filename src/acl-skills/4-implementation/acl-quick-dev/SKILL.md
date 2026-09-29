@@ -63,10 +63,10 @@ Before generating or modifying code artifacts, verify prerequisite document appr
    - The AI Agent is **STRICTLY FORBIDDEN** from proceeding to the next story until the Manager reviews and marks `story-<id>.md` as `status: Approved` in Markdown Studio (`markdown.html`).
    - Only after `story-<id>.md` is approved does the AI mark that story as completed (`- [x]`) in `epics.md` and proceed to the next story.
 
-### Brownfield Projects (Adaptive Tiered Gate):
+### Existing Projects & Feature Additions (Adaptive Tiered Gate):
 
 1. **Tier 1 (Self-Contained Spec)**:
-   - Verify that `project-context.md` and the targeted `spec-<feature-slug>.md` (in `_acl-output/4-implementation/` or `_acl-output/specs/`) are marked `status: Approved`.
+   - Verify that `project-context.md` and the targeted `spec-<feature-slug>.md` (in `_acl-output/4-implementation/`, `_acl-output/implementation-artifacts/`, or `_acl-output/specs/`) are marked `status: Approved`.
    - Greenfield full sequential artifacts (Phase 1-3) are **NOT required** for Tier 1 changes.
    - If the spec is `In Review` or `Rejected`:
      - **HALT IMMEDIATELY. DO NOT GENERATE OR MODIFY CODE.**

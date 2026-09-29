@@ -1,31 +1,84 @@
 # ACL-ADLC Protocol & Phase Gate Rules for GitHub Copilot
 
-## Universal Phase Gate Invariant (Mandatory & Non-Negotiable)
-Before executing any actions, generating files, editing files, adopting personas, or answering prompts regarding downstream delivery phases:
-1. Check `_acl-output/` or run `node tools/adlc-gate-guard.cjs <phase>`.
-2. If ANY upstream prerequisite document in `_acl-output/` is missing or has status other than `Approved` / `Accepted` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
-   - **TOTAL AGENT BLOCK**:
-     - Do NOT adopt personas or offer conversational brainstorming.
-     - Do NOT create, update, or edit any downstream files (PRD, Architecture, Epics, Stories, Code).
-     - Do NOT ask or suggest the developer to self-approve or alter the status.
-   - **ONLY PERMITTED ACTION**: Output the official lock notice:
+## 🛑 CRITICAL PRE-FLIGHT CHECK (MANDATORY BEFORE ANY CODE MODIFICATION)
+
+When the user asks for ANY new feature, bugfix, UI component, tweak, refactoring, or code change:
+1. **STRICT PROHIBITION ON DIRECT CODE GENERATION**:
+   - You are **STRICTLY FORBIDDEN** from generating or modifying application code (`src/`, `api/`, etc.) directly without an approved specification!
+   - Existing approvals on older deliverables (`brief.md`, `prd.md`, `epics.md`) belong to prior features, NOT new requests.
+2. **INTERACTIVE TIER SELECTION (MANDATORY)**:
+   - **Case A: User specifies Tier** (e.g. "Tier 1: ...", "Tier 2: ..."):
+     - Follow the rules of that tier immediately.
+   - **Case B: No Tier specified in prompt**:
+     - **DO NOT WRITE ANY CODE.**
+     - **DO NOT EDIT ANY FILES.**
+     - **OUTPUT THIS EXACT PROMPT AND STOP**:
 
 ```text
 ========================================================================
-⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)
+📊 [FEATURE / CHANGE ASSESSMENT]: Choose Execution Tier
 ========================================================================
-📄 Document in Review: <Document Name> (<Path>)
-🏷️ Current Status:      [IN REVIEW / PENDING]
+🎯 Feature / Change:   <Summary of requested work>
+💡 AI Recommendation:  [Tier 1 / Tier 2 based on blast radius]
 
-⚠️ STATUS:
-   As per the ACL-ADLC sequential delivery framework, this document 
-   is currently awaiting official review and sign-off by your Manager.
+Please choose which Tier you want to proceed with:
 
-👉 NEXT STEP:
-   Please wait for your manager to review and mark this document as 
-   'Accepted' or 'Approved' in Markdown Studio before proceeding with 
-   downstream tasks (<Next Phase / Skill Name>).
+  [1] Tier 1 — Self-Contained Spec (1-Page Story + Manager Sign-Off)
+      📝 AI generates a 1-page Spec in _acl-output/4-implementation/ (status: In Review).
+      ⏳ Code implementation is strictly LOCKED until Manager approves in Markdown Studio.
+
+  [2] Tier 2 — Major Architectural Overhaul / Full Cascade
+      🏛️ Full sequential governance (Product Brief -> PRD -> Architecture Spine -> Epics).
+
+👉 Reply with 1 or 2 to proceed:
 ========================================================================
 ```
 
-3. Only proceed with downstream tasks once upstream prerequisites have `status: Approved` or `status: Accepted`.
+---
+
+## 🟡 TIER 1 WORKFLOW (Self-Contained Spec + Manager Gate Lock)
+1. **Create Spec**: Generate `_acl-output/4-implementation/spec-<feature-slug>.md` with frontmatter:
+   ```yaml
+   ---
+   title: <Feature Name>
+   tier: Tier 1 (Self-Contained)
+   status: In Review
+   type: feature
+   created: <YYYY-MM-DD>
+   ---
+   ```
+2. **Immediate Gate Lock**:
+   - **DO NOT WRITE APPLICATION CODE.**
+   - Output the Gate Lock banner:
+     ```text
+     ========================================================================
+     ⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)
+     ========================================================================
+     📄 Document in Review: spec-<feature-slug>.md (_acl-output/4-implementation/)
+     🏷️ Current Status:      [IN REVIEW]
+
+     ⚠️ STATUS:
+        As per the Tier 1 protocol, this 1-page specification
+        is currently awaiting official review and sign-off by your Manager.
+        Code implementation is strictly locked until approved.
+
+     👉 NEXT STEP:
+        Please open Markdown Studio (http://localhost:5173/markdown.html)
+        and have your Manager review and mark this document as 'Approved'
+        or 'Rejected' before proceeding with code implementation.
+     ========================================================================
+     ```
+3. **Coding Gate**: Only proceed to implement application code when `spec-<feature-slug>.md` has `status: Approved`.
+
+---
+
+## 🔴 TIER 2 WORKFLOW (Major Overhaul / Full Cascade)
+- Sequential deliverables (`brief.md` -> `prd.md` -> `architecture-spine.md` -> `epics.md` -> story spec).
+- Each deliverable must have `status: Approved` by the Manager in Markdown Studio before downstream phases unlock.
+
+---
+
+## 🛑 STRICT PROHIBITION: No Direct AI Status Manipulation & Manager-Only Approval
+- The AI agent is STRICTLY PROHIBITED from self-approving or modifying `status: In Review` -> `status: Approved`.
+- Only the Manager in Markdown Studio (`markdown.html`) can approve documents.
+- Frontmatter status is strictly a 3-value enum: `In Review`, `Approved`, `Rejected`.
