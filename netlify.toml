@@ -1,6 +1,6 @@
 [build]
   publish = "src/public"
-  functions = "netlify/functions"
+  functions = "api"
 
 # Route /api/save-markdown directly to Netlify function
 [[redirects]]

@@ -28,7 +28,6 @@
     "tools",
     "web-bundles",
     "api",
-    "netlify",
     "netlify.toml",
     "vercel.json",
     "ACL-ADLC-Figma-Precision-Engine-Guide.pdf"

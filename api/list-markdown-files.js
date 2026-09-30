@@ -1,4 +1,5 @@
-// ACL-ADLC Markdown Studio Serverless List Files Endpoint (Vercel + GitHub REST API)
+// Universal Serverless Function: list-markdown-files.js
+// Works seamlessly across Vercel, Netlify, AWS Lambda, Firebase Functions, and local Node.js
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -110,27 +111,63 @@ function compareStoriesAndFiles(a, b) {
   return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
 }
 
-module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-GitHub-Token');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+async function universalHandler(arg1, arg2) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-GitHub-Token',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'Content-Type': 'application/json',
+  };
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
+  // Detect runtime: Node stream response (Vercel / Express) vs Lambda event/context (Netlify / AWS)
+  const isStream = Boolean(arg2 && typeof arg2.writeHead === 'function');
+
+  function reply(statusCode, payload) {
+    const bodyStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    if (isStream) {
+      arg2.writeHead(statusCode, corsHeaders);
+      arg2.end(bodyStr);
+      return;
+    }
+    return {
+      statusCode,
+      headers: corsHeaders,
+      body: bodyStr,
+    };
+  }
+
+  const httpMethod = (isStream ? arg1.method : arg1 && arg1.httpMethod) || 'GET';
+  if (httpMethod === 'OPTIONS') {
+    return reply(200, '');
   }
 
   try {
-    const urlObj = new URL(req.url, 'http://localhost');
-    const qOwner = urlObj.searchParams.get('owner');
-    const qRepo = urlObj.searchParams.get('repo');
-    const qBranch = urlObj.searchParams.get('branch');
-    const qToken = urlObj.searchParams.get('token');
+    let qParams = {};
+    let rawHeaders = {};
 
-    const rawHeaderAuth = req.headers['authorization'] || '';
-    const rawCustomToken = req.headers['x-github-token'] || '';
+    if (isStream) {
+      const req = arg1;
+      rawHeaders = req.headers || {};
+      try {
+        const urlObj = new URL(req.url, 'http://localhost');
+        qParams = Object.fromEntries(urlObj.searchParams.entries());
+      } catch {
+        qParams = {};
+      }
+    } else {
+      const event = arg1 || {};
+      rawHeaders = event.headers || {};
+      qParams = event.queryStringParameters || {};
+    }
+
+    const qOwner = qParams.owner;
+    const qRepo = qParams.repo;
+    const qBranch = qParams.branch;
+    const qToken = qParams.token;
+
+    const rawHeaderAuth = rawHeaders['authorization'] || rawHeaders['Authorization'] || '';
+    const rawCustomToken = rawHeaders['x-github-token'] || rawHeaders['X-GitHub-Token'] || '';
 
     const token = (
       rawCustomToken ||
@@ -153,7 +190,7 @@ module.exports = async function handler(req, res) {
       'main'
     ).trim();
 
-    // Auto-detect owner and repo from Netlify REPOSITORY_URL or package.json if not explicitly provided
+    // Auto-detect owner and repo from Netlify REPOSITORY_URL or package.json
     if (!owner || !repo) {
       const netlifyRepoUrl = process.env.REPOSITORY_URL || '';
       if (netlifyRepoUrl) {
@@ -274,9 +311,7 @@ module.exports = async function handler(req, res) {
             branch: branch,
           };
 
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(responsePayload));
-          return;
+          return reply(200, responsePayload);
         }
       } catch {
         // Fall back to local disk if GitHub call fails
@@ -346,16 +381,15 @@ module.exports = async function handler(req, res) {
       source: 'local-disk',
     };
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(diskPayload));
+    return reply(200, diskPayload);
   } catch (err) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        success: false,
-        files: [],
-        error: err.message,
-      }),
-    );
+    return reply(500, {
+      success: false,
+      files: [],
+      error: err.message,
+    });
   }
-};
+}
+
+module.exports = universalHandler;
+module.exports.handler = universalHandler;

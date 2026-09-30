@@ -15,17 +15,30 @@ Open source framework for structured, agent-assisted software delivery.
 
 **APPLIES TO ALL AGENTS ACROSS ALL TOOLS (Cursor, GitHub Copilot, Claude Code, Windsurf, AGY, Antigravity, Roo Code, etc.)**:
 
-Whenever the developer asks for ANY new feature, component, bugfix, UI tweak, refactoring, or code change in ANY project (Greenfield or Brownfield, after completion or ongoing):
-1. **STRICT PROHIBITION ON DIRECT CODE GENERATION**:
-   - The AI Agent is **STRICTLY FORBIDDEN** from directly writing, creating, or editing application code (`src/`, `api/`, etc.) using any tool (`write_to_file`, `replace_file_content`, etc.) or terminal command!
-   - Do NOT jump straight into coding, even if existing documents in `_acl-output/` have `status: Approved`. Existing approvals belong exclusively to previously delivered features!
-2. **INTERACTIVE TIER SELECTION (MANDATORY FOR BOTH GREENFIELD & BROWNFIELD)**:
-   - In **BOTH Greenfield and Brownfield projects** (post-completion, existing project, or ongoing feature addition):
-   - **Case A: Tier is Explicitly Specified in the User Prompt** (e.g., *"Tier 1: add dark mode"*, *"Tier 2: database overhaul"*, *"use Tier 1"*):
-     - Follow the rules of that tier immediately.
-   - **Case B: No Tier is Specified in the User Prompt**:
-     - The AI Agent **MUST NOT** write code or edit files.
-     - The AI Agent **MUST IMMEDIATELY OUTPUT** the interactive Tier Selection prompt and **STOP / HALT** to await the user's choice:
+> ⚠️ **APPLICABILITY SCOPE**:
+> - **Application Projects Managed by ACL-ADLC**: This Pre-Flight Check and Delivery Governance apply strictly to **Application Projects** (target software projects where phase documents and code are delivered into `_acl-output/`).
+> - **Framework Source Code Exemption**: This check does **NOT** apply to internal development, testing, CLI tooling, or maintenance inside the **`ACL-ADLC` framework repository itself** (which is governed by automated tests and `npm run quality`).
+
+### Project Lifecycle Determination: Greenfield vs. Brownfield
+
+1. **GREENFIELD PROJECTS (Day 0 Initial Project / MVP Creation)**:
+   - When building a new project from scratch, the AI Agent **DOES NOT PROMPT FOR A TIER**.
+   - The AI Agent **MUST EXECUTE ALL SEQUENTIAL PHASES IN ORDER**:
+     - **Phase 1**: Product Brief (`brief.md`) -> Manager Sign-Off Gate
+     - **Phase 2**: PRD (`prd.md`) -> Manager Sign-Off Gate
+     - **Phase 3A**: Architecture Spine (`architecture-spine.md`) -> Manager Sign-Off Gate
+     - **Phase 3B**: Epics & Stories (`epics.md`) -> Manager Sign-Off Gate
+     - **Phase 4**: Story Implementation (`story-<num>-<num>.md`) -> Manager Sign-Off Gate -> Code
+   - Direct code generation is strictly forbidden until each phase gate is approved by the Manager in Markdown Studio.
+
+2. **BROWNFIELD PROJECTS (Existing Project / Feature Addition / Tweak / Bugfix)**:
+   - Whenever the developer asks for ANY new feature, component, bugfix, UI tweak, refactoring, or code change in an existing or ongoing project:
+     - **STRICT PROHIBITION ON DIRECT CODE GENERATION**: The AI Agent is **STRICTLY FORBIDDEN** from directly writing, creating, or editing application code (`src/`, `api/`, etc.)!
+     - **Case A: Tier is Explicitly Specified in the User Prompt** (e.g., *"Tier 1: add dark mode"*, *"Tier 2: database overhaul"*, *"use Tier 1"*):
+       - Follow the rules of that tier immediately.
+     - **Case B: No Tier is Specified in the User Prompt**:
+       - The AI Agent **MUST NOT** write code or edit files.
+       - The AI Agent **MUST IMMEDIATELY OUTPUT** the interactive Tier Selection prompt and **STOP / HALT** to await the user's choice:
 
 ```text
 ========================================================================
@@ -103,13 +116,13 @@ Please choose which Tier you want to proceed with:
       ========================================================================
       ```
 
-### 1. Feature Addition & Change Request Protocol (Interactive Tier Selection for Greenfield & Brownfield)
+### 1. Feature Addition & Change Request Protocol (Brownfield Projects)
 
 > ℹ️ **PROJECT LIFECYCLE & TIER GOVERNANCE**:
-> - **Brand-New Greenfield Project (Day 0 Initial Creation)**: Follow the sequential creation flow (Phase 1 Brief -> Phase 2 PRD -> Phase 3A Architecture -> Phase 3B Epics).
-> - **Post-Completion or Existing Project (Greenfield OR Brownfield)**: Whenever adding a new feature, component, bugfix, or change, execution tiers (**Tier 1 vs. Tier 2**) **ALWAYS apply**. The AI Agent must never directly write code without an approved spec.
+> - **Brand-New Greenfield Project (Day 0 Initial Creation)**: Always follows the full sequential cascade (Phase 1 Brief -> Phase 2 PRD -> Phase 3A Architecture -> Phase 3B Epics -> Phase 4 Stories). No tier selection is asked because all steps are required.
+> - **Brownfield / Existing Project (Feature Addition or Change)**: Execution tiers (**Tier 1 vs. Tier 2**) **ALWAYS apply**. The AI Agent must prompt the user to choose between Tier 1 (1-Page Spec) and Tier 2 (Major Overhaul) before writing any code.
 
-Whenever the developer asks for a feature, bugfix, or code change in an existing or completed project:
+Whenever the developer asks for a feature, bugfix, or code change in a Brownfield / existing project:
 
 #### Case A: Tier is Explicitly Specified in the User Prompt
 
