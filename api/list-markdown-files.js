@@ -223,10 +223,6 @@ async function universalHandler(arg1, arg2) {
       }
     }
 
-    // Default repository fallback
-    if (!owner) owner = 'karthick1827';
-    if (!repo) repo = 'jira-clone';
-
     // 1. Fetch from GitHub API if owner and repo are known
     if (owner && repo) {
       try {
@@ -371,6 +367,15 @@ async function universalHandler(arg1, arg2) {
     )
       ? '2'
       : finalDiskList.find((f) => f.tier)?.tier || '1';
+
+    if (!fs.existsSync(scanDir) && (!owner || !repo)) {
+      return reply(400, {
+        success: false,
+        files: [],
+        error: 'No GitHub repository specified.',
+        hint: 'Please configure GITHUB_OWNER and GITHUB_REPO in environment variables, or enter them in Markdown Studio Cloud Sync settings.',
+      });
+    }
 
     const diskPayload = {
       success: true,

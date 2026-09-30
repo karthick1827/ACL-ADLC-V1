@@ -223,12 +223,15 @@ async function universalHandler(arg1, arg2) {
       }
     }
 
-    // Default repository fallback
-    if (!owner) owner = 'karthick1827';
-    if (!repo) repo = 'jira-clone';
-
     // 1. If GitHub Token is configured: Commit to GitHub via REST API
     if (token) {
+      if (!owner || !repo) {
+        return reply(400, {
+          success: false,
+          error: 'No GitHub repository specified for cloud commit.',
+          hint: 'Please configure GITHUB_OWNER and GITHUB_REPO in environment variables, or enter them in Markdown Studio Cloud Sync settings.',
+        });
+      }
       const authHeader =
         token.startsWith('Bearer ') || token.startsWith('token ') ? token : token.startsWith('ghp_') ? `token ${token}` : `Bearer ${token}`;
 
