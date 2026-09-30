@@ -202,7 +202,7 @@ async function universalHandler(arg1, arg2) {
       }
     }
 
-    let frameworkVersion = '6.11.41';
+    let frameworkVersion = '6.11.42';
     if (!owner || !repo) {
       try {
         const pkgPath = path.join(process.cwd(), 'package.json');
