@@ -30,7 +30,13 @@
     "api",
     "netlify.toml",
     "vercel.json",
-    "ACL-ADLC-Figma-Precision-Engine-Guide.pdf"
+    "ACL-ADLC-Figma-Precision-Engine-Guide.pdf",
+    "AGENTS.md",
+    ".cursorrules",
+    ".cursor",
+    "CLAUDE.md",
+    ".windsurfrules",
+    ".github/copilot-instructions.md"
   ],
   "scripts": {
     "acl:install": "node tools/installer/acl-cli.js install",

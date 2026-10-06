@@ -1506,14 +1506,13 @@ const server = http.createServer((req, res) => {
   }
 
   const candidateMarkdownPaths = [
-    path.join(ACL_OUTPUT_DIR, 'markdown.html'),
-    path.join(PROJECT_ROOT, 'public', 'markdown', 'markdown.html'),
-    path.join(PROJECT_ROOT, 'src', 'public', 'markdown', 'markdown.html'),
-    path.join(__dirname, '..', 'src', 'public', 'markdown', 'markdown.html'),
-    path.join(PROJECT_ROOT, 'src', 'public', 'markdown.html'),
-    path.join(__dirname, '..', 'src', 'public', 'markdown.html'),
     path.join(PROJECT_ROOT, 'public', 'markdown.html'),
     path.join(PROJECT_ROOT, 'markdown.html'),
+    path.join(ACL_OUTPUT_DIR, 'markdown.html'),
+    path.join(PROJECT_ROOT, 'src', 'public', 'markdown.html'),
+    path.join(PROJECT_ROOT, 'src', 'public', 'markdown', 'markdown.html'),
+    path.join(__dirname, '..', 'src', 'public', 'markdown.html'),
+    path.join(__dirname, '..', 'src', 'public', 'markdown', 'markdown.html'),
   ];
   let servePath = null;
   for (const p of candidateMarkdownPaths) {
@@ -1528,7 +1527,6 @@ const server = http.createServer((req, res) => {
       url.pathname === '/markdown.html' ||
       url.pathname === '/markdown' ||
       url.pathname === '/markdown/' ||
-      url.pathname === '/markdown/markdown.html' ||
       url.pathname === '/markdownstudio.html' ||
       url.pathname === '/markdownstudio') &&
     servePath

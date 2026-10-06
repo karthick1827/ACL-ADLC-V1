@@ -732,18 +732,18 @@ class Installer {
           }
         }
 
-        // Deploy unified markdown.html file into markdown folder
+        // Deploy unified markdown.html file directly into public or project root
         const publicDir = path.join(projectRoot, 'public');
         let targetMarkdownFile;
         let targetMarkdownDir;
         if (await fs.pathExists(publicDir)) {
-          targetMarkdownDir = path.join(publicDir, 'markdown');
-          await fs.ensureDir(targetMarkdownDir);
-          targetMarkdownFile = path.join(targetMarkdownDir, 'markdown.html');
+          targetMarkdownDir = publicDir;
+          targetMarkdownFile = path.join(publicDir, 'markdown.html');
 
-          const publicDuplicate = path.join(publicDir, 'markdown.html');
-          if (await fs.pathExists(publicDuplicate)) {
-            await fs.remove(publicDuplicate);
+          // Clean up legacy public/markdown/markdown.html so only /markdown.html is used
+          const legacySubdirFile = path.join(publicDir, 'markdown', 'markdown.html');
+          if (await fs.pathExists(legacySubdirFile)) {
+            await fs.remove(legacySubdirFile);
           }
           const rootDuplicate = path.join(projectRoot, 'markdown.html');
           if (await fs.pathExists(rootDuplicate)) {
@@ -766,17 +766,22 @@ class Installer {
             (await fs.pathExists(path.join(projectRoot, 'next.config.ts'))) ||
             (await fs.pathExists(path.join(projectRoot, 'package.json')));
           if (isWebProject) {
-            targetMarkdownDir = path.join(publicDir, 'markdown');
+            targetMarkdownDir = publicDir;
             await fs.ensureDir(targetMarkdownDir);
-            targetMarkdownFile = path.join(targetMarkdownDir, 'markdown.html');
+            targetMarkdownFile = path.join(publicDir, 'markdown.html');
+
+            const legacySubdirFile = path.join(publicDir, 'markdown', 'markdown.html');
+            if (await fs.pathExists(legacySubdirFile)) {
+              await fs.remove(legacySubdirFile);
+            }
           } else {
-            targetMarkdownDir = path.join(projectRoot, 'markdown');
-            await fs.ensureDir(targetMarkdownDir);
-            targetMarkdownFile = path.join(targetMarkdownDir, 'markdown.html');
-          }
-          const rootDuplicate = path.join(projectRoot, 'markdown.html');
-          if (await fs.pathExists(rootDuplicate)) {
-            await fs.remove(rootDuplicate);
+            targetMarkdownDir = projectRoot;
+            targetMarkdownFile = path.join(projectRoot, 'markdown.html');
+
+            const legacySubdirFile = path.join(projectRoot, 'markdown', 'markdown.html');
+            if (await fs.pathExists(legacySubdirFile)) {
+              await fs.remove(legacySubdirFile);
+            }
           }
           const rootStudioDup = path.join(projectRoot, 'markdownstudio.html');
           if (await fs.pathExists(rootStudioDup)) {
@@ -834,63 +839,106 @@ class Installer {
             }
           };
 
+          const assetBaseDir = (await fs.pathExists(publicDir)) ? publicDir : targetMarkdownDir;
+          const assetTargetDir = path.join(assetBaseDir, 'markdown');
+          await fs.ensureDir(assetTargetDir);
           for (const sub of ['css', 'js']) {
             const subSrc = path.join(markdownSrcDir, sub);
             if (await fs.pathExists(subSrc)) {
-              const subDest = path.join(targetMarkdownDir, sub);
+              const subDest = path.join(assetTargetDir, sub);
               await fs.copy(subSrc, subDest);
               await trackDirFiles(subDest);
             }
           }
         }
 
+        const frameworkRoot = path.resolve(__dirname, '../../..');
+
         // Deploy AGENTS.md governance rules to project root
         const targetAgentsMd = path.join(projectRoot, 'AGENTS.md');
-        const srcAgentsMd = path.join(path.resolve(__dirname, '../../..'), 'AGENTS.md');
+        const srcAgentsMd = path.join(frameworkRoot, 'AGENTS.md');
         if (await fs.pathExists(srcAgentsMd)) {
           await fs.copy(srcAgentsMd, targetAgentsMd);
           this.installedFiles.add(targetAgentsMd);
+        }
 
-          // Deploy .cursorrules & .cursor/rules/adlc-governance.mdc for Cursor AI
-          const cursorRulesFile = path.join(projectRoot, '.cursorrules');
-          await fs.copy(srcAgentsMd, cursorRulesFile);
-          this.installedFiles.add(cursorRulesFile);
+        // Deploy .cursorrules & .cursor/rules/acl-gate-protocol.mdc for Cursor AI
+        const srcCursorRules = path.join(frameworkRoot, '.cursorrules');
+        const targetCursorRules = path.join(projectRoot, '.cursorrules');
+        if (await fs.pathExists(srcCursorRules)) {
+          await fs.copy(srcCursorRules, targetCursorRules);
+          this.installedFiles.add(targetCursorRules);
+        } else if (await fs.pathExists(srcAgentsMd)) {
+          await fs.copy(srcAgentsMd, targetCursorRules);
+          this.installedFiles.add(targetCursorRules);
+        }
 
-          const cursorRulesDir = path.join(projectRoot, '.cursor', 'rules');
-          await fs.ensureDir(cursorRulesDir);
-          const cursorMdcFile = path.join(cursorRulesDir, 'adlc-governance.mdc');
-          const mdcHeader = `---
-description: ACL-ADLC Universal Phase Gate Approval & Governance Rules
-globs: ["**/*"]
-alwaysApply: true
----
+        const cursorRulesDir = path.join(projectRoot, '.cursor', 'rules');
+        await fs.ensureDir(cursorRulesDir);
+        const srcCursorMdc = path.join(frameworkRoot, '.cursor', 'rules', 'acl-gate-protocol.mdc');
+        const targetCursorMdc = path.join(cursorRulesDir, 'acl-gate-protocol.mdc');
+        if (await fs.pathExists(srcCursorMdc)) {
+          await fs.copy(srcCursorMdc, targetCursorMdc);
+          this.installedFiles.add(targetCursorMdc);
+        } else if (await fs.pathExists(srcCursorRules)) {
+          const mdcHeader = `---\ndescription: ACL-ADLC Governance - Pre-flight tier selection and gate lock protocols\nglobs: ["**/*"]\nalwaysApply: true\n---\n\n`;
+          const content = await fs.readFile(srcCursorRules, 'utf8');
+          await fs.writeFile(targetCursorMdc, mdcHeader + content, 'utf8');
+          this.installedFiles.add(targetCursorMdc);
+        }
 
-`;
-          const agentsContent = await fs.readFile(srcAgentsMd, 'utf8');
-          await fs.writeFile(cursorMdcFile, mdcHeader + agentsContent, 'utf8');
-          this.installedFiles.add(cursorMdcFile);
+        // Clean up legacy adlc-governance.mdc if present
+        const legacyMdc = path.join(cursorRulesDir, 'adlc-governance.mdc');
+        if (await fs.pathExists(legacyMdc)) {
+          await fs.remove(legacyMdc);
+        }
 
-          // Deploy CLAUDE.md for Claude Code
-          const claudeFile = path.join(projectRoot, 'CLAUDE.md');
-          await fs.copy(srcAgentsMd, claudeFile);
-          this.installedFiles.add(claudeFile);
+        // Deploy CLAUDE.md for Claude Code
+        const srcClaudeMd = path.join(frameworkRoot, 'CLAUDE.md');
+        const targetClaudeMd = path.join(projectRoot, 'CLAUDE.md');
+        if (await fs.pathExists(srcClaudeMd)) {
+          await fs.copy(srcClaudeMd, targetClaudeMd);
+          this.installedFiles.add(targetClaudeMd);
+        } else if (await fs.pathExists(srcAgentsMd)) {
+          await fs.copy(srcAgentsMd, targetClaudeMd);
+          this.installedFiles.add(targetClaudeMd);
+        }
 
-          // Deploy .windsurfrules for Windsurf Cascade
-          const windsurfFile = path.join(projectRoot, '.windsurfrules');
-          await fs.copy(srcAgentsMd, windsurfFile);
-          this.installedFiles.add(windsurfFile);
+        // Deploy .windsurfrules for Windsurf Cascade
+        const srcWindsurf = path.join(frameworkRoot, '.windsurfrules');
+        const targetWindsurf = path.join(projectRoot, '.windsurfrules');
+        if (await fs.pathExists(srcWindsurf)) {
+          await fs.copy(srcWindsurf, targetWindsurf);
+          this.installedFiles.add(targetWindsurf);
+        } else if (await fs.pathExists(srcAgentsMd)) {
+          await fs.copy(srcAgentsMd, targetWindsurf);
+          this.installedFiles.add(targetWindsurf);
+        }
 
-          // Deploy .clinerules for Cline & Roo Code
-          const clineFile = path.join(projectRoot, '.clinerules');
-          await fs.copy(srcAgentsMd, clineFile);
-          this.installedFiles.add(clineFile);
+        // Deploy .clinerules for Cline & Roo Code
+        const targetCline = path.join(projectRoot, '.clinerules');
+        if (await fs.pathExists(srcCursorRules)) {
+          await fs.copy(srcCursorRules, targetCline);
+          this.installedFiles.add(targetCline);
+        } else if (await fs.pathExists(srcAgentsMd)) {
+          await fs.copy(srcAgentsMd, targetCline);
+          this.installedFiles.add(targetCline);
+        }
 
-          // Deploy .github/copilot-instructions.md for GitHub Copilot
-          const copilotDir = path.join(projectRoot, '.github');
-          await fs.ensureDir(copilotDir);
-          const copilotFile = path.join(copilotDir, 'copilot-instructions.md');
-          await fs.copy(srcAgentsMd, copilotFile);
-          this.installedFiles.add(copilotFile);
+        // Deploy .github/copilot-instructions.md for GitHub Copilot
+        const srcCopilot = path.join(frameworkRoot, '.github', 'copilot-instructions.md');
+        const copilotDir = path.join(projectRoot, '.github');
+        await fs.ensureDir(copilotDir);
+        const targetCopilot = path.join(copilotDir, 'copilot-instructions.md');
+        if (await fs.pathExists(srcCopilot)) {
+          await fs.copy(srcCopilot, targetCopilot);
+          this.installedFiles.add(targetCopilot);
+        } else if (await fs.pathExists(srcCursorRules)) {
+          await fs.copy(srcCursorRules, targetCopilot);
+          this.installedFiles.add(targetCopilot);
+        } else if (await fs.pathExists(srcAgentsMd)) {
+          await fs.copy(srcAgentsMd, targetCopilot);
+          this.installedFiles.add(targetCopilot);
         }
       }
 
@@ -921,7 +969,7 @@ function aclMarkdownSaverPlugin() {
     name: 'acl-markdown-saver',
     configureServer(server) {
       // URL alias rewrite & direct markdown serving
-      server.middlewares.use((req, res, next) => {
+      server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url ? req.url.split('?')[0] : '';
         if (rawUrl === '/markdownstudio' || rawUrl === '/markdownstudio.html') {
           req.url = req.url.replace(/^\\/markdownstudio(\\.html)?/, '/markdown.html');
@@ -929,17 +977,17 @@ function aclMarkdownSaverPlugin() {
         if (
           rawUrl === '/markdown.html' ||
           rawUrl === '/markdown' ||
-          rawUrl === '/markdown/' ||
-          rawUrl === '/markdown/markdown.html'
+          rawUrl === '/markdown/'
         ) {
           try {
-            const fs = require('node:fs');
-            const path = require('node:path');
+            const fsMod = await import('node:fs');
+            const fs = fsMod.default || fsMod;
+            const pathMod = await import('node:path');
+            const path = pathMod.default || pathMod;
             const candidates = [
-              path.resolve(process.cwd(), 'public/markdown/markdown.html'),
               path.resolve(process.cwd(), 'public/markdown.html'),
-              path.resolve(process.cwd(), 'markdown/markdown.html'),
               path.resolve(process.cwd(), 'markdown.html'),
+              path.resolve(process.cwd(), 'src/public/markdown.html'),
             ];
             for (const cand of candidates) {
               if (fs.existsSync(cand)) {
