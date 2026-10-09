@@ -41,7 +41,7 @@ function assert(condition, message) {
 }
 
 function read(relativePath) {
-  return fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf-8');
+  return fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf-8').replaceAll('\r\n', '\n');
 }
 
 function parseFrontmatter(content, relativePath) {

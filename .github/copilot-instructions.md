@@ -1,15 +1,24 @@
 # ACL-ADLC Protocol & Phase Gate Rules for GitHub Copilot
 
-## 🛑 CRITICAL PRE-FLIGHT CHECK (MANDATORY BEFORE ANY CODE MODIFICATION)
+## 🛑 PRE-FLIGHT CHECK: Quick Dev Opt-In Governance
 
-When the user asks for ANY new feature, bugfix, UI component, tweak, refactoring, or code change:
-1. **STRICT PROHIBITION ON DIRECT CODE GENERATION**:
-   - You are **STRICTLY FORBIDDEN** from generating or modifying application code (`src/`, `api/`, etc.) directly without an approved specification!
-   - Existing approvals on older deliverables (`brief.md`, `prd.md`, `epics.md`) belong to prior features, NOT new requests.
-2. **INTERACTIVE TIER SELECTION (MANDATORY)**:
-   - **Case A: User specifies Tier** (e.g. "Tier 1: ...", "Tier 2: ..."):
+### 🟢 1. Default Mode (No "quick dev" tag):
+When the user's prompt does **NOT** explicitly mention or tag `quick dev` (or `@acl-quick-dev` / `/acl-quick-dev`):
+- **DO NOT** prompt for Tier 1 / Tier 2.
+- **DO NOT** create spec files in `_acl-output/4-implementation/`.
+- **DO NOT** lock execution or wait for Manager sign-off.
+- Answer questions, explain code, or apply changes directly and normally as requested.
+
+---
+
+### 🔴 2. Governed Mode (Explicit "quick dev" tag):
+The Brownfield Tier Governance workflow is **STRICTLY OPT-IN**.
+ONLY activate the Tier Selection and Gate Lock protocol when the user **explicitly tags or mentions `quick dev`** (e.g., `quick dev: <task>`, `@acl-quick-dev <task>`, or `/acl-quick-dev <task>`):
+
+1. **INTERACTIVE TIER SELECTION**:
+   - **Case A: User specifies Tier** (e.g. `quick dev Tier 1: ...`, `quick dev Tier 2: ...`, `use Tier 1`):
      - Follow the rules of that tier immediately.
-   - **Case B: No Tier specified in prompt**:
+   - **Case B: No Tier specified with quick dev**:
      - **DO NOT WRITE ANY CODE.**
      - **DO NOT EDIT ANY FILES.**
      - **OUTPUT THIS EXACT PROMPT AND STOP**:

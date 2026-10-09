@@ -32,13 +32,20 @@ Open source framework for structured, agent-assisted software delivery.
    - Direct code generation is strictly forbidden until each phase gate is approved by the Manager in Markdown Studio.
 
 2. **BROWNFIELD PROJECTS (Existing Project / Feature Addition / Tweak / Bugfix)**:
-   - Whenever the developer asks for ANY new feature, component, bugfix, UI tweak, refactoring, or code change in an existing or ongoing project:
-     - **STRICT PROHIBITION ON DIRECT CODE GENERATION**: The AI Agent is **STRICTLY FORBIDDEN** from directly writing, creating, or editing application code (`src/`, `api/`, etc.)!
-     - **Case A: Tier is Explicitly Specified in the User Prompt** (e.g., *"Tier 1: add dark mode"*, *"Tier 2: database overhaul"*, *"use Tier 1"*):
-       - Follow the rules of that tier immediately.
-     - **Case B: No Tier is Specified in the User Prompt**:
-       - The AI Agent **MUST NOT** write code or edit files.
-       - The AI Agent **MUST IMMEDIATELY OUTPUT** the interactive Tier Selection prompt and **STOP / HALT** to await the user's choice:
+   - **Default Mode (No "quick dev" tag)**:
+     - When the developer's prompt does **NOT** explicitly tag or mention `quick dev` (or `@acl-quick-dev` / `/acl-quick-dev`):
+       - Do **NOT** prompt for Tier 1 / Tier 2.
+       - Do **NOT** create spec files in `_acl-output/4-implementation/`.
+       - Do **NOT** lock execution or wait for Manager sign-off.
+       - Answer questions, review code, or apply changes directly and normally as requested.
+   - **Governed Mode (Explicit "quick dev" tag)**:
+     - The Brownfield Tier Governance workflow is **STRICTLY OPT-IN**.
+     - Whenever the developer **explicitly tags or mentions `quick dev`** (e.g., `quick dev: <task>`, `@acl-quick-dev <task>`, or `/acl-quick-dev <task>`):
+       - **Case A: Tier is Explicitly Specified in the User Prompt** (e.g., *"quick dev Tier 1: add dark mode"*, *"quick dev Tier 2: database overhaul"*, *"use Tier 1"*):
+         - Follow the rules of that tier immediately.
+       - **Case B: No Tier is Specified in the User Prompt**:
+         - The AI Agent **MUST NOT** write code or edit files.
+         - The AI Agent **MUST IMMEDIATELY OUTPUT** the interactive Tier Selection prompt and **STOP / HALT** to await the user's choice:
 
 ```text
 ========================================================================
@@ -122,11 +129,11 @@ Please choose which Tier you want to proceed with:
 > - **Brand-New Greenfield Project (Day 0 Initial Creation)**: Always follows the full sequential cascade (Phase 1 Brief -> Phase 2 PRD -> Phase 3A Architecture -> Phase 3B Epics -> Phase 4 Stories). No tier selection is asked because all steps are required.
 > - **Brownfield / Existing Project (Feature Addition or Change)**: Execution tiers (**Tier 1 vs. Tier 2**) **ALWAYS apply**. The AI Agent must prompt the user to choose between Tier 1 (1-Page Spec) and Tier 2 (Major Overhaul) before writing any code.
 
-Whenever the developer asks for a feature, bugfix, or code change in a Brownfield / existing project:
+Whenever the developer asks for a feature, bugfix, or code change in a Brownfield / existing project **and explicitly tags or mentions `quick dev`**:
 
 #### Case A: Tier is Explicitly Specified in the User Prompt
 
-If the user specifies a tier (e.g., _"Tier 1: create notification drawer"_, _"Tier 2: migrate database"_, or _"use Tier 1"_), the AI Agent immediately follows the rules of that tier without asking.
+If the user specifies a tier (e.g., _"quick dev Tier 1: create notification drawer"_, _"quick dev Tier 2: migrate database"_, or _"use Tier 1"_), the AI Agent immediately follows the rules of that tier without asking.
 
 #### Case B: No Tier is Specified in the User Prompt
 

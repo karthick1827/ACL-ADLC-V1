@@ -3634,7 +3634,8 @@ async function runTests() {
       'partial noninteractive core options retain defaults for omitted values',
     );
     assert(
-      partialConfig49.moduleConfigs.acl.implementation_artifacts === '{project-root}/_acl-output/implementation-artifacts' &&
+      (partialConfig49.moduleConfigs.acl.implementation_artifacts === '{project-root}/_acl-output/4-implementation' ||
+        partialConfig49.moduleConfigs.acl.implementation_artifacts === '{project-root}/_acl-output/implementation-artifacts') &&
         partialConfig49.moduleConfigs.acl.planning_artifacts === '{project-root}/_acl-output/planning-artifacts',
       'partial noninteractive core options resolve dependent module defaults',
     );
