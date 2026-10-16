@@ -18,6 +18,7 @@
   },
   "license": "MIT",
   "author": "Karthick N",
+  
   "main": "tools/installer/acl-cli.js",
   "bin": {
     "acl": "tools/installer/acl-cli.js",
@@ -59,6 +60,9 @@
     "prepare": "husky || exit 0",
     "quality": "npm run format:check && npm run lint && npm run lint:md && npm run docs:build && npm run test:site-url && npm run test:install && npm run test:urls && npm run test:renderer && npm run test:dev-auto-contract && npm run validate:refs && npm run validate:skills && npm run validate:gates && npm run docs:validate-sidebar",
     "rebundle": "node tools/bundle-web-bundles.js",
+    "studio:dev": "node tools/sync-studio.js --watch --serve",
+    "studio:sync": "node tools/sync-studio.js",
+    "studio:watch": "node tools/sync-studio.js --watch",
     "test": "npm run test:refs && npm run test:install && npm run test:urls && npm run test:site-url && npm run test:channels && npm run test:renderer && npm run test:dev-auto-contract && npm run test:skills && npm run validate:gates && npm run lint && npm run lint:md && npm run format:check",
     "test:channels": "node test/test-installer-channels.js",
     "test:dev-auto-contract": "node test/test-dev-auto-contract.js",

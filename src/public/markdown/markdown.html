@@ -97,6 +97,18 @@
         >
           <span class="rail-item-icon">📝</span>
         </button>
+
+        <!-- Subheader 5: Agents -->
+        <button
+          type="button"
+          class="rail-item"
+          id="railItemAgents"
+          onclick="switchAppView('agents')"
+          title="Agents (Available Agents & Skills)"
+          aria-label="Agents"
+        >
+          <span class="rail-item-icon">🤖</span>
+        </button>
       </div>
       <div class="rail-footer">
         <span class="rail-version-dot" title="ACL-ADLC Active"></span>
@@ -145,6 +157,16 @@
           <div class="nav-item-text">
             <span class="nav-item-title">Markdown Studio</span>
             <span class="nav-item-subtitle">Document Editor & Manager Approval</span>
+          </div>
+        </button>
+
+        <div class="nav-drawer-section-label" style="margin-top: 1.25rem">🤖 Agents</div>
+        <!-- Agents -->
+        <button type="button" class="nav-drawer-item" id="navItemAgents" onclick="switchAppView('agents')">
+          <span class="nav-item-icon">🤖</span>
+          <div class="nav-item-text">
+            <span class="nav-item-title">Agents</span>
+            <span class="nav-item-subtitle">Available Agents & SKILL.md</span>
           </div>
         </button>
       </nav>
@@ -301,6 +323,51 @@
       </div>
     </div>
 
+    <!-- Agents View (Read-Only Agent Skills Browser) -->
+    <div class="app-container" id="agentsView" style="display: none">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-controls">
+          <div class="search-input-wrapper">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              id="agentsSearchInput"
+              class="search-input"
+              placeholder="Search agents or skills..."
+              oninput="renderAgentsTree()"
+            />
+          </div>
+          <div class="agents-tree-summary" id="agentsCountBadge">
+            <span>🤖 Available Agents</span>
+          </div>
+        </div>
+
+        <!-- Agents Tree -->
+        <div class="file-tree-container" id="agentsTreeRoot"></div>
+      </aside>
+
+      <!-- Workspace (Read-Only Preview) -->
+      <main class="workspace">
+        <div class="editor-status-bar">
+          <div class="status-selection-area">
+            <span class="status-label">Agent Specification:</span>
+            <span id="agentsCurrentPath" class="agents-current-path">Select an agent</span>
+          </div>
+
+          <div class="view-mode-group">
+            <span class="agents-readonly-badge" title="Agent SKILL.md specifications are read-only">
+              🔒 Read-Only Preview
+            </span>
+          </div>
+        </div>
+
+        <div class="editor-wrapper agents-preview-wrapper">
+          <div id="agentsMarkdownPreview" class="markdown-body"></div>
+        </div>
+      </main>
+    </div>
+
     <!-- Toast -->
     <div class="toast" id="toastNotification">
       <span id="toastIcon">✔</span>
@@ -334,6 +401,7 @@
     <script src="/markdown/js/workflow-modal.js"></script>
     <script src="/markdown/js/drawer.js"></script>
     <script src="/markdown/js/dashboard.js"></script>
+    <script src="/markdown/js/agents.js"></script>
     <script src="/markdown/js/app.js"></script>
   </body>
 </html>
