@@ -801,7 +801,7 @@ class Installer {
         // Deploy workflow SVG diagrams and Studio logo alongside markdown.html
         const targetDir = path.dirname(targetMarkdownFile);
         const svgSrcDirs = [path.dirname(srcMarkdown), path.join(path.dirname(srcMarkdown), '..')];
-        for (const svgName of ['greenfield.svg', 'brownfield.svg', 'velocityone-studio-logo.png']) {
+        for (const svgName of ['greenfield.svg', 'brownfield.svg', 'velocityone-studio-logo.png', 'vo-icon.svg']) {
           for (const sDir of svgSrcDirs) {
             const svgSrc = path.join(sDir, svgName);
             if (await fs.pathExists(svgSrc)) {
@@ -1006,7 +1006,7 @@ function aclMarkdownSaverPlugin() {
       // Workflow SVGs and Studio logo static serve
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url ? req.url.split('?')[0] : '';
-        if (rawUrl === '/greenfield.svg' || rawUrl === '/brownfield.svg' || rawUrl === '/velocityone-studio-logo.png') {
+        if (rawUrl === '/greenfield.svg' || rawUrl === '/brownfield.svg' || rawUrl === '/velocityone-studio-logo.png' || rawUrl === '/vo-icon.svg') {
           try {
             const svgName = rawUrl.slice(1);
             const fsMod = await import('node:fs');

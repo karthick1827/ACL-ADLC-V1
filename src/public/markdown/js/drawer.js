@@ -1,7 +1,6 @@
 function toggleNavDrawer() {
   const drawer = document.getElementById('navDrawer');
-  const backdrop = document.getElementById('navDrawerBackdrop');
-  if (!drawer || !backdrop) return;
+  if (!drawer) return;
   if (drawer.classList.contains('open')) {
     closeNavDrawer();
   } else {
@@ -11,10 +10,7 @@ function toggleNavDrawer() {
 
 function openNavDrawer() {
   const drawer = document.getElementById('navDrawer');
-  const backdrop = document.getElementById('navDrawerBackdrop');
   if (drawer) drawer.classList.add('open');
-  if (backdrop) backdrop.classList.add('open');
-  document.body.style.overflow = 'hidden';
 }
 
 function closeNavDrawer() {
@@ -22,7 +18,45 @@ function closeNavDrawer() {
   const backdrop = document.getElementById('navDrawerBackdrop');
   if (drawer) drawer.classList.remove('open');
   if (backdrop) backdrop.classList.remove('open');
-  document.body.style.overflow = '';
+}
+
+let navDrawerHoverTimer = null;
+
+function handleNavDrawerHoverEnter() {
+  if (navDrawerHoverTimer) {
+    clearTimeout(navDrawerHoverTimer);
+    navDrawerHoverTimer = null;
+  }
+  openNavDrawer();
+}
+
+function handleNavDrawerHoverLeave() {
+  if (navDrawerHoverTimer) {
+    clearTimeout(navDrawerHoverTimer);
+  }
+  navDrawerHoverTimer = setTimeout(() => {
+    closeNavDrawer();
+  }, 180);
+}
+
+function initNavDrawerHover() {
+  const rail = document.getElementById('verticalTabRail');
+  const drawer = document.getElementById('navDrawer');
+
+  if (rail) {
+    rail.addEventListener('mouseenter', handleNavDrawerHoverEnter);
+    rail.addEventListener('mouseleave', handleNavDrawerHoverLeave);
+  }
+  if (drawer) {
+    drawer.addEventListener('mouseenter', handleNavDrawerHoverEnter);
+    drawer.addEventListener('mouseleave', handleNavDrawerHoverLeave);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initNavDrawerHover);
+} else {
+  initNavDrawerHover();
 }
 
 function switchAppView(view) {
@@ -36,10 +70,17 @@ function switchAppView(view) {
   const studioView = document.getElementById('studioView');
   const dashboardView = document.getElementById('dashboardView');
   const headerTitle = document.getElementById('appHeaderTitle');
+
   const navStudio = document.getElementById('navItemStudio');
   const navSummarized = document.getElementById('navItemSummarized');
   const navScrum = document.getElementById('navItemScrum');
   const navDeveloper = document.getElementById('navItemDeveloper');
+
+  const railStudio = document.getElementById('railItemStudio');
+  const railSummarized = document.getElementById('railItemSummarized');
+  const railScrum = document.getElementById('railItemScrum');
+  const railDeveloper = document.getElementById('railItemDeveloper');
+
   const btnSave = document.getElementById('btnSave');
   const syncStatus = document.getElementById('syncStatus');
 
@@ -48,6 +89,11 @@ function switchAppView(view) {
     if (navSummarized) navSummarized.classList.remove('active');
     if (navScrum) navScrum.classList.remove('active');
     if (navDeveloper) navDeveloper.classList.remove('active');
+
+    if (railStudio) railStudio.classList.remove('active');
+    if (railSummarized) railSummarized.classList.remove('active');
+    if (railScrum) railScrum.classList.remove('active');
+    if (railDeveloper) railDeveloper.classList.remove('active');
   }
 
   if (view === 'dashboard-summarized' || view === 'dashboard') {
@@ -59,6 +105,7 @@ function switchAppView(view) {
     if (headerTitle) headerTitle.textContent = '';
     clearNavActive();
     if (navSummarized) navSummarized.classList.add('active');
+    if (railSummarized) railSummarized.classList.add('active');
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
     renderDeliveryDashboard();
@@ -71,6 +118,7 @@ function switchAppView(view) {
     if (headerTitle) headerTitle.textContent = '';
     clearNavActive();
     if (navScrum) navScrum.classList.add('active');
+    if (railScrum) railScrum.classList.add('active');
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
     renderScrumMasterDashboard();
@@ -83,6 +131,7 @@ function switchAppView(view) {
     if (headerTitle) headerTitle.textContent = '';
     clearNavActive();
     if (navDeveloper) navDeveloper.classList.add('active');
+    if (railDeveloper) railDeveloper.classList.add('active');
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
     renderDeveloperDashboard();
@@ -95,6 +144,7 @@ function switchAppView(view) {
     if (headerTitle) headerTitle.textContent = '';
     clearNavActive();
     if (navStudio) navStudio.classList.add('active');
+    if (railStudio) railStudio.classList.add('active');
     if (btnSave) btnSave.style.display = 'flex';
     if (syncStatus) syncStatus.style.display = 'flex';
     if (activeFileId) loadFile(activeFileId);

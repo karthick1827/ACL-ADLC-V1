@@ -63,6 +63,10 @@ function getActiveFile() {
   return null;
 }
 
+if (typeof marked !== 'undefined' && marked.setOptions) {
+  marked.setOptions({ gfm: true, breaks: true });
+}
+
 function renderPreview() {
   const file = getActiveFile();
   if (!file) return;
@@ -77,6 +81,9 @@ function renderPreview() {
   }
 
   if (typeof marked !== 'undefined') {
+    if (marked.setOptions) {
+      marked.setOptions({ gfm: true, breaks: true });
+    }
     previewEl.innerHTML = marked.parse(displayContent);
     if (typeof hljs !== 'undefined') {
       previewEl.querySelectorAll('pre code').forEach((block) => {

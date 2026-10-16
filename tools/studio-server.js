@@ -1536,7 +1536,12 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/greenfield.svg' || url.pathname === '/brownfield.svg' || url.pathname === '/velocityone-studio-logo.png') {
+  if (
+    url.pathname === '/greenfield.svg' ||
+    url.pathname === '/brownfield.svg' ||
+    url.pathname === '/velocityone-studio-logo.png' ||
+    url.pathname === '/vo-icon.svg'
+  ) {
     const assetFile = url.pathname.slice(1);
     let assetPath = path.join(__dirname, '..', 'src', 'public', assetFile);
     if (!fs.existsSync(assetPath)) {

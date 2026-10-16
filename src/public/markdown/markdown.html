@@ -34,7 +34,75 @@
     <link rel="stylesheet" href="/markdown/css/modals.css" />
     <link rel="stylesheet" href="/markdown/css/dashboard.css" />
   </head>
-  <body class="view-studio">
+  <body class="view-dashboard">
+    <!-- Slim Vertical Tab Rail (Google-style vertical tabs) -->
+    <aside class="vertical-tab-rail" id="verticalTabRail" aria-label="Quick Navigation">
+      <div class="rail-top">
+        <div class="rail-brand-icon" title="VelocityONE Studio">
+          <svg class="vo-icon-svg" width="36" height="36" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="VelocityONE (VO)">
+            <rect width="32" height="32" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.2"/>
+            <text x="16" y="21.5" text-anchor="middle" font-size="14.5" letter-spacing="-0.5px" style="user-select:none">
+              <tspan fill="#0047BA" font-family="'Georgia', 'Times New Roman', serif" font-weight="bold">V</tspan><tspan fill="#0F172A" font-family="'Inter', -apple-system, sans-serif" font-weight="900">O</tspan>
+            </text>
+          </svg>
+        </div>
+      </div>
+      <div class="rail-menu">
+        <!-- Subheader 1: Summarized -->
+        <button
+          type="button"
+          class="rail-item active"
+          id="railItemSummarized"
+          onclick="switchAppView('dashboard-summarized')"
+          title="Summarized Dashboard (Phases & Delivery Telemetry)"
+          aria-label="Summarized Dashboard"
+        >
+          <span class="rail-item-icon">📈</span>
+        </button>
+
+        <!-- Subheader 2: Scrum Master -->
+        <button
+          type="button"
+          class="rail-item"
+          id="railItemScrum"
+          onclick="switchAppView('dashboard-scrum')"
+          title="Scrum Master Dashboard (Epics & Stories Velocity)"
+          aria-label="Scrum Master Dashboard"
+        >
+          <span class="rail-item-icon">🏃</span>
+        </button>
+
+        <!-- Subheader 3: Developer -->
+        <button
+          type="button"
+          class="rail-item"
+          id="railItemDeveloper"
+          onclick="switchAppView('dashboard-developer')"
+          title="Developer Dashboard (Stories & Acceptance Criteria)"
+          aria-label="Developer Dashboard"
+        >
+          <span class="rail-item-icon">💻</span>
+        </button>
+
+        <div class="rail-divider"></div>
+
+        <!-- Subheader 4: Markdown Studio -->
+        <button
+          type="button"
+          class="rail-item"
+          id="railItemStudio"
+          onclick="switchAppView('studio')"
+          title="Markdown Studio (Document Editor & Manager Approval)"
+          aria-label="Markdown Studio"
+        >
+          <span class="rail-item-icon">📝</span>
+        </button>
+      </div>
+      <div class="rail-footer">
+        <span class="rail-version-dot" title="ACL-ADLC Active"></span>
+      </div>
+    </aside>
+
     <!-- Slide-out Navigation Drawer -->
     <div class="nav-drawer-backdrop" id="navDrawerBackdrop" onclick="closeNavDrawer()"></div>
     <aside class="nav-drawer" id="navDrawer">
@@ -42,12 +110,11 @@
         <div class="nav-drawer-brand">
           <img class="brand-logo" src="/velocityone-studio-logo.png" alt="VelocityONE Studio" />
         </div>
-        <button type="button" class="nav-drawer-close" onclick="closeNavDrawer()" title="Close navigation">✕</button>
       </div>
       <nav class="nav-drawer-menu">
         <div class="nav-drawer-section-label">📊 Dashboard</div>
         <!-- Sub-item 1: Summarized -->
-        <button type="button" class="nav-drawer-item sub-item" id="navItemSummarized" onclick="switchAppView('dashboard-summarized')">
+        <button type="button" class="nav-drawer-item sub-item active" id="navItemSummarized" onclick="switchAppView('dashboard-summarized')">
           <span class="nav-item-icon">📈</span>
           <div class="nav-item-text">
             <span class="nav-item-title">Summarized</span>
@@ -73,7 +140,7 @@
 
         <div class="nav-drawer-section-label" style="margin-top: 1.25rem">📝 Editor</div>
         <!-- Markdown Studio -->
-        <button type="button" class="nav-drawer-item active" id="navItemStudio" onclick="switchAppView('studio')">
+        <button type="button" class="nav-drawer-item" id="navItemStudio" onclick="switchAppView('studio')">
           <span class="nav-item-icon">📝</span>
           <div class="nav-item-text">
             <span class="nav-item-title">Markdown Studio</span>
@@ -90,22 +157,6 @@
     <!-- Top Application Header -->
     <header>
       <div class="brand-container">
-        <button type="button" class="btn-nav-drawer" id="btnNavDrawer" onclick="toggleNavDrawer()" title="Navigation Menu (☰)">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-        </button>
         <div class="brand">
           <img class="brand-logo" src="/velocityone-studio-logo.png" alt="VelocityONE Studio" />
           <span id="appHeaderTitle"></span>

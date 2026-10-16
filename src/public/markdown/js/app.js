@@ -64,7 +64,18 @@ async function init() {
     }
   }
 
-  // NO background polling or window-focus triggers: files sync strictly on initial load, manual Sync button, or file save.
+  // Open Summarized Dashboard by default when visiting /markdown.html
+  switchAppView('dashboard-summarized');
+
+  // Universal live auto-sync: automatically syncs when any agent (Claude Code, AGY, Gemini, Copilot, Cursor, etc.)
+  // generates or updates markdown files in _acl-output/ without needing manual browser refresh
+  setInterval(() => {
+    syncFromLiveDisk(true);
+  }, 1500);
+
+  window.addEventListener('focus', () => {
+    syncFromLiveDisk(true);
+  });
 }
 
 window.addEventListener('DOMContentLoaded', init);
