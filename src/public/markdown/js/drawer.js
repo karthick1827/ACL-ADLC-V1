@@ -165,10 +165,6 @@ function switchAppView(view) {
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
     if (workflowDropdownWrapper) workflowDropdownWrapper.style.display = 'none';
-    const readonlyBadge = document.querySelector('#agentsView .agents-readonly-badge') || document.querySelector('.agents-readonly-badge');
-    if (readonlyBadge) {
-      readonlyBadge.innerHTML = '👁️ Preview';
-    }
     if (typeof loadAgentsData === 'function') {
       loadAgentsData();
     }

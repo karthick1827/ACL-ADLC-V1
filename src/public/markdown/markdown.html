@@ -98,14 +98,14 @@
           <span class="rail-item-icon">📝</span>
         </button>
 
-        <!-- Subheader 5: Agents -->
+        <!-- Subheader 5: Agents Info -->
         <button
           type="button"
           class="rail-item"
           id="railItemAgents"
           onclick="switchAppView('agents')"
-          title="Agents (Available Agents & Skills)"
-          aria-label="Agents"
+          title="Agents Info (Available Agents & Skills)"
+          aria-label="Agents Info"
         >
           <span class="rail-item-icon">🤖</span>
         </button>
@@ -160,12 +160,12 @@
           </div>
         </button>
 
-        <div class="nav-drawer-section-label" style="margin-top: 1.25rem">🤖 Agents</div>
-        <!-- Agents -->
+        <div class="nav-drawer-section-label" style="margin-top: 1.25rem">🤖 Agents Info</div>
+        <!-- Agents Info -->
         <button type="button" class="nav-drawer-item" id="navItemAgents" onclick="switchAppView('agents')">
           <span class="nav-item-icon">🤖</span>
           <div class="nav-item-text">
-            <span class="nav-item-title">Agents</span>
+            <span class="nav-item-title">Agents Info</span>
             <span class="nav-item-subtitle">Available Agents & SKILL.md</span>
           </div>
         </button>
@@ -334,12 +334,12 @@
               type="text"
               id="agentsSearchInput"
               class="search-input"
-              placeholder="Search agents or skills..."
+              placeholder="Search agents info..."
               oninput="renderAgentsTree()"
             />
           </div>
           <div class="agents-tree-summary" id="agentsCountBadge">
-            <span>🤖 Available Agents</span>
+            <span>🤖 Agents Info</span>
           </div>
         </div>
 
@@ -354,15 +354,9 @@
             <span class="status-label">Agent Specification:</span>
             <span id="agentsCurrentPath" class="agents-current-path">Select an agent</span>
           </div>
-
-          <div class="view-mode-group">
-            <span class="agents-readonly-badge" title="Agent SKILL.md specifications are read-only">
-              🔒 Read-Only Preview
-            </span>
-          </div>
         </div>
 
-        <div class="editor-wrapper agents-preview-wrapper">
+        <div class="editor-wrapper">
           <div id="agentsMarkdownPreview" class="markdown-body"></div>
         </div>
       </main>
