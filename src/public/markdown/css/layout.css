@@ -304,6 +304,15 @@ body {
   flex-direction: column;
   gap: 0.5rem;
   flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.nav-drawer-menu::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 .nav-drawer-section-label {
   font-size: 0.95rem;
