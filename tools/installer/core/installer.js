@@ -1336,7 +1336,7 @@ function aclMarkdownSaverPlugin() {
 
             agents.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
-            let frameworkVersion = '6.11.45';
+            let frameworkVersion = '6.11.46';
             try {
               const pkgCandidates = [
                 path.join(projectRoot, 'node_modules', 'acl-adlc', 'package.json'),

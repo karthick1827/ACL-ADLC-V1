@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * ACL-ADLC Markdown Studio Live Synchronizer & Replicator
  *
@@ -34,8 +32,8 @@ const DEFAULT_TARGETS = [
 const targetProjects = customTarget
   ? [customTarget]
   : process.env.ACL_TARGET_PROJECT
-  ? [process.env.ACL_TARGET_PROJECT]
-  : DEFAULT_TARGETS.filter((p) => fs.existsSync(p));
+    ? [process.env.ACL_TARGET_PROJECT]
+    : DEFAULT_TARGETS.filter((p) => fs.existsSync(p));
 
 if (targetProjects.length === 0) {
   console.error(`[SYNC-ERROR] No valid target projects found.`);
@@ -141,7 +139,7 @@ if (isServe) {
 // Watch Mode
 if (isWatch) {
   console.log(`👀 Watching for changes in: ${SRC_PUBLIC_DIR}`);
-  console.log(`⚡ Updates will automatically replicate to all target projects:\n${targetProjects.map(p => '   - ' + p).join('\n')}\n`);
+  console.log(`⚡ Updates will automatically replicate to all target projects:\n${targetProjects.map((p) => '   - ' + p).join('\n')}\n`);
 
   let debounceTimer = null;
   const changedFiles = new Set();

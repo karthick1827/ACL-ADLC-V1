@@ -1528,7 +1528,7 @@ const server = http.createServer(async (req, res) => {
 
       agents.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
-      let frameworkVersion = '6.11.45';
+      let frameworkVersion = '6.11.46';
       try {
         const pkgCandidates = [path.join(PROJECT_ROOT, 'package.json'), path.join(__dirname, '..', 'package.json')];
         for (const cand of pkgCandidates) {
