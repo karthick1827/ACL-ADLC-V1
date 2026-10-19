@@ -633,47 +633,143 @@ function getAclFrameworkVersion() {
 }
 
 /**
- * Render preview of the selected agent's SKILL.md file identical to Markdown Studio preview view.
+ * Render the human-readable executive document preview of the selected agent's SKILL.md file.
+ * Formatted like an official corporate document so stakeholders understand everything at a glance.
  */
 function previewAgentSkill(agentId) {
   const agent = agentsList.find((a) => a.id === agentId);
   if (!agent) return;
 
+  const modInfo = getAgentModuleInfo(agent);
+  const frameworkVersion = getAclFrameworkVersion();
   const currentPathEl = document.getElementById('agentsCurrentPath');
   if (currentPathEl) {
-    currentPathEl.textContent = `${agent.name}/SKILL.md`;
+    currentPathEl.innerHTML = `
+      <span>${agent.name}/SKILL.md</span>
+      <span class="agents-module-tag" style="margin-left: 10px; font-size: 0.74rem; padding: 2px 8px; border-radius: 4px; background: #eff6ff; color: #1d4ed8; font-weight: 600; border: 1px solid #bfdbfe;" title="Module: ${modInfo.label}">
+        Module: ${modInfo.label}
+      </span>
+    `;
   }
 
   const previewEl = document.getElementById('agentsMarkdownPreview');
   if (!previewEl) return;
 
   const rawContent = agent.skillFile?.content || '# ' + agent.name + '\n\n*No SKILL.md content available.*';
+  const meta = getSkillOfficeMeta(agent, modInfo, rawContent);
 
-  // Strip YAML frontmatter just like Markdown Studio does in renderPreview()
-  let displayContent = rawContent || '';
-  if (displayContent.startsWith('---')) {
-    const parts = displayContent.split('---');
-    if (parts.length >= 3) {
-      displayContent = parts.slice(2).join('---').trim();
-    }
+  // 1. Clean raw markdown content: remove YAML frontmatter and encoding glitches
+  let cleanContent = rawContent.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+  cleanContent = cleanContent.replaceAll('????', '🛡️').replaceAll('???', '—');
+
+  // 2. Transform the Phase Gate section into a clean executive governance box
+  const gateRegex = /##\s+[^\n\r]*(?:Universal Phase Gate Precondition|STRICT PROHIBITION)[\s\S]*?(?=\n#|\n##\s+(?!🛑|🚦)|$)/i;
+  let hasGate = gateRegex.test(cleanContent);
+  if (hasGate) {
+    cleanContent = cleanContent.replace(gateRegex, '');
   }
 
-  // Render clean markdown to HTML (same as Markdown Studio renderPreview)
+  // 3. Render clean markdown to HTML
+  let bodyHtml = '';
   if (typeof marked !== 'undefined') {
-    if (marked.setOptions) {
-      marked.setOptions({ gfm: true, breaks: true });
-    }
-    previewEl.innerHTML = marked.parse(displayContent);
-    if (typeof hljs !== 'undefined') {
-      previewEl.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
-      });
-    }
+    bodyHtml = marked.parse(cleanContent);
   } else {
-    previewEl.textContent = displayContent;
+    bodyHtml = `<pre>${cleanContent}</pre>`;
+  }
+
+  // 4. Assemble the complete human-readable document sheet
+  const officeHtml = `
+    <div class="office-document-sheet">
+      <!-- Top Action Toolbar -->
+      <div class="office-sheet-toolbar">
+        <div class="office-toolbar-left">
+          <span class="office-badge-pill">🛡️ OFFICIAL SPECIFICATION</span>
+          <span class="status-pill status-skill" title="${modInfo.label}">
+            <span class="dot"></span>
+            ${modInfo.short}
+          </span>
+        </div>
+      </div>
+
+      <!-- Document Header -->
+      <div class="office-doc-header">
+        <div class="office-doc-kicker">ACL-ADLC Enterprise Framework (${frameworkVersion}) · ${modInfo.label}</div>
+        <h1 class="office-doc-title">${meta.title}</h1>
+        <div class="office-doc-subtitle">${meta.subtitle}</div>
+
+        <!-- Executive 4-Card Metadata Grid (For Non-Tech Stakeholders) -->
+        <div class="office-meta-grid">
+          <div class="office-meta-card">
+            <div class="office-meta-card-label">🎯 Business Purpose</div>
+            <div class="office-meta-card-value">${meta.businessValue}</div>
+          </div>
+          <div class="office-meta-card">
+            <div class="office-meta-card-label">📍 Delivery Phase</div>
+            <div class="office-meta-card-value">${modInfo.label}</div>
+          </div>
+          <div class="office-meta-card">
+            <div class="office-meta-card-label">📦 Key Deliverable</div>
+            <div class="office-meta-card-value">${meta.deliverable}</div>
+          </div>
+          <div class="office-meta-card">
+            <div class="office-meta-card-label">🛡️ Quality Gate</div>
+            <div class="office-meta-card-value">${meta.governance}</div>
+          </div>
+        </div>
+
+        <!-- Stakeholder Explainer Card: Non-Technical Plain-English Guide -->
+        <div class="office-explainer-card">
+          <div class="office-explainer-header">
+            <span>💡</span>
+            <span>Guide for Non-Technical Stakeholders & Executives</span>
+          </div>
+          <div class="office-explainer-content">
+            This agent represents an official automated delivery role in the project lifecycle. Here is what business and non-technical stakeholders need to know:
+            <ul class="office-explainer-list">
+              ${meta.stakeholderGuide.map((item) => `<li>${item}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+
+        <!-- Mandatory Quality & Compliance Assurance Box -->
+        <div class="office-governance-card">
+          <div class="office-governance-title">
+            <span>🛡️</span>
+            <span>Mandatory Quality & Governance Standard</span>
+          </div>
+          <div class="office-governance-desc">
+            This agent operates under non-negotiable sequential phase-gate governance. Downstream phases and code implementation remain strictly locked until all prerequisite deliverables have received official <strong>Manager Approval</strong> in Markdown Studio. Direct autonomous code changes or status alterations without human sign-off are strictly prohibited.
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Document Body -->
+      <div class="office-content">
+        ${bodyHtml}
+      </div>
+
+      <!-- Office Document Sign-off Footer -->
+      <div class="office-doc-footer">
+        <div class="office-footer-signature">
+          <span>🏛️</span>
+          <span>ACL-ADLC ${frameworkVersion} Governance Framework · Official Agent Specification</span>
+        </div>
+        <div>Approved Official Specification · Read-only 🔒</div>
+      </div>
+    </div>
+  `;
+
+  previewEl.innerHTML = officeHtml;
+
+  // Syntax highlighting for any code blocks
+  if (typeof hljs !== 'undefined') {
+    previewEl.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
   }
 
   // Reset scroll to top
-  previewEl.scrollTop = 0;
+  const wrapper = previewEl.closest('.editor-wrapper') || previewEl;
+  wrapper.scrollTop = 0;
 }
 
