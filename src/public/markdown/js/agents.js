@@ -182,6 +182,7 @@ async function loadAgentsData(forceReload = false) {
     if (!activeAgentId || !agentsList.some((a) => a.id === activeAgentId)) {
       activeAgentId = agentsList[0].id;
     }
+    openAgentFolders.clear();
     openAgentFolders.add(activeAgentId);
     renderAgentsTree();
     previewAgentSkill(activeAgentId);
@@ -209,6 +210,7 @@ async function loadAgentsData(forceReload = false) {
 /**
  * Render the agent folders and strictly their SKILL.md file.
  * All other files in the agent folder are completely ignored.
+ * Accordion invariant: only one agent folder can be open at a time.
  */
 function renderAgentsTree() {
   const root = document.getElementById('agentsTreeRoot');
@@ -226,6 +228,14 @@ function renderAgentsTree() {
     const modLabel = (mod.label || '').toLowerCase();
     return name.includes(query) || displayName.includes(query) || desc.includes(query) || modLabel.includes(query);
   });
+
+  // If search query is active and currently open agent is not in results, open first match
+  if (query && filtered.length > 0 && !filtered.some((a) => openAgentFolders.has(a.id))) {
+    openAgentFolders.clear();
+    openAgentFolders.add(filtered[0].id);
+    activeAgentId = filtered[0].id;
+    previewAgentSkill(activeAgentId);
+  }
 
   const countBadge = document.getElementById('agentsCountBadge');
   if (countBadge) {
@@ -257,7 +267,8 @@ function renderAgentsTree() {
     const headerDiv = document.createElement('div');
     headerDiv.className = 'folder-header';
 
-    const isOpen = query !== '' ? true : openAgentFolders.has(agent.id);
+    // Strict single-folder accordion: only the agent in openAgentFolders is open
+    const isOpen = openAgentFolders.has(agent.id);
 
     headerDiv.setAttribute(
       'title',
@@ -274,11 +285,14 @@ function renderAgentsTree() {
     const filesDiv = document.createElement('div');
     filesDiv.className = `folder-files-list ${isOpen ? '' : 'hidden'}`;
 
+    // Clicking folder header toggles this folder and closes all others
     headerDiv.addEventListener('click', () => {
-      if (openAgentFolders.has(agent.id)) {
-        openAgentFolders.delete(agent.id);
-      } else {
+      const isCurrentlyOpen = openAgentFolders.has(agent.id);
+      openAgentFolders.clear();
+      if (!isCurrentlyOpen) {
         openAgentFolders.add(agent.id);
+        selectAgentSkill(agent.id);
+        return;
       }
       renderAgentsTree();
     });
@@ -314,9 +328,11 @@ function renderAgentsTree() {
 
 /**
  * Handle selecting an agent skill.
+ * Ensures only this agent's folder is open in the left sidebar tree.
  */
 function selectAgentSkill(agentId) {
   activeAgentId = agentId;
+  openAgentFolders.clear();
   openAgentFolders.add(agentId);
   renderAgentsTree();
   previewAgentSkill(agentId);
