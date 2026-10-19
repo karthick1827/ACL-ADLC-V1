@@ -76,29 +76,32 @@ function switchAppView(view) {
   const navSummarized = document.getElementById('navItemSummarized');
   const navScrum = document.getElementById('navItemScrum');
   const navDeveloper = document.getElementById('navItemDeveloper');
+  const navGit = document.getElementById('navItemGit');
   const navAgents = document.getElementById('navItemAgents');
 
   const railStudio = document.getElementById('railItemStudio');
   const railSummarized = document.getElementById('railItemSummarized');
   const railScrum = document.getElementById('railItemScrum');
   const railDeveloper = document.getElementById('railItemDeveloper');
+  const railGit = document.getElementById('railItemGit');
   const railAgents = document.getElementById('railItemAgents');
 
   const btnSave = document.getElementById('btnSave');
   const syncStatus = document.getElementById('syncStatus');
-  const workflowDropdownWrapper = document.getElementById('workflowDropdownWrapper');
 
   function clearNavActive() {
     if (navStudio) navStudio.classList.remove('active');
     if (navSummarized) navSummarized.classList.remove('active');
     if (navScrum) navScrum.classList.remove('active');
     if (navDeveloper) navDeveloper.classList.remove('active');
+    if (navGit) navGit.classList.remove('active');
     if (navAgents) navAgents.classList.remove('active');
 
     if (railStudio) railStudio.classList.remove('active');
     if (railSummarized) railSummarized.classList.remove('active');
     if (railScrum) railScrum.classList.remove('active');
     if (railDeveloper) railDeveloper.classList.remove('active');
+    if (railGit) railGit.classList.remove('active');
     if (railAgents) railAgents.classList.remove('active');
   }
 
@@ -116,7 +119,6 @@ function switchAppView(view) {
     if (railSummarized) railSummarized.classList.add('active');
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
-    if (workflowDropdownWrapper) workflowDropdownWrapper.style.display = 'inline-block';
     renderDeliveryDashboard();
   } else if (view === 'dashboard-scrum') {
     activeAppView = 'dashboard-scrum';
@@ -132,7 +134,6 @@ function switchAppView(view) {
     if (railScrum) railScrum.classList.add('active');
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
-    if (workflowDropdownWrapper) workflowDropdownWrapper.style.display = 'inline-block';
     renderScrumMasterDashboard();
   } else if (view === 'dashboard-developer') {
     activeAppView = 'dashboard-developer';
@@ -148,8 +149,22 @@ function switchAppView(view) {
     if (railDeveloper) railDeveloper.classList.add('active');
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
-    if (workflowDropdownWrapper) workflowDropdownWrapper.style.display = 'inline-block';
     renderDeveloperDashboard();
+  } else if (view === 'dashboard-git') {
+    activeAppView = 'dashboard-git';
+    document.body.classList.add('view-dashboard');
+    document.body.classList.remove('view-studio');
+    document.body.classList.remove('view-agents');
+    if (studioView) studioView.style.display = 'none';
+    if (agentsView) agentsView.style.display = 'none';
+    if (dashboardView) dashboardView.style.display = 'block';
+    if (headerTitle) headerTitle.textContent = '';
+    clearNavActive();
+    if (navGit) navGit.classList.add('active');
+    if (railGit) railGit.classList.add('active');
+    if (btnSave) btnSave.style.display = 'none';
+    if (syncStatus) syncStatus.style.display = 'none';
+    renderGitDashboard();
   } else if (view === 'agents') {
     activeAppView = 'agents';
     document.body.classList.remove('view-dashboard');
@@ -164,7 +179,6 @@ function switchAppView(view) {
     if (railAgents) railAgents.classList.add('active');
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
-    if (workflowDropdownWrapper) workflowDropdownWrapper.style.display = 'none';
     if (typeof loadAgentsData === 'function') {
       loadAgentsData();
     }
@@ -182,7 +196,6 @@ function switchAppView(view) {
     if (railStudio) railStudio.classList.add('active');
     if (btnSave) btnSave.style.display = 'flex';
     if (syncStatus) syncStatus.style.display = 'flex';
-    if (workflowDropdownWrapper) workflowDropdownWrapper.style.display = 'inline-block';
     if (activeFileId) loadFile(activeFileId);
   }
 }
