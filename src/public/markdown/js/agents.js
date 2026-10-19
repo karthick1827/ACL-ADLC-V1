@@ -208,9 +208,8 @@ async function loadAgentsData(forceReload = false) {
 }
 
 /**
- * Render the agent folders and strictly their SKILL.md file.
- * All other files in the agent folder are completely ignored.
- * Accordion invariant: only one agent folder can be open at a time.
+ * Render the agent list directly in the left file tree container.
+ * Clicking any agent opens that agent's markdown file directly.
  */
 function renderAgentsTree() {
   const root = document.getElementById('agentsTreeRoot');
@@ -229,10 +228,8 @@ function renderAgentsTree() {
     return name.includes(query) || displayName.includes(query) || desc.includes(query) || modLabel.includes(query);
   });
 
-  // If search query is active and currently open agent is not in results, open first match
-  if (query && filtered.length > 0 && !filtered.some((a) => openAgentFolders.has(a.id))) {
-    openAgentFolders.clear();
-    openAgentFolders.add(filtered[0].id);
+  // If search query is active and currently active agent is not in results, select first match
+  if (query && filtered.length > 0 && !filtered.some((a) => a.id === activeAgentId)) {
     activeAgentId = filtered[0].id;
     previewAgentSkill(activeAgentId);
   }
@@ -261,52 +258,17 @@ function renderAgentsTree() {
 
   filtered.forEach((agent) => {
     const modInfo = getAgentModuleInfo(agent);
-    const folderDiv = document.createElement('div');
-    folderDiv.className = 'folder-item';
+    const isActive = agent.id === activeAgentId;
+    const hoverTitle = `Skill: ${agent.name} | Module: ${modInfo.label}\n${agent.description || ''}`;
 
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'folder-header';
+    const itemDiv = document.createElement('div');
+    itemDiv.className = `file-item ${isActive ? 'active' : ''}`;
+    itemDiv.setAttribute('title', hoverTitle);
 
-    // Strict single-folder accordion: only the agent in openAgentFolders is open
-    const isOpen = openAgentFolders.has(agent.id);
-
-    headerDiv.setAttribute(
-      'title',
-      `Skill: ${agent.name}\nModule: ${modInfo.label}\nLocation: ${agent.folderPath || agent.name}\n${agent.description || ''}`,
-    );
-
-    headerDiv.innerHTML = `
-      <div class="folder-title-left">
-        <span class="folder-chevron ${isOpen ? '' : 'collapsed'}">▼</span>
-        <span>${agent.name}</span>
-      </div>
-    `;
-
-    const filesDiv = document.createElement('div');
-    filesDiv.className = `folder-files-list ${isOpen ? '' : 'hidden'}`;
-
-    // Clicking folder header toggles this folder and closes all others
-    headerDiv.addEventListener('click', () => {
-      const isCurrentlyOpen = openAgentFolders.has(agent.id);
-      openAgentFolders.clear();
-      if (!isCurrentlyOpen) {
-        openAgentFolders.add(agent.id);
-        selectAgentSkill(agent.id);
-        return;
-      }
-      renderAgentsTree();
-    });
-
-    // STRICT INVARIANT: Only SKILL.md is rendered. All other files are ignored.
-    const fileDiv = document.createElement('div');
-    fileDiv.className = `file-item ${agent.id === activeAgentId ? 'active' : ''}`;
-    const hoverTitle = `Skill: ${agent.name} | Module: ${modInfo.label}`;
-    fileDiv.setAttribute('title', hoverTitle);
-
-    fileDiv.innerHTML = `
+    itemDiv.innerHTML = `
       <div class="file-item-left" title="${hoverTitle}">
-        <span class="file-icon">📄</span>
-        <span style="font-weight: 600;" title="${hoverTitle}">SKILL.md</span>
+        <span class="file-icon">📁</span>
+        <span style="font-weight: 600;" title="${hoverTitle}">${agent.name}</span>
       </div>
       <span class="status-pill status-skill" title="${hoverTitle}">
         <span class="dot"></span>
@@ -314,26 +276,21 @@ function renderAgentsTree() {
       </span>
     `;
 
-    fileDiv.addEventListener('click', (e) => {
+    itemDiv.addEventListener('click', (e) => {
       e.stopPropagation();
       selectAgentSkill(agent.id);
     });
 
-    filesDiv.appendChild(fileDiv);
-    folderDiv.appendChild(headerDiv);
-    folderDiv.appendChild(filesDiv);
-    root.appendChild(folderDiv);
+    root.appendChild(itemDiv);
   });
 }
 
 /**
- * Handle selecting an agent skill.
- * Ensures only this agent's folder is open in the left sidebar tree.
+ * Handle selecting an agent.
+ * Directly loads and previews that agent's markdown file alone.
  */
 function selectAgentSkill(agentId) {
   activeAgentId = agentId;
-  openAgentFolders.clear();
-  openAgentFolders.add(agentId);
   renderAgentsTree();
   previewAgentSkill(agentId);
 }
@@ -347,15 +304,16 @@ const SKILL_OFFICE_REGISTRY = {
   'acl-product-brief': {
     title: 'Product Brief Specialist',
     subtitle: 'Defines the strategic vision, market context, user personas, and initial boundaries before design or development starts.',
-    businessValue: 'Eliminates wasted development cost by ensuring leadership, product, and engineering agree on the core problem statement and target audience.',
+    businessValue:
+      'Eliminates wasted development cost by ensuring leadership, product, and engineering agree on the core problem statement and target audience.',
     deliverable: 'brief.md (Phase 1 Deliverable)',
     governance: 'Gate 1/4: Requires Manager Sign-Off before PRD or Architecture can begin',
     inputs: 'User ideas, market data, customer problem statements, strategic goals',
     stakeholderGuide: [
       'Work with this agent to articulate what product you are building and why customers care.',
       'The agent will challenge weak assumptions and surface unknown risks early.',
-      'Once finalized, the document is submitted to the Manager in Markdown Studio for formal approval.'
-    ]
+      'Once finalized, the document is submitted to the Manager in Markdown Studio for formal approval.',
+    ],
   },
   'acl-agent-pm': {
     title: 'Project & Delivery Manager (PM)',
@@ -367,8 +325,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Helps plan workflows and coordinate project requirements.',
       'Ensures user stories and milestones are realistic and deliverable.',
-      'Tracks project constraints and prevents scope creep.'
-    ]
+      'Tracks project constraints and prevents scope creep.',
+    ],
   },
   'acl-prd': {
     title: 'Product Requirements Document (PRD) Specialist',
@@ -380,8 +338,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Defines user stories, acceptance criteria, and edge cases.',
       'Maintains traceability back to the initial Product Brief.',
-      'Must be reviewed and approved by the Manager before architecture starts.'
-    ]
+      'Must be reviewed and approved by the Manager before architecture starts.',
+    ],
   },
   'acl-architecture': {
     title: 'System Architecture & Tech Spine',
@@ -393,8 +351,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Defines how software components, APIs, and data models connect.',
       'Ensures non-functional requirements (security, reliability, speed) are addressed.',
-      'Prevents technical debt from entering the codebase.'
-    ]
+      'Prevents technical debt from entering the codebase.',
+    ],
   },
   'acl-agent-architect': {
     title: 'Lead Solution Architect',
@@ -406,8 +364,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Evaluates cloud services, database options, and software patterns.',
       'Designs fault-tolerant, secure, and maintainable systems.',
-      'Signs off on architectural integrity before engineering begins.'
-    ]
+      'Signs off on architectural integrity before engineering begins.',
+    ],
   },
   'acl-create-epics-and-stories': {
     title: 'Epic & Story Decomposer',
@@ -418,9 +376,9 @@ const SKILL_OFFICE_REGISTRY = {
     inputs: 'Approved architecture-spine.md and prd.md',
     stakeholderGuide: [
       'Breaks large initiatives into focused, achievable work packages.',
-      'Adds verifiable checkboxes for each story\'s acceptance criteria.',
-      'Telemetry links directly into the Markdown Studio dashboard.'
-    ]
+      "Adds verifiable checkboxes for each story's acceptance criteria.",
+      'Telemetry links directly into the Markdown Studio dashboard.',
+    ],
   },
   'acl-quick-dev': {
     title: 'Rapid Feature & Bugfix Engine',
@@ -432,8 +390,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Ideal for brownfield feature additions and maintenance.',
       'Generates a concise 1-page specification for quick sign-off.',
-      'Code is strictly locked until the manager clicks "Approved".'
-    ]
+      'Code is strictly locked until the manager clicks "Approved".',
+    ],
   },
   'acl-agent-dev': {
     title: 'Full-Stack Software Engineer',
@@ -445,8 +403,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Writes application code strictly against approved criteria.',
       'Runs automated quality checks and conventional commits.',
-      'Does not take unapproved shortcuts or alter unassigned files.'
-    ]
+      'Does not take unapproved shortcuts or alter unassigned files.',
+    ],
   },
   'acl-code-review': {
     title: 'Automated Code Review & QA Auditor',
@@ -458,8 +416,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Acts as an automated second pair of eyes on every code change.',
       'Validates that acceptance criteria are actually met by the code.',
-      'Surfaces hidden edge cases before deployment.'
-    ]
+      'Surfaces hidden edge cases before deployment.',
+    ],
   },
   'acl-qa-generate-e2e-tests': {
     title: 'Automated E2E Testing Specialist',
@@ -471,8 +429,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Automates browser testing of key user flows.',
       'Verifies that buttons, forms, and workflows behave as intended.',
-      'Catches breaking changes automatically before release.'
-    ]
+      'Catches breaking changes automatically before release.',
+    ],
   },
   'acl-checkpoint-preview': {
     title: 'Milestone & Demo Preview Generator',
@@ -484,8 +442,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Provides an executive summary of what was accomplished.',
       'Includes screenshots, test evidence, and user journey steps.',
-      'Gives stakeholders confidence before approving production releases.'
-    ]
+      'Gives stakeholders confidence before approving production releases.',
+    ],
   },
   'acl-sprint-planning': {
     title: 'Sprint Planning Facilitator',
@@ -497,8 +455,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Balances workload across available sprint capacity.',
       'Ensures prerequisites and dependencies are resolved.',
-      'Prepares work packages for immediate development.'
-    ]
+      'Prepares work packages for immediate development.',
+    ],
   },
   'acl-sprint-status': {
     title: 'Sprint Progress & Telemetry Tracker',
@@ -510,8 +468,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Shows real-time status of each story in the sprint.',
       'Flags stalled items and blockers for manager intervention.',
-      'Provides data-driven velocity projections.'
-    ]
+      'Provides data-driven velocity projections.',
+    ],
   },
   'acl-retrospective': {
     title: 'Sprint Retrospective Facilitator',
@@ -521,10 +479,10 @@ const SKILL_OFFICE_REGISTRY = {
     governance: 'Sprint Continuous Improvement Review',
     inputs: 'Sprint velocity data, bug counts, blocker logs',
     stakeholderGuide: [
-      'Gathers team feedback on what worked and what didn\'t.',
+      "Gathers team feedback on what worked and what didn't.",
       'Creates concrete process improvements for the next sprint.',
-      'Builds team alignment and operational excellence.'
-    ]
+      'Builds team alignment and operational excellence.',
+    ],
   },
   'acl-advanced-elicitation': {
     title: 'Deep Critique & Socratic Inquirer',
@@ -536,21 +494,21 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Use whenever you want to test whether an idea holds up to scrutiny.',
       'Offers methods like Socratic inquiry, pre-mortem risk analysis, and red-teaming.',
-      'Strengthens business cases before presenting to leadership.'
-    ]
+      'Strengthens business cases before presenting to leadership.',
+    ],
   },
   'acl-figma-bridge': {
     title: 'Figma UI/UX Bridge',
     subtitle: 'Reads Figma designs and exports structured UI specifications and code tokens directly into Markdown Studio.',
-    businessValue: 'Eliminates design-to-development handoff gaps, ensuring interfaces match designers\' vision 1:1.',
+    businessValue: "Eliminates design-to-development handoff gaps, ensuring interfaces match designers' vision 1:1.",
     deliverable: 'design.md / UI Specifications',
     governance: 'Design System Alignment Gate',
     inputs: 'Figma file URL / access token',
     stakeholderGuide: [
       'Connects Figma design files directly into the ACL-ADLC workflow.',
       'Translates frames, components, and color variables into implementation specs.',
-      'Ensures developers implement exactly what UX designers created.'
-    ]
+      'Ensures developers implement exactly what UX designers created.',
+    ],
   },
   'acl-brainstorming': {
     title: 'Ideation & Creative Workshop Facilitator',
@@ -562,8 +520,8 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Run brainstorming sessions to explore creative directions.',
       'Generates structured idea clusters with pros and cons.',
-      'Filters best concepts for advancement to Phase 1 Product Brief.'
-    ]
+      'Filters best concepts for advancement to Phase 1 Product Brief.',
+    ],
   },
   'acl-help': {
     title: 'Framework Concierge & Guide',
@@ -575,9 +533,9 @@ const SKILL_OFFICE_REGISTRY = {
     stakeholderGuide: [
       'Ask any question about how the framework works.',
       'Learn which agent to invoke for a specific task.',
-      'Get explanations of phase gates, Markdown Studio, and approvals.'
-    ]
-  }
+      'Get explanations of phase gates, Markdown Studio, and approvals.',
+    ],
+  },
 };
 
 /**
@@ -613,14 +571,14 @@ function getSkillOfficeMeta(agent, modInfo, rawContent) {
     title: title,
     subtitle: desc,
     businessValue: `Provides structured automated assistance for ${modInfo.label} with verified quality checks.`,
-    deliverable: `${agent.name}/SKILL.md & associated phase deliverables`,
+    deliverable: `${agent.name} & associated phase deliverables`,
     governance: `${modInfo.label} Gate: Requires Manager Sign-Off before downstream execution`,
     inputs: 'Project requirements and phase documentation',
     stakeholderGuide: [
       `Assists team members during ${modInfo.label}.`,
       'Operates under strict human-in-the-loop governance.',
-      'All changes must be approved by the Manager in Markdown Studio before code generation.'
-    ]
+      'All changes must be approved by the Manager in Markdown Studio before code generation.',
+    ],
   };
 }
 
@@ -661,7 +619,7 @@ function previewAgentSkill(agentId) {
   const currentPathEl = document.getElementById('agentsCurrentPath');
   if (currentPathEl) {
     currentPathEl.innerHTML = `
-      <span>${agent.name}/SKILL.md</span>
+      <span>${agent.name}</span>
       <span class="agents-module-tag" style="margin-left: 10px; font-size: 0.74rem; padding: 2px 8px; border-radius: 4px; background: #eff6ff; color: #1d4ed8; font-weight: 600; border: 1px solid #bfdbfe;" title="Module: ${modInfo.label}">
         Module: ${modInfo.label}
       </span>
@@ -790,5 +748,3 @@ function previewAgentSkill(agentId) {
   // Reset scroll to top
   previewEl.scrollTop = 0;
 }
-
-
