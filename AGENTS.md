@@ -94,7 +94,7 @@ Please choose which Tier you want to proceed with:
     - Phase 3B: `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`
     - Phase 4: `_acl-output/4-implementation/story-<epic_num>-<story_num>.md` (Tier 2) or `_acl-output/4-implementation/spec-<feature-slug>.md` (Tier 1)
   - **STRICT EXCLUSIONS & BAN ON `status` IN CHILD / INTERNAL FILES**:
-    - Internal working memory logs (`.memlog.md`, `*-memlog.md`), supplementary child files (`addendum.md`, `sources.md`, `research.md`, `review-triage.md`, `patch-plan.md`, `test-summary.md`), and test directories are internal AI working artifacts.
+    - The delivery tracker (`_acl-output/working-tree.md`), internal working memory logs (`.memlog.md`, `*-memlog.md`), supplementary child files (`addendum.md`, `sources.md`, `research.md`, `review-triage.md`, `patch-plan.md`, `test-summary.md`), and test directories are internal AI working artifacts.
     - **ABSOLUTE PROHIBITION**: Supplementary child files (`addendum.md`, `sources.md`, `research.md`, etc.) **MUST NEVER CONTAIN A `status` FIELD IN THEIR YAML FRONTMATTER**. They are non-gated internal reference files. AI skills and agents MUST NEVER generate or set a `status:` field on any child file.
     - AI agents across ALL tools (Cursor, Antigravity, AGY, Claude Code, Copilot, etc.) MUST NEVER evaluate internal memory logs or child files for approval status, and MUST NEVER block gates based on them. Gate evaluation applies STRICTLY and EXCLUSIVELY to the primary deliverables listed above.
   - If **ANY** required upstream phase deliverable listed above is missing, or has ANY status other than `Approved` (e.g. `In Review`, `Rejected`):
@@ -431,6 +431,24 @@ Please choose which Tier you want to proceed with:
             - The AI marks that story's checklist item as completed (`- [x]`) in `epics.md`.
             - The AI is **UNBLOCKED** to implement the next story in the sequence (e.g. Story 7.2).
      - This cycle repeats story-by-story until all newly created stories are implemented, reviewed, and approved!
+
+---
+
+## 🌳 Working Tree Tracking (Mandatory After Every Deliverable Write)
+
+`_acl-output/working-tree.md` records where an Application Project stands: greenfield or brownfield, which agents ran, which deliverables they produced, and which gate is next. Markdown Studio renders it in the **🌳 Working Tree** tab.
+
+- **Track every write**: Immediately after ANY agent or skill creates or updates a primary deliverable in `_acl-output/` (`project-context.md`, `brief.md`, `prd.md`, `architecture-spine.md`, `ux.md`, `epics.md`, `story-*.md`, `spec-*.md`, test plans), run:
+
+  ```bash
+  uv run {project-root}/_acl/scripts/working_tree.py track --agent <agent> --skill <skill-id> --file <path-to-deliverable> [--note "<one-line summary>"]
+  ```
+
+  - `--agent` is one of `analyst` (Mary), `pm` (John), `ux-designer` (Sally), `architect` (Winston), `dev` (Amelia), `tech-writer` (Paige). If no persona is active, omit it and the agent is inferred from `--skill`.
+  - Add `--project-type brownfield` when the first deliverable of an existing codebase is created. Otherwise the project type is inferred: a Product Brief first means greenfield, a Project Context first means brownfield.
+- **Backfill**: If deliverables exist that the tracker has not seen (for example, work done before tracking), run `uv run {project-root}/_acl/scripts/working_tree.py sync`. It also records Manager status changes.
+- **Never edit `working-tree.md` by hand** and never add a `status` field to it. It is a non-gated tracker, so gate checks MUST NOT evaluate it.
+- Tracking is bookkeeping only. It never unlocks a gate, and it does not replace the Gate Lock banner or Manager sign-off.
 
 ---
 

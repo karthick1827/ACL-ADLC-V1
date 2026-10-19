@@ -1,0 +1,2 @@
+# Keep LF everywhere so checkouts match prettier (endOfLine: lf) regardless of core.autocrlf.
+* text=auto eol=lf

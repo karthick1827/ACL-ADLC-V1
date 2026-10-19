@@ -65,7 +65,7 @@
     "test:figma": "node test/test-8-layers-accuracy.js",
     "test:install": "node test/test-installation-components.js",
     "test:refs": "node test/test-file-refs-csv.js",
-    "test:renderer": "uv run --python 3.11 python -m unittest src/scripts/tests/test_config_utils.py src/scripts/tests/test_resolve_config.py src/scripts/tests/test_resolve_customization.py && node test/test-quick-dev-renderer.js && node test/test-dev-auto-renderer.js",
+    "test:renderer": "uv run --python 3.11 python -m unittest src/scripts/tests/test_config_utils.py src/scripts/tests/test_resolve_config.py src/scripts/tests/test_resolve_customization.py src/scripts/tests/test_working_tree.py && node test/test-quick-dev-renderer.js && node test/test-dev-auto-renderer.js",
     "test:site-url": "node test/test-site-url.mjs",
     "test:skills": "node test/test-validate-skills.js",
     "test:urls": "node test/test-parse-source-urls.js",

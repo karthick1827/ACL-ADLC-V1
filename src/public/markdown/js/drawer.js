@@ -75,11 +75,13 @@ function switchAppView(view) {
   const navSummarized = document.getElementById('navItemSummarized');
   const navScrum = document.getElementById('navItemScrum');
   const navDeveloper = document.getElementById('navItemDeveloper');
+  const navWorkingTree = document.getElementById('navItemWorkingTree');
 
   const railStudio = document.getElementById('railItemStudio');
   const railSummarized = document.getElementById('railItemSummarized');
   const railScrum = document.getElementById('railItemScrum');
   const railDeveloper = document.getElementById('railItemDeveloper');
+  const railWorkingTree = document.getElementById('railItemWorkingTree');
 
   const btnSave = document.getElementById('btnSave');
   const syncStatus = document.getElementById('syncStatus');
@@ -89,11 +91,13 @@ function switchAppView(view) {
     if (navSummarized) navSummarized.classList.remove('active');
     if (navScrum) navScrum.classList.remove('active');
     if (navDeveloper) navDeveloper.classList.remove('active');
+    if (navWorkingTree) navWorkingTree.classList.remove('active');
 
     if (railStudio) railStudio.classList.remove('active');
     if (railSummarized) railSummarized.classList.remove('active');
     if (railScrum) railScrum.classList.remove('active');
     if (railDeveloper) railDeveloper.classList.remove('active');
+    if (railWorkingTree) railWorkingTree.classList.remove('active');
   }
 
   if (view === 'dashboard-summarized' || view === 'dashboard') {
@@ -135,6 +139,19 @@ function switchAppView(view) {
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
     renderDeveloperDashboard();
+  } else if (view === 'working-tree') {
+    activeAppView = 'working-tree';
+    document.body.classList.add('view-dashboard');
+    document.body.classList.remove('view-studio');
+    if (studioView) studioView.style.display = 'none';
+    if (dashboardView) dashboardView.style.display = 'block';
+    if (headerTitle) headerTitle.textContent = '';
+    clearNavActive();
+    if (navWorkingTree) navWorkingTree.classList.add('active');
+    if (railWorkingTree) railWorkingTree.classList.add('active');
+    if (btnSave) btnSave.style.display = 'none';
+    if (syncStatus) syncStatus.style.display = 'none';
+    renderWorkingTree();
   } else {
     activeAppView = 'studio';
     document.body.classList.remove('view-dashboard');

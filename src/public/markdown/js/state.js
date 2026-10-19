@@ -83,6 +83,7 @@ function isChildFile(filename, folderPath = '') {
     'sprint-status.yaml',
     'sprint-status.yml',
     'sprint-status.md',
+    'working-tree.md',
   ]);
 
   return EXCLUDED_CHILDREN.has(lower);
