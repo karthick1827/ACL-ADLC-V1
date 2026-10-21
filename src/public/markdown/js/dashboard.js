@@ -1409,3 +1409,270 @@ function renderDeveloperDashboard() {
         </div>
       `;
 }
+
+// ===================================================
+// User Control Centre (Git Identity & Permissions Dashboard)
+// ===================================================
+function updateNavUserControlCentre(data) {
+  const isConnected = Boolean(data && data.isPushed && data.userDetails);
+  const navTitle = document.getElementById('navGitTitle');
+  const navIcon = document.getElementById('navGitIcon');
+  const railIcon = document.getElementById('railGitIcon');
+
+  const ownerName = isConnected ? data.userDetails.fullName || data.userDetails.username || 'GitHub Owner' : 'Guest';
+  const avatarUrl = isConnected ? data.userDetails.avatarUrl : null;
+
+  if (navTitle) {
+    navTitle.textContent = ownerName;
+  }
+  if (navIcon) {
+    if (avatarUrl) {
+      navIcon.innerHTML = `<img src="${avatarUrl}" alt="${ownerName}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
+    } else {
+      navIcon.innerHTML = `<span style="font-size: 1.15rem;">👤</span>`;
+    }
+  }
+  if (railIcon) {
+    if (avatarUrl) {
+      railIcon.innerHTML = `<img src="${avatarUrl}" alt="${ownerName}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
+    } else {
+      railIcon.innerHTML = `<span style="font-size: 1.15rem;">👤</span>`;
+    }
+  }
+}
+
+async function renderGitDashboard() {
+  const container = document.getElementById('dashboardContainerRoot');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="text-align: center; padding: 3rem 0; color: #64748b;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">👤 Loading User Control Centre...</div>
+      <div style="font-size: 0.85rem;">Checking GitHub connection and repository records...</div>
+    </div>
+  `;
+
+  try {
+    const res = await fetch('/api/git-details');
+    const data = await res.json();
+    const isPushed = Boolean(data && data.isPushed);
+
+    // Update navbar identity
+    updateNavUserControlCentre(data);
+
+    const user = data.userDetails || {};
+    const project = data.projectDetails || {};
+    const git = data.gitDetails || {};
+
+    const hasUsername = Boolean(user.username);
+    const hasFullName = Boolean(user.fullName);
+    const hasEmail = Boolean(user.email);
+    const hasAvatar = Boolean(user.avatarUrl);
+    const hasOrgRole = Boolean(user.orgRole);
+
+    const hasProjectName = Boolean(project.projectName);
+    const hasUserRole = Boolean(project.userRole);
+    const hasProjectStatus = Boolean(project.projectStatus);
+    const hasLinkedRepos = Boolean(project.linkedRepositories && project.linkedRepositories.length > 0);
+    const hasAssignedDate = Boolean(project.assignedDate);
+
+    const hasPermission = Boolean(git.permissionLevel);
+    const hasTeams = Boolean(git.teams && git.teams.length > 0);
+    const has2FA = Boolean(git.twoFactorStatus);
+    const hasLastActivity = Boolean(git.lastActivity);
+
+    const bannerHtml = isPushed
+      ? `
+        <div class="git-status-banner pushed">
+          <div>
+            <strong>🟢 Connected to GitHub</strong> &nbsp;—&nbsp;
+            <span>Remote: <code style="font-size: 0.82rem; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${data.remoteOrigin || 'origin'}</code></span>
+            <span style="margin-left: 0.75rem; color: #15803d; font-size: 0.82rem;">(All fields synchronized and read-only)</span>
+          </div>
+        </div>
+      `
+      : `
+        <div class="git-status-banner unpushed">
+          <div>
+            <strong>⚠️ Project Not Pushed to GitHub / Remote Disconnected</strong> &nbsp;—&nbsp;
+            <span style="color: #c2410c;">Repository is local only. All fields are empty and strictly locked in read-only mode.</span>
+          </div>
+        </div>
+      `;
+
+    const avatarHtml = hasAvatar
+      ? `<img src="${user.avatarUrl}" alt="${user.fullName || user.username || 'User Avatar'}" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\\'git-profile-avatar-placeholder\\'>👤</span>';" />`
+      : `<span class="git-profile-avatar-placeholder">👤</span>`;
+
+    const linkedReposHtml = hasLinkedRepos
+      ? project.linkedRepositories
+          .map(
+            (r) =>
+              `<div style="margin-bottom: 0.25rem;"><a href="${r}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-family: monospace; font-size: 0.86rem;">${r}</a></div>`,
+          )
+          .join('')
+      : '<span class="empty">—</span>';
+
+    container.innerHTML = `
+      <div class="git-dashboard-wrapper">
+        <!-- Top App Title Card -->
+        <div class="dashboard-header-card">
+          <div class="dashboard-header-top">
+            <div class="dashboard-title-group">
+              <h2><span>👤</span> User Control Centre</h2>
+              <p>Git identity, project assignment, and repository permissions imported from GitHub / GitLab.</p>
+            </div>
+            <div>
+              <span class="project-type-badge ${isPushed ? 'badge-greenfield' : 'badge-brownfield'}">
+                ${isPushed ? '🟢 GitHub Linked' : '⚪ Guest / Local'}
+              </span>
+            </div>
+          </div>
+          ${bannerHtml}
+        </div>
+
+        <!-- USER DETAILS CARD (Source: Git - GitHub / GitLab) -->
+        <div class="git-profile-card">
+          <div class="git-profile-avatar-wrap">
+            ${avatarHtml}
+          </div>
+          <div class="git-profile-info">
+            <div class="git-profile-info-top">
+              <span class="git-profile-name">${hasFullName ? user.fullName : '<span class="empty">—</span>'}</span>
+              <span class="git-profile-login">${hasUsername ? '@' + user.username : '<span class="empty">@—</span>'}</span>
+              ${hasOrgRole ? `<span class="git-role-badge">🛡️ Org Role: ${user.orgRole}</span>` : '<span class="git-role-badge" style="background:#f1f5f9; color:#94a3b8; border-color:#e2e8f0;">🛡️ Org Role: —</span>'}
+            </div>
+            <div class="git-profile-sub">
+              <span>📧 <strong>Email:</strong> ${hasEmail ? user.email : '<span class="empty">—</span>'}</span>
+              <span>🔒 <strong>Access Level:</strong> ${hasOrgRole ? user.orgRole : '<span class="empty">—</span>'}</span>
+            </div>
+            <div class="git-integrations-bar">
+              <span>Linked Workspaces:</span>
+              <span class="git-int-pill">${hasEmail ? '✅ Atlassian JIRA (Linked)' : '⚪ JIRA (Unlinked)'}</span>
+              <span class="git-int-pill">${hasEmail ? '✅ Confluence (Linked)' : '⚪ Confluence (Unlinked)'}</span>
+              <span class="git-int-pill">🔒 Read-Only Identity</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2-COLUMN GRID: PROJECT DETAILS & GIT ACCESS -->
+        <div class="git-sections-grid">
+          
+          <!-- PROJECT DETAILS (Source: Dashboard / Project Records) -->
+          <div class="git-card">
+            <div class="git-card-header">
+              <div class="git-card-title">
+                <span>📁</span> Project Details
+              </div>
+              <span class="git-read-only-pill">🔒 Read-Only Records</span>
+            </div>
+
+            <div class="git-field-list">
+              <!-- Field: Project Name -->
+              <div class="git-field-row">
+                <div class="git-field-label">Project Name</div>
+                <div class="git-field-value ${hasProjectName ? '' : 'empty'}">${hasProjectName ? project.projectName : '—'}</div>
+              </div>
+
+              <!-- Field: User's Role in Project -->
+              <div class="git-field-row">
+                <div class="git-field-label">User's Role in Project</div>
+                <div class="git-field-value ${hasUserRole ? '' : 'empty'}">
+                  ${hasUserRole ? `👤 ${project.userRole}` : '—'}
+                </div>
+              </div>
+
+              <!-- Field: Project Status -->
+              <div class="git-field-row">
+                <div class="git-field-label">Project Status</div>
+                <div class="git-field-value ${hasProjectStatus ? '' : 'empty'}">
+                  ${hasProjectStatus ? `🟢 ${project.projectStatus}` : '—'}
+                </div>
+              </div>
+
+              <!-- Field: Linked Repositories -->
+              <div class="git-field-row">
+                <div class="git-field-label">Linked Repositories</div>
+                <div class="git-field-value ${hasLinkedRepos ? '' : 'empty'}">
+                  ${linkedReposHtml}
+                </div>
+              </div>
+
+              <!-- Field: Assigned Date -->
+              <div class="git-field-row">
+                <div class="git-field-label">Assigned Date</div>
+                <div class="git-field-value ${hasAssignedDate ? '' : 'empty'}">${hasAssignedDate ? project.assignedDate : '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GIT DETAILS (Source: GitHub / GitLab API) -->
+          <div class="git-card">
+            <div class="git-card-header">
+              <div class="git-card-title">
+                <span>🐙</span> Git Details
+              </div>
+              <span class="git-read-only-pill">🔒 Read-Only Telemetry</span>
+            </div>
+
+            <div class="git-field-list">
+              <!-- Field: Permission Level -->
+              <div class="git-field-row">
+                <div class="git-field-label">Permission Level</div>
+                <div class="git-field-value ${hasPermission ? '' : 'empty'}">
+                  ${hasPermission ? `👑 ${git.permissionLevel}` : '—'}
+                </div>
+              </div>
+
+              <!-- Field: Teams -->
+              <div class="git-field-row">
+                <div class="git-field-label">Organization Teams / Department</div>
+                <div class="git-field-value ${hasTeams ? '' : 'empty'}">
+                  ${hasTeams ? git.teams.map((t) => `<span style="background: #e2e8f0; padding: 2px 7px; border-radius: 4px; font-size: 0.8rem; margin-right: 4px;">👥 ${t}</span>`).join(' ') : '—'}
+                </div>
+              </div>
+
+              <!-- Field: 2FA Status -->
+              <div class="git-field-row">
+                <div class="git-field-label">2FA Status (Security Compliance)</div>
+                <div class="git-field-value ${has2FA ? '' : 'empty'}">
+                  ${has2FA ? `🔒 ${git.twoFactorStatus}` : '—'}
+                </div>
+              </div>
+
+              <!-- Field: Last Activity -->
+              <div class="git-field-row">
+                <div class="git-field-label">Last Activity (Recent Push / Commit / PR)</div>
+                <div class="git-field-value ${hasLastActivity ? '' : 'empty'}" style="font-family: monospace; font-size: 0.82rem;">
+                  ${hasLastActivity ? `🕒 ${git.lastActivity}` : '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1rem;">
+          User Control Centre &bull; VelocityONE Telemetry &bull; All fields are read-only and automatically retrieved from Git.
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `
+      <div style="padding: 2rem; background: #fee2e2; color: #991b1b; border-radius: 8px;">
+        <h3>Error loading User Control Centre details</h3>
+        <p>${err.message}</p>
+        <button class="git-toggle-btn" onclick="renderGitDashboard()">Retry</button>
+      </div>
+    `;
+  }
+}
+
+// Auto-check GitHub link on page load to update navbar
+if (typeof window !== 'undefined') {
+  fetch('/api/git-details')
+    .then((r) => r.json())
+    .then((d) => updateNavUserControlCentre(d))
+    .catch(() => updateNavUserControlCentre(null));
+}

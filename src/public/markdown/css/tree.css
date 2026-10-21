@@ -9,6 +9,13 @@ aside.sidebar {
   flex-shrink: 0;
   height: 100%;
   min-height: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+aside.sidebar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .sidebar-controls {
@@ -23,17 +30,20 @@ aside.sidebar {
 .search-input-wrapper {
   position: relative;
   width: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .search-input {
   width: 100%;
-  padding: 0.45rem 0.75rem 0.45rem 2.1rem;
+  padding: 0.45rem 2.4rem 0.45rem 2.1rem;
   font-size: 0.82rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-canvas);
   color: var(--text-primary);
   outline: none;
+  transition: all 0.15s ease;
 }
 .search-input:focus {
   border-color: var(--accent-blue);
@@ -47,33 +57,163 @@ aside.sidebar {
   transform: translateY(-50%);
   font-size: 0.8rem;
   color: var(--text-muted);
+  pointer-events: none;
+  z-index: 1;
 }
 
-.filter-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+/* Status Filter Button at the right end of the Search Bar */
+.search-filter-wrapper {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  z-index: 10;
 }
 
-.select-control {
-  width: 100%;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.78rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-canvas);
-  color: var(--text-primary);
-  outline: none;
+.btn-status-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
   cursor: pointer;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1;
+  transition: all 0.15s ease;
+  user-select: none;
+  padding: 0;
+}
+.btn-status-filter:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+.btn-status-filter.active-filter {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+.filter-sort-icon {
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Small dropdown menu below the up/down icon */
+.status-filter-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 145px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 6px 4px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 100;
+  animation: filterDropdownFade 0.15s ease;
+}
+.status-filter-dropdown.open {
+  display: flex;
+}
+
+@keyframes filterDropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.status-filter-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  padding: 4px 8px 6px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 2px;
+}
+
+.status-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #334155;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+.status-filter-item:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+.status-filter-item.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.status-filter-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-filter-text {
+  flex: 1;
+}
+
+.status-filter-check {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #2563eb;
+  opacity: 0;
+  line-height: 1;
+}
+.status-filter-item.active .status-filter-check {
+  opacity: 1;
 }
 
 .file-tree-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.75rem 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.file-tree-container::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .folder-item {

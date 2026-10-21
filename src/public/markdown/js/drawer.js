@@ -69,6 +69,7 @@ function switchAppView(view) {
 
   const studioView = document.getElementById('studioView');
   const dashboardView = document.getElementById('dashboardView');
+  const agentsView = document.getElementById('agentsView');
   const headerTitle = document.getElementById('appHeaderTitle');
 
   const navStudio = document.getElementById('navItemStudio');
@@ -76,12 +77,16 @@ function switchAppView(view) {
   const navScrum = document.getElementById('navItemScrum');
   const navDeveloper = document.getElementById('navItemDeveloper');
   const navWorkingTree = document.getElementById('navItemWorkingTree');
+  const navGit = document.getElementById('navItemGit');
+  const navAgents = document.getElementById('navItemAgents');
 
   const railStudio = document.getElementById('railItemStudio');
   const railSummarized = document.getElementById('railItemSummarized');
   const railScrum = document.getElementById('railItemScrum');
   const railDeveloper = document.getElementById('railItemDeveloper');
   const railWorkingTree = document.getElementById('railItemWorkingTree');
+  const railGit = document.getElementById('railItemGit');
+  const railAgents = document.getElementById('railItemAgents');
 
   const btnSave = document.getElementById('btnSave');
   const syncStatus = document.getElementById('syncStatus');
@@ -92,19 +97,25 @@ function switchAppView(view) {
     if (navScrum) navScrum.classList.remove('active');
     if (navDeveloper) navDeveloper.classList.remove('active');
     if (navWorkingTree) navWorkingTree.classList.remove('active');
+    if (navGit) navGit.classList.remove('active');
+    if (navAgents) navAgents.classList.remove('active');
 
     if (railStudio) railStudio.classList.remove('active');
     if (railSummarized) railSummarized.classList.remove('active');
     if (railScrum) railScrum.classList.remove('active');
     if (railDeveloper) railDeveloper.classList.remove('active');
     if (railWorkingTree) railWorkingTree.classList.remove('active');
+    if (railGit) railGit.classList.remove('active');
+    if (railAgents) railAgents.classList.remove('active');
   }
 
   if (view === 'dashboard-summarized' || view === 'dashboard') {
     activeAppView = 'dashboard-summarized';
     document.body.classList.add('view-dashboard');
     document.body.classList.remove('view-studio');
+    document.body.classList.remove('view-agents');
     if (studioView) studioView.style.display = 'none';
+    if (agentsView) agentsView.style.display = 'none';
     if (dashboardView) dashboardView.style.display = 'block';
     if (headerTitle) headerTitle.textContent = '';
     clearNavActive();
@@ -117,7 +128,9 @@ function switchAppView(view) {
     activeAppView = 'dashboard-scrum';
     document.body.classList.add('view-dashboard');
     document.body.classList.remove('view-studio');
+    document.body.classList.remove('view-agents');
     if (studioView) studioView.style.display = 'none';
+    if (agentsView) agentsView.style.display = 'none';
     if (dashboardView) dashboardView.style.display = 'block';
     if (headerTitle) headerTitle.textContent = '';
     clearNavActive();
@@ -130,7 +143,9 @@ function switchAppView(view) {
     activeAppView = 'dashboard-developer';
     document.body.classList.add('view-dashboard');
     document.body.classList.remove('view-studio');
+    document.body.classList.remove('view-agents');
     if (studioView) studioView.style.display = 'none';
+    if (agentsView) agentsView.style.display = 'none';
     if (dashboardView) dashboardView.style.display = 'block';
     if (headerTitle) headerTitle.textContent = '';
     clearNavActive();
@@ -143,7 +158,9 @@ function switchAppView(view) {
     activeAppView = 'working-tree';
     document.body.classList.add('view-dashboard');
     document.body.classList.remove('view-studio');
+    document.body.classList.remove('view-agents');
     if (studioView) studioView.style.display = 'none';
+    if (agentsView) agentsView.style.display = 'none';
     if (dashboardView) dashboardView.style.display = 'block';
     if (headerTitle) headerTitle.textContent = '';
     clearNavActive();
@@ -152,11 +169,45 @@ function switchAppView(view) {
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
     renderWorkingTree();
+  } else if (view === 'dashboard-git') {
+    activeAppView = 'dashboard-git';
+    document.body.classList.add('view-dashboard');
+    document.body.classList.remove('view-studio');
+    document.body.classList.remove('view-agents');
+    if (studioView) studioView.style.display = 'none';
+    if (agentsView) agentsView.style.display = 'none';
+    if (dashboardView) dashboardView.style.display = 'block';
+    if (headerTitle) headerTitle.textContent = '';
+    clearNavActive();
+    if (navGit) navGit.classList.add('active');
+    if (railGit) railGit.classList.add('active');
+    if (btnSave) btnSave.style.display = 'none';
+    if (syncStatus) syncStatus.style.display = 'none';
+    renderGitDashboard();
+  } else if (view === 'agents') {
+    activeAppView = 'agents';
+    document.body.classList.remove('view-dashboard');
+    document.body.classList.remove('view-studio');
+    document.body.classList.add('view-agents');
+    if (studioView) studioView.style.display = 'none';
+    if (dashboardView) dashboardView.style.display = 'none';
+    if (agentsView) agentsView.style.display = 'flex';
+    if (headerTitle) headerTitle.textContent = '';
+    clearNavActive();
+    if (navAgents) navAgents.classList.add('active');
+    if (railAgents) railAgents.classList.add('active');
+    if (btnSave) btnSave.style.display = 'none';
+    if (syncStatus) syncStatus.style.display = 'none';
+    if (typeof loadAgentsData === 'function') {
+      loadAgentsData();
+    }
   } else {
     activeAppView = 'studio';
     document.body.classList.remove('view-dashboard');
+    document.body.classList.remove('view-agents');
     document.body.classList.add('view-studio');
     if (dashboardView) dashboardView.style.display = 'none';
+    if (agentsView) agentsView.style.display = 'none';
     if (studioView) studioView.style.display = 'flex';
     if (headerTitle) headerTitle.textContent = '';
     clearNavActive();
