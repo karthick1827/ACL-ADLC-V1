@@ -132,6 +132,24 @@ function wtClassify(relPath) {
   return { kind: 'document', phase: 'other', skill: null };
 }
 
+// The tree shows only the main phase deliverables. Supporting files (reconcile-*.md, review rubrics,
+// epic scope notes, test summaries, ...) stay in the model so they still count toward gates, but are not drawn.
+const WT_MAIN_NAMES = {
+  brief: ['brief.md'],
+  prd: ['prd.md'],
+  ux: ['ux.md', 'design.md', 'experience.md'],
+  epics: ['epics.md'],
+};
+const WT_MAIN_KINDS = new Set(['project-context', 'architecture', 'story', 'spec', 'tests']);
+
+function wtIsMainDeliverable(kind, relPath) {
+  const name = (relPath || '').toLowerCase().split('/').pop();
+  if (WT_MAIN_NAMES[kind]) return WT_MAIN_NAMES[kind].includes(name);
+  if (kind === 'architecture') return !name.startsWith('reconcile');
+  if (kind === 'tests') return name !== 'test-summary.md';
+  return WT_MAIN_KINDS.has(kind);
+}
+
 function parseWorkingTreeTracker(content) {
   const meta = {};
   const rows = [];
@@ -225,6 +243,7 @@ function buildWorkingTreeModel() {
         rel,
         status,
         gated: wtHasStatusField(file),
+        main: wtIsMainDeliverable(info.kind, rel),
         agent: (row && row.Agent) || wtAgentForSkill(info.skill),
         skill: (row && row.Skill) || info.skill || '—',
         when: (row && row.When) || formatFileDateTime(file.updatedAt),
@@ -265,7 +284,7 @@ function buildWorkingTreeModel() {
     });
   }
   const leftovers = docs.filter((d) => !placed.has(d));
-  if (leftovers.length > 0 && projectType !== 'undetermined') {
+  if (leftovers.some((d) => d.main) && projectType !== 'undetermined') {
     phases.push({ key: 'other', title: 'Other Documents', icon: '📁', gates: [], docs: leftovers });
   }
 
@@ -312,7 +331,8 @@ function buildWorkingTreeModel() {
   }
 
   for (const phase of phases) {
-    phase.approved = phase.docs.filter((d) => d.status === 'Approved').length;
+    phase.shown = phase.docs.filter((d) => d.main);
+    phase.approved = phase.shown.filter((d) => d.status === 'Approved').length;
     phase.isCurrent = position && position.phaseKey === phase.key;
     phase.isDone =
       !phase.isCurrent &&
@@ -402,8 +422,12 @@ function renderWtPlaceholder(gate, isNext) {
 function renderWtBranch(phase, model) {
   const p = model.position;
   const leaves = [];
-  for (const doc of phase.docs) {
+  for (const doc of phase.shown) {
     leaves.push(renderWtLeaf(doc, p && p.type === 'awaiting' && p.doc === doc));
+  }
+  // A hidden supporting file can be the one awaiting sign-off; show it rather than lose the "You are here" marker.
+  if (p && p.type === 'awaiting' && phase.docs.includes(p.doc) && !p.doc.main) {
+    leaves.push(renderWtLeaf(p.doc, true));
   }
   for (const g of phase.gates) {
     const isNext = Boolean(p && p.type === 'next' && p.phaseKey === phase.key && p.gateKey === g);
@@ -424,10 +448,16 @@ function renderWtBranch(phase, model) {
         <span class="wt-leaf-skill"><code>acl-quick-dev</code></span>
       </div>`);
   }
-  if (leaves.length === 0) leaves.push('<div class="wt-empty-leaf">No documents yet</div>');
+  if (leaves.length === 0) {
+    const hidden = phase.docs.length;
+    leaves.push(
+      `<div class="wt-empty-leaf">${hidden > 0 ? `${hidden} supporting file${hidden === 1 ? '' : 's'} (not shown)` : 'No documents yet'}</div>`,
+    );
+  }
 
   const stateClass = phase.isCurrent ? 'current' : phase.isDone ? 'done' : phase.isFuture ? 'future' : '';
-  const count = phase.docs.length > 0 ? `${phase.approved}/${phase.docs.length} approved` : 'not started';
+  const count =
+    phase.shown.length > 0 ? `${phase.approved}/${phase.shown.length} approved` : phase.docs.length > 0 ? 'complete' : 'not started';
   return `
     <div class="wt-branch ${stateClass}">
       <div class="wt-phase-node">
@@ -522,14 +552,15 @@ function renderWorkingTree() {
         ? `🍂 Brownfield Project${model.tier ? ` · Tier ${model.tier}` : ''}`
         : '❔ Project type pending';
 
+  const shownDocs = model.docs.filter((d) => d.main);
   const agentCounts = new Map();
-  for (const d of model.docs) {
+  for (const d of shownDocs) {
     if (d.agent && d.agent !== '—') agentCounts.set(d.agent, (agentCounts.get(d.agent) || 0) + 1);
   }
   const agentChips = [...agentCounts.entries()]
     .map(([agent, n]) => `<span class="wt-agent-chip">${wtEscape(agent)} <b>${n}</b></span>`)
     .join('');
-  const approved = model.docs.filter((d) => d.status === 'Approved').length;
+  const approved = shownDocs.filter((d) => d.status === 'Approved').length;
 
   container.innerHTML = `
     <div class="dashboard-header-card">
@@ -543,7 +574,7 @@ function renderWorkingTree() {
           <p>Where the project stands right now: which agents ran, what they produced, and which gate is next.</p>
         </div>
         <div class="wt-stats">
-          <div class="wt-stat"><b>${model.docs.length}</b><span>Deliverables</span></div>
+          <div class="wt-stat"><b>${shownDocs.length}</b><span>Deliverables</span></div>
           <div class="wt-stat"><b>${approved}</b><span>Approved</span></div>
           <div class="wt-stat"><b>${agentCounts.size}</b><span>Agents</span></div>
         </div>
