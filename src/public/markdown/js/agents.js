@@ -140,14 +140,17 @@ async function loadAgentsData(forceReload = false) {
     `;
   }
 
-  try {
-    const res = await fetch('/api/list-agents?t=' + Date.now());
-    if (res.ok) {
+  // Live API first; then the static snapshot the installer writes next to markdown.html
+  // (used when the dev server / host does not serve /api/list-agents).
+  for (const source of ['/api/list-agents', '/acl-agents.json']) {
+    try {
+      const res = await fetch(source + '?t=' + Date.now());
+      if (!res.ok) continue;
+      // SPA dev servers answer unknown routes with index.html — treat non-JSON as missing
       const data = await res.json();
-      if (data && Array.isArray(data.agents)) {
-        agentsList = data.agents;
-      }
-      if (data && data.frameworkVersion) {
+      if (!data || !Array.isArray(data.agents) || data.agents.length === 0) continue;
+      agentsList = data.agents;
+      if (data.frameworkVersion) {
         window.__ACL_FRAMEWORK_VERSION__ = data.frameworkVersion;
         const drawerLabel = document.getElementById('drawerVersionLabel');
         if (drawerLabel) {
@@ -155,9 +158,10 @@ async function loadAgentsData(forceReload = false) {
           drawerLabel.textContent = v.startsWith('v') ? v : `v${v}`;
         }
       }
+      break;
+    } catch (err) {
+      console.warn(`[Agents] Could not load agents from ${source}:`, err);
     }
-  } catch (err) {
-    console.warn('[Agents] Could not fetch /api/list-agents:', err);
   }
 
   // Fallback to embedded agents if provided

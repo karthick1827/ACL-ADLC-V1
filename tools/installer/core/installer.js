@@ -17,6 +17,34 @@ const { MODULE_HELP_CSV_HEADER } = require('../modules/module-help-schema');
 const { ExistingInstall } = require('./existing-install');
 const { warnPreNativeSkillsLegacy } = require('./legacy-warnings');
 
+// Markdown Studio serverless endpoints shipped from the framework's api/ folder
+const API_ENDPOINT_FILES = ['save-markdown.js', 'list-markdown-files.js', 'list-agents.js'];
+
+/**
+ * The api/*.js endpoints are authored as CommonJS. In a `"type": "module"` project
+ * `module.exports` silently yields no exports, so every CommonJS construct is rewritten to ESM.
+ */
+function convertCommonJsEndpointToEsm(content) {
+  const namedExports = [];
+  let defaultExport = null;
+  const converted = content
+    .replaceAll(/^const (\w+) = require\((['"][^'"]+['"])\);?[ \t]*$/gm, 'import $1 from $2;')
+    .replaceAll(/^module\.exports\.(\w+) = (\w+);?[ \t]*\r?$\n?/gm, (_m, name, value) => {
+      namedExports.push(name === value ? name : `${value} as ${name}`);
+      return '';
+    })
+    .replaceAll(/^module\.exports = async function (\w*)\s*\(/gm, 'export default async function $1(')
+    .replaceAll(/^module\.exports = (\w+);?[ \t]*\r?$\n?/gm, (_m, value) => {
+      defaultExport = value;
+      return '';
+    })
+    .trimEnd();
+  const exportLines = [];
+  if (defaultExport) exportLines.push(`export default ${defaultExport};`);
+  if (namedExports.length > 0) exportLines.push(`export { ${namedExports.join(', ')} };`);
+  return exportLines.length > 0 ? `${converted}\n\n${exportLines.join('\n')}\n` : `${converted}\n`;
+}
+
 class Installer {
   constructor() {
     this.externalModuleManager = new ExternalModuleManager();
@@ -99,6 +127,9 @@ class Installer {
       // Skills are now in IDE directories — remove redundant copies from _acl/.
       // Also cleans up skill dirs left by older installer versions.
       await this._cleanupSkillDirs(paths.aclDir);
+
+      // Skills are final now — snapshot them for the Markdown Studio Agents tab
+      await this._writeAgentsManifest(paths.projectRoot);
 
       const restoreResult = await this._restoreUserFiles(paths, updateState);
 
@@ -2022,21 +2053,12 @@ export default async function handler(req, res) {
       }
 
       if (srcApiDir) {
-        for (const endpointFile of ['save-markdown.js', 'list-markdown-files.js']) {
+        for (const endpointFile of API_ENDPOINT_FILES) {
           const srcFile = path.join(srcApiDir, endpointFile);
           if (await fs.pathExists(srcFile)) {
             let content = await fs.readFile(srcFile, 'utf8');
             if (isEsm) {
-              content = content
-                .replace(
-                  "const fs = require('node:fs');\nconst path = require('node:path');\n\nmodule.exports = async function handler(req, res) {",
-                  "import fs from 'node:fs';\nimport path from 'node:path';\n\nexport default async function handler(req, res) {",
-                )
-                .replace(
-                  "const fs = require('node:fs');\nconst path = require('node:path');",
-                  "import fs from 'node:fs';\nimport path from 'node:path';",
-                )
-                .replace('module.exports = async function handler(req, res) {', 'export default async function handler(req, res) {');
+              content = convertCommonJsEndpointToEsm(content);
             }
             const targetFile = path.join(apiDir, endpointFile);
             await fs.writeFile(targetFile, content, 'utf8');
@@ -2081,7 +2103,7 @@ export default async function handler(req, res) {
       }
       if (srcNetlifyDir) {
         await fs.ensureDir(netlifyDir);
-        for (const endpointFile of ['save-markdown.js', 'list-markdown-files.js']) {
+        for (const endpointFile of API_ENDPOINT_FILES) {
           const srcFile = path.join(srcNetlifyDir, endpointFile);
           const targetFile = path.join(netlifyDir, endpointFile);
           if (await fs.pathExists(srcFile)) {
@@ -2104,6 +2126,32 @@ export default async function handler(req, res) {
       }
     } catch {
       // Best-effort vercel and netlify endpoints deployment
+    }
+  }
+
+  /**
+   * Write acl-agents.json next to markdown.html. The Agents tab falls back to this static
+   * snapshot when /api/list-agents is not served (custom dev servers, static hosting).
+   */
+  async _writeAgentsManifest(projectRoot) {
+    if (!projectRoot) return;
+    try {
+      const studioDir = (await fs.pathExists(path.join(projectRoot, 'public', 'markdown.html')))
+        ? path.join(projectRoot, 'public')
+        : (await fs.pathExists(path.join(projectRoot, 'markdown.html')))
+          ? projectRoot
+          : null;
+      if (!studioDir) return;
+
+      const { collectAgents } = require(path.join(__dirname, '..', '..', '..', 'api', 'list-agents.js'));
+      const payload = collectAgents(projectRoot);
+      if (payload.agents.length === 0) return;
+
+      const targetFile = path.join(studioDir, 'acl-agents.json');
+      await fs.writeFile(targetFile, JSON.stringify(payload), 'utf8');
+      this.installedFiles.add(targetFile);
+    } catch {
+      // Best-effort: the Agents tab still works wherever /api/list-agents is served
     }
   }
 
