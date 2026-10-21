@@ -180,17 +180,20 @@ async function main() {
       .filter((name) => name.endsWith('.md'))
       .map((name) => fs.readFileSync(path.join(dir, name), 'utf8'))
       .join('\n');
+    // Templates join paths with '/' after a native root, so Windows output mixes separators.
+    const toPosix = (value) => value.replaceAll('\\', '/');
+    const posixMarkdown = toPosix(markdown);
     assert(!/\{\{(?:\.|config\.)|\{workflow\.|\[\[acl-snapshot:/.test(markdown), 'compile token survived');
     assert(!markdown.includes('{skill-root}'), 'mutable skill-root reference survived');
     assert(markdown.includes('{spec_file}'), 'runtime placeholder was removed');
     assert(markdown.includes('tailored to `expert`'), 'user_skill_level behavior missing');
     for (const prompt of ['adversarial.md', 'edge-case-hunter.md', 'verification-gap.md']) {
       const promptPath = path.join(dir, 'review-prompts', prompt);
-      assert(markdown.includes(promptPath), `snapshot reviewer path missing: ${prompt}`);
+      assert(posixMarkdown.includes(toPosix(promptPath)), `snapshot reviewer path missing: ${prompt}`);
       assert(fs.existsSync(promptPath), `snapshot reviewer missing: ${prompt}`);
     }
-    for (const match of markdown.matchAll(/`(\/[^`]+\/step-[^`]+\.md)`/g)) {
-      assert(path.dirname(match[1]) === dir, `cross-generation reference: ${match[1]}`);
+    for (const match of posixMarkdown.matchAll(/`((?:[A-Za-z]:)?\/[^`]+\/step-[^`]+\.md)`/g)) {
+      assert(path.posix.dirname(match[1]) === toPosix(dir), `cross-generation reference: ${match[1]}`);
     }
   });
 
@@ -353,8 +356,16 @@ async function main() {
     const escaped = fixture();
     const outside = path.join(escaped.outer, 'outside.md');
     fs.writeFileSync(outside, 'outside', 'utf8');
-    fs.rmSync(path.join(escaped.skill, 'workflow.md'));
-    fs.symlinkSync(outside, path.join(escaped.skill, 'workflow.md'), 'file');
+    if (process.platform === 'win32') {
+      // File symlinks need Developer Mode or admin on Windows; a directory junction escapes the same way.
+      const outsideDir = path.join(escaped.outer, 'outside-dir');
+      fs.mkdirSync(outsideDir);
+      fs.writeFileSync(path.join(outsideDir, 'outside.md'), 'outside', 'utf8');
+      fs.symlinkSync(outsideDir, path.join(escaped.skill, 'escape'), 'junction');
+    } else {
+      fs.rmSync(path.join(escaped.skill, 'workflow.md'));
+      fs.symlinkSync(outside, path.join(escaped.skill, 'workflow.md'), 'file');
+    }
     result = run(escaped);
     assert(result.stdout.includes('escapes skill directory'), 'source symlink escape accepted');
   });
@@ -368,7 +379,8 @@ async function main() {
     fs.mkdirSync(project);
     fs.symlinkSync(source.acl, path.join(project, '_acl'), process.platform === 'win32' ? 'junction' : 'dir');
     const longFix = { project, acl: source.acl, skill: source.skill };
-    const output = entry(run(longFix));
+    // Windows cannot spawn a process whose cwd exceeds MAX_PATH; the project root is passed explicitly anyway.
+    const output = entry(run(longFix, process.platform === 'win32' ? outer : project));
     assert(path.basename(path.dirname(path.dirname(output))).length <= 93, 'namespace component was not bounded');
   });
 

@@ -32,7 +32,6 @@ function getDiskMarkdownFiles() {
         entry.name === 'src' ||
         entry.name === 'tools' ||
         entry.name === 'docs' ||
-        entry.name === 'tests' ||
         lower.includes('memlog')
       )
         continue;
@@ -59,7 +58,6 @@ function getDiskMarkdownFiles() {
           'review-triage.md',
           'patch-plan.md',
           'research.md',
-          'test-summary.md',
           'sprint-status.md',
         ].includes(lower)
       ) {
@@ -98,7 +96,8 @@ function getDiskMarkdownFiles() {
             tier = '2';
           }
         }
-        if (!tier && (/epics\.md/i.test(content) || /architecture-spine/i.test(content))) {
+        // working-tree.md is the delivery tracker; it names other deliverables, so skip the content heuristic for it.
+        if (!tier && lower !== 'working-tree.md' && (/epics\.md/i.test(content) || /architecture-spine/i.test(content))) {
           tier = '2';
         }
 

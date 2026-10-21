@@ -64,8 +64,10 @@ async function init() {
     }
   }
 
-  // Open Summarized Dashboard by default when visiting /markdown.html
-  switchAppView('dashboard-summarized');
+  // Open Summarized Dashboard by default when visiting /markdown.html; #working-tree etc. deep-link to a view
+  const hashView = (window.location.hash || '').slice(1);
+  const deepLinkViews = ['working-tree', 'dashboard-scrum', 'dashboard-developer', 'studio'];
+  switchAppView(deepLinkViews.includes(hashView) ? hashView : 'dashboard-summarized');
 
   // Universal live auto-sync: automatically syncs when any agent (Claude Code, AGY, Gemini, Copilot, Cursor, etc.)
   // generates or updates markdown files in _acl-output/ without needing manual browser refresh

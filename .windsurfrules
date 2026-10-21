@@ -87,6 +87,12 @@ Please choose which Tier you want to proceed with:
 
 ---
 
+## 🌳 WORKING TREE TRACKING
+- After creating or updating any deliverable in `_acl-output/`, run `uv run {project-root}/_acl/scripts/working_tree.py track --agent <analyst|pm|ux-designer|architect|dev|tech-writer> --skill <skill-id> --file <path>`.
+- Run `uv run {project-root}/_acl/scripts/working_tree.py sync` to backfill untracked deliverables. Never hand-edit `_acl-output/working-tree.md` or give it a `status` field; gates never evaluate it.
+
+---
+
 ## 🛑 STRICT PROHIBITION: No Direct AI Status Manipulation & Manager-Only Approval
 - The AI agent is STRICTLY PROHIBITED from self-approving or modifying `status: In Review` -> `status: Approved`.
 - Only the Manager in Markdown Studio (`markdown.html`) can approve documents.

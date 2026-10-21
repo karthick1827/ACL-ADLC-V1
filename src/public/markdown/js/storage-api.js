@@ -38,6 +38,9 @@ async function syncFromLiveDisk(quiet = false) {
         window.__serverActiveTier = String(data.activeTier);
       }
       if (data && Array.isArray(data.files)) {
+        // The working-tree tracker is filtered out of the document list below, so read it first.
+        const trackerChanged = captureWorkingTreeTracker(data.files);
+        if (trackerChanged && activeAppView === 'working-tree') renderWorkingTree();
         let filteredFiles = data.files.filter((f) => !isChildFile(f.filename, f.folderPath));
 
         // Deduplicate files: prefer canonical numbered phase directories over root/duplicate paths
@@ -119,6 +122,8 @@ async function syncFromLiveDisk(quiet = false) {
             renderScrumMasterDashboard();
           } else if (activeAppView === 'dashboard-developer') {
             renderDeveloperDashboard();
+          } else if (activeAppView === 'working-tree') {
+            renderWorkingTree();
           }
         }
         if (data && data.source === 'github') {

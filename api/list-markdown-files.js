@@ -16,7 +16,6 @@ const EXCLUDED_FILENAMES = new Set([
   'review-triage.md',
   'patch-plan.md',
   'research.md',
-  'test-summary.md',
   'sprint-status.md',
   'sprint-status.yaml',
   'sprint-status.yml',
@@ -24,14 +23,13 @@ const EXCLUDED_FILENAMES = new Set([
   '.memlog.md',
 ]);
 
-function isExcludedFile(filename, folderPath = '') {
+function isExcludedFile(filename) {
   if (!filename) return true;
   const lower = filename.toLowerCase();
-  const lowerFolder = (folderPath || '').toLowerCase();
   if (lower.startsWith('.')) return true;
   if (lower.includes('memlog')) return true;
   if (lower.startsWith('readiness-report')) return true;
-  if (lowerFolder.includes('/tests') || lowerFolder.endsWith('tests') || lowerFolder === 'tests') return true;
+  // Test deliverables under _acl-output/**/tests/ are listed: the Studio shows them under Validate & Release.
   return EXCLUDED_FILENAMES.has(lower);
 }
 
@@ -61,7 +59,9 @@ function parseMarkdownMetadata(content, fullPath, statTime = null) {
       tier = '2';
     }
   }
-  if (!tier && (/epics\.md/i.test(content) || /architecture-spine/i.test(content))) {
+  // working-tree.md is the delivery tracker; it names other deliverables, so skip the content heuristic for it.
+  const isTracker = path.basename(fullPath).toLowerCase() === 'working-tree.md';
+  if (!tier && !isTracker && (/epics\.md/i.test(content) || /architecture-spine/i.test(content))) {
     tier = '2';
   }
 
@@ -250,9 +250,7 @@ async function universalHandler(arg1, arg2) {
             if (item.type !== 'blob') return false;
             if (!item.path.startsWith('_acl-output') && !item.path.startsWith('acl-output')) return false;
             if (!item.path.endsWith('.md')) return false;
-            const fname = path.basename(item.path);
-            const fdir = path.dirname(item.path);
-            return !isExcludedFile(fname, fdir);
+            return !isExcludedFile(path.basename(item.path));
           });
 
           // Fetch blobs concurrently
@@ -324,16 +322,11 @@ async function universalHandler(arg1, arg2) {
           const full = path.join(dir, entry.name);
           const rel = relPrefix ? `${relPrefix}/${entry.name}` : entry.name;
           if (entry.isDirectory()) {
-            if (
-              entry.name.startsWith('.') ||
-              entry.name === 'node_modules' ||
-              entry.name === 'tests' ||
-              entry.name.toLowerCase().includes('memlog')
-            ) {
+            if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name.toLowerCase().includes('memlog')) {
               continue;
             }
             scan(full, rel);
-          } else if (entry.isFile() && entry.name.endsWith('.md') && !isExcludedFile(entry.name, relPrefix)) {
+          } else if (entry.isFile() && entry.name.endsWith('.md') && !isExcludedFile(entry.name)) {
             const content = fs.readFileSync(full, 'utf8');
             const stat = fs.statSync(full);
             diskList.push(parseMarkdownMetadata(content, rel, stat.mtime.toISOString()));

@@ -33,6 +33,7 @@
     <link rel="stylesheet" href="/markdown/css/editor.css" />
     <link rel="stylesheet" href="/markdown/css/modals.css" />
     <link rel="stylesheet" href="/markdown/css/dashboard.css" />
+    <link rel="stylesheet" href="/markdown/css/working-tree.css" />
   </head>
   <body class="view-dashboard">
     <!-- Slim Vertical Tab Rail (Google-style vertical tabs) -->
@@ -82,6 +83,18 @@
           aria-label="Developer Dashboard"
         >
           <span class="rail-item-icon">💻</span>
+        </button>
+
+        <!-- Subheader 4: Working Tree -->
+        <button
+          type="button"
+          class="rail-item"
+          id="railItemWorkingTree"
+          onclick="switchAppView('working-tree')"
+          title="Working Tree (Live Delivery Position & Agent Activity)"
+          aria-label="Working Tree"
+        >
+          <span class="rail-item-icon">🌳</span>
         </button>
 
         <div class="rail-divider"></div>
@@ -163,6 +176,14 @@
           <div class="nav-item-text">
             <span class="nav-item-title">Developer</span>
             <span class="nav-item-subtitle">Stories & Acceptance Criteria</span>
+          </div>
+        </button>
+        <!-- Sub-item 4: Working Tree -->
+        <button type="button" class="nav-drawer-item sub-item" id="navItemWorkingTree" onclick="switchAppView('working-tree')">
+          <span class="nav-item-icon">🌳</span>
+          <div class="nav-item-text">
+            <span class="nav-item-title">Working Tree</span>
+            <span class="nav-item-subtitle">Live Position & Agent Activity</span>
           </div>
         </button>
 
@@ -438,6 +459,7 @@
     <script src="/markdown/js/workflow-modal.js?v=5"></script>
     <script src="/markdown/js/drawer.js?v=5"></script>
     <script src="/markdown/js/dashboard.js?v=5"></script>
+    <script src="/markdown/js/working-tree.js?v=7"></script>
     <script src="/markdown/js/agents.js?v=5"></script>
     <script src="/markdown/js/app.js?v=5"></script>
   </body>
