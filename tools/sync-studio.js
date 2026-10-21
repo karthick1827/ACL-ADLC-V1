@@ -107,6 +107,14 @@ function replicateToTarget(targetProject) {
     }
   }
 
+  // 4. Replicate tools/atlassian-service.mjs
+  const srcAtlassian = path.join(REPO_ROOT, 'tools', 'atlassian-service.mjs');
+  const targetAtlassian = path.join(targetProject, 'tools', 'atlassian-service.mjs');
+  if (fs.existsSync(srcAtlassian) && copyFileSafe(srcAtlassian, targetAtlassian)) {
+    console.log(`  ✓ Replicated: tools/atlassian-service.mjs`);
+    count++;
+  }
+
   console.log(`\n✅ Replication Complete for ${path.basename(targetProject)}! (${count} files synchronized)\n`);
 }
 

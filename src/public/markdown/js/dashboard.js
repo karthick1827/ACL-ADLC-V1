@@ -381,7 +381,10 @@ function renderDeliveryDashboard() {
             </div>
           </div>
 
-          <!-- Footer -->
+          <!-- ATLASSIAN JIRA & CONFLUENCE INTEGRATION SUITE -->
+        <div id="atlassianSuiteRoot"></div>
+
+        <!-- Footer -->
           <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1rem;">
             To edit documents or record official manager sign-offs, switch to <strong>Markdown Studio</strong> from the ☰ menu.
           </div>
@@ -1658,6 +1661,9 @@ async function renderGitDashboard() {
         </div>
       </div>
     `;
+
+    // Initialize Atlassian JIRA & Confluence Integration Suite
+    renderAtlassianSuite(isPushed);
   } catch (err) {
     container.innerHTML = `
       <div style="padding: 2rem; background: #fee2e2; color: #991b1b; border-radius: 8px;">
@@ -1675,4 +1681,504 @@ if (typeof window !== 'undefined') {
     .then((r) => r.json())
     .then((d) => updateNavUserControlCentre(d))
     .catch(() => updateNavUserControlCentre(null));
+}
+
+// ATLASSIAN JIRA & CONFLUENCE INTEGRATION CONTROLLER
+// =========================================================================
+
+async function renderAtlassianSuite(isPushed) {
+  const mount = document.getElementById('atlassianSuiteRoot');
+  if (!mount) return;
+
+  mount.innerHTML = `
+    <div class="atlassian-suite-card">
+      <div style="text-align: center; padding: 1.5rem; color: #64748b;">
+        <span>🔄 Loading Atlassian Workspace Telemetry...</span>
+      </div>
+    </div>
+  `;
+
+  try {
+    const [cfgRes, discRes, histRes] = await Promise.all([
+      fetch('/api/atlassian/config')
+        .then((r) => r.json())
+        .catch(() => ({})),
+      fetch('/api/atlassian/discover')
+        .then((r) => r.json())
+        .catch(() => ({ epics: [], stories: [], deliverables: [] })),
+      fetch('/api/atlassian/sync-history')
+        .then((r) => r.json())
+        .catch(() => []),
+    ]);
+
+    const epicsCount = (discRes.epics || []).length;
+    const storiesCount = (discRes.stories || []).length;
+    const deliverablesCount = (discRes.deliverables || []).length;
+    const isConnected = Boolean(cfgRes.connected);
+    const isDemo = Boolean(cfgRes.isDemoMode);
+
+    let statusBadgeHtml = '';
+    if (isConnected && !isDemo) {
+      statusBadgeHtml = `<span class="atlassian-status-badge connected">🟢 Connected: ${cfgRes.domain || 'Cloud'}</span>`;
+    } else if (isDemo) {
+      statusBadgeHtml = `<span class="atlassian-status-badge demo">🟡 Interactive Sandbox Mode</span>`;
+    } else {
+      statusBadgeHtml = `<span class="atlassian-status-badge standby">⚪ Standby (Offline)</span>`;
+    }
+
+    mount.innerHTML = `
+      <div class="atlassian-suite-card" id="atlassianCard">
+        <!-- Header -->
+        <div class="atlassian-header">
+          <div class="atlassian-title-group">
+            <h3><span>🎯 📘</span> Atlassian Workspace Integration (JIRA & Confluence)</h3>
+            <p>Direct two-way bridge connecting <code>_acl-output/</code> specifications with live JIRA backlog and Confluence documentation spaces.</p>
+          </div>
+          <div class="atlassian-badges">
+            ${statusBadgeHtml}
+            <button type="button" class="atlassian-toggle-btn" onclick="toggleAtlassianConfigPanel()">
+              <span>⚙️</span> Configure Connection
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible Configuration Panel -->
+        <div class="atlassian-config-box" id="atlassianConfigPanel" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #0f172a; font-size: 0.95rem;">Atlassian Cloud Credentials & Workspace Keys</strong>
+            <span style="font-size: 0.78rem; color: #64748b;">Stored locally in <code>_acl/atlassian-config.json</code></span>
+          </div>
+
+          <form id="atlassianConfigForm" onsubmit="saveAtlassianConfig(event)">
+            <div class="atlassian-config-grid">
+              <div class="atlassian-input-group">
+                <label>Atlassian Domain URL</label>
+                <input type="text" id="atlDomain" name="domain" value="${cfgRes.domain || 'https://velocityone.atlassian.net'}" placeholder="https://your-domain.atlassian.net" required />
+              </div>
+              <div class="atlassian-input-group">
+                <label>Atlassian Account Email</label>
+                <input type="email" id="atlEmail" name="email" value="${cfgRes.email || 'nkarthick1827@gmail.com'}" placeholder="user@company.com" required />
+              </div>
+              <div class="atlassian-input-group">
+                <label>API Token (Atlassian Cloud)</label>
+                <div style="display: flex; gap: 0.25rem;">
+                  <input type="password" id="atlToken" name="apiToken" value="${cfgRes.apiToken || ''}" placeholder="••••••••••••••••••••" style="flex: 1;" />
+                  <button type="button" class="atlassian-toggle-btn" onclick="togglePasswordVisibility('atlToken')" title="Show/Hide">👁️</button>
+                </div>
+              </div>
+              <div class="atlassian-input-group">
+                <label>JIRA Project Key</label>
+                <input type="text" id="atlJiraKey" name="jiraProjectKey" value="${cfgRes.jiraProjectKey || 'PROJ'}" placeholder="e.g. FLEET" style="text-transform: uppercase;" required />
+              </div>
+              <div class="atlassian-input-group">
+                <label>Confluence Space Key</label>
+                <input type="text" id="atlConfSpace" name="confluenceSpaceKey" value="${cfgRes.confluenceSpaceKey || 'DOCS'}" placeholder="e.g. DOCS" style="text-transform: uppercase;" required />
+              </div>
+            </div>
+
+            <div class="atlassian-config-actions">
+              <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: #475569;">
+                <input type="checkbox" id="atlDemoMode" name="isDemoMode" ${isDemo ? 'checked' : ''} style="cursor: pointer;" />
+                <label for="atlDemoMode" style="cursor: pointer; font-size: 0.82rem; text-transform: none; color: #475569;">Use Sandbox Simulation Mode (generates live-preview keys without requiring active API token)</label>
+              </div>
+              <div style="display: flex; gap: 0.5rem;">
+                <button type="button" class="atlassian-toggle-btn" onclick="toggleAtlassianConfigPanel()">Cancel</button>
+                <button type="submit" class="atlassian-btn-sync jira" style="width: auto; padding: 0.45rem 1rem;">Save & Connect</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- 2-Engine Execution Cards -->
+        <div class="atlassian-engines-grid">
+          
+          <!-- JIRA ENGINE -->
+          <div class="atlassian-engine-card jira">
+            <div class="atlassian-engine-header">
+              <div class="atlassian-engine-info">
+                <span class="atlassian-engine-icon">🎯</span>
+                <div class="atlassian-engine-title">
+                  <h4>JIRA Backlog & Story Engine</h4>
+                  <span>Sprint & Issue Management</span>
+                </div>
+              </div>
+              <span class="atlassian-status-badge ${isConnected ? 'connected' : 'standby'}">
+                ${isConnected ? 'Ready to Sync' : 'Standby'}
+              </span>
+            </div>
+
+            <div class="atlassian-engine-body">
+              Automatically creates and updates JIRA <strong>Epics</strong> from <code>epics.md</code> and links child <strong>User Stories</strong> with their complete technical Acceptance Criteria checklists attached.
+              <div>
+                <span class="atlassian-count-badge">📦 Detected: <strong>${epicsCount} Epics</strong> • <strong>${storiesCount} Stories</strong></span>
+              </div>
+            </div>
+
+            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button type="button" class="atlassian-btn-sync jira" id="btnSyncJira" onclick="executeJiraSync()" style="flex: 1; min-width: 170px;" title="Push local epics & stories to JIRA without duplicates">
+                <span>🎯</span> Sync to JIRA (Push)
+              </button>
+              <button type="button" class="atlassian-btn-sync jira" id="btnPullJira" onclick="executeJiraPull()" style="flex: 1; min-width: 170px; background: #0284c7; border-color: #0369a1;" title="Fetch JIRA board stories into _acl-output/ with status: In Review">
+                <span>📥</span> Pull from JIRA (Fetch)
+              </button>
+            </div>
+          </div>
+
+          <!-- CONFLUENCE ENGINE -->
+          <div class="atlassian-engine-card confluence">
+            <div class="atlassian-engine-header">
+              <div class="atlassian-engine-info">
+                <span class="atlassian-engine-icon">📘</span>
+                <div class="atlassian-engine-title">
+                  <h4>Confluence Documentation Hub</h4>
+                  <span>Living Product & Architecture Pages</span>
+                </div>
+              </div>
+              <span class="atlassian-status-badge ${isConnected ? 'connected' : 'standby'}">
+                ${isConnected ? 'Ready to Sync' : 'Standby'}
+              </span>
+            </div>
+
+            <div class="atlassian-engine-body">
+              Publishes and versions your primary phase deliverables (<strong>Product Brief</strong>, <strong>PRD</strong>, <strong>Architecture Spine</strong>, and <strong>UX Specs</strong>) directly to company Confluence spaces.
+              <div>
+                <span class="atlassian-count-badge">📄 Detected: <strong>${deliverablesCount} Primary Deliverables</strong></span>
+              </div>
+            </div>
+
+            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button type="button" class="atlassian-btn-sync confluence" id="btnSyncConfluence" onclick="executeConfluenceSync()" style="flex: 1; min-width: 170px;" title="Publish local phase deliverables to Confluence without duplicates">
+                <span>📘</span> Sync to Confluence (Push)
+              </button>
+              <button type="button" class="atlassian-btn-sync confluence" id="btnPullConfluence" onclick="executeConfluencePull()" style="flex: 1; min-width: 170px; background: #2563eb; border-color: #1d4ed8;" title="Fetch Confluence pages into _acl-output/ with status: In Review">
+                <span>📥</span> Pull from Confluence (Fetch)
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Global Batch Sync Button -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1rem 1.25rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <div>
+            <strong style="color: #0f172a; font-size: 0.95rem;">Full Enterprise Synchronization</strong>
+            <p style="font-size: 0.78rem; color: #64748b; margin: 0.2rem 0 0 0;">Synchronize all Epics, User Stories, and Documentation deliverables across both platforms in a single atomic pass.</p>
+          </div>
+          <button type="button" class="atlassian-btn-syncall" id="btnSyncAll" onclick="executeSyncAll()">
+            <span>⚡</span> Sync All to Atlassian
+          </button>
+        </div>
+
+        <!-- Live Sync Results & Audit Table -->
+        <div id="atlassianSyncResultContainer" style="${histRes && histRes.length > 0 ? '' : 'display: none;'}">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <strong style="font-size: 0.88rem; color: #0f172a;">Recent Atlassian Synchronization Audit</strong>
+            <span style="font-size: 0.75rem; color: #64748b;">Last Updated: ${cfgRes.lastSynced ? new Date(cfgRes.lastSynced).toLocaleString() : 'Just now'}</span>
+          </div>
+          <div class="atlassian-log-box" id="atlassianLogBox">
+            ${renderSyncHistoryItems(histRes)}
+          </div>
+        </div>
+
+      </div>
+    `;
+  } catch (err) {
+    mount.innerHTML = `
+      <div class="atlassian-suite-card">
+        <p style="color: #dc2626; margin: 0;">Failed loading Atlassian Workspace data: ${err.message}</p>
+      </div>
+    `;
+  }
+}
+
+window.toggleAtlassianConfigPanel = function () {
+  const panel = document.getElementById('atlassianConfigPanel');
+  if (panel) {
+    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  }
+};
+
+window.togglePasswordVisibility = function (inputId) {
+  const input = document.getElementById(inputId);
+  if (input) {
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+};
+
+window.saveAtlassianConfig = async function (e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const domain = document.getElementById('atlDomain')?.value?.trim();
+  const email = document.getElementById('atlEmail')?.value?.trim();
+  const apiToken = document.getElementById('atlToken')?.value?.trim();
+  const jiraProjectKey = document.getElementById('atlJiraKey')?.value?.trim()?.toUpperCase();
+  const confluenceSpaceKey = document.getElementById('atlConfSpace')?.value?.trim()?.toUpperCase();
+  const isDemoMode = Boolean(document.getElementById('atlDemoMode')?.checked);
+
+  try {
+    const res = await fetch('/api/atlassian/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        domain,
+        email,
+        apiToken,
+        jiraProjectKey,
+        confluenceSpaceKey,
+        isDemoMode,
+        connected: true,
+      }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('✅ Atlassian credentials and workspace keys saved successfully!');
+      renderAtlassianSuite(true);
+    } else {
+      alert('⚠️ Error saving configuration: ' + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert('⚠️ Failed to save Atlassian configuration: ' + err.message);
+  }
+};
+
+window.executeJiraSync = async function () {
+  // Auto-save any active dirty editor changes before pushing to JIRA
+  if (typeof window.saveCurrentFile === 'function') {
+    try {
+      await window.saveCurrentFile();
+    } catch (e) {}
+  }
+
+  const btn = document.getElementById('btnSyncJira');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Syncing Epics & Stories to JIRA...';
+  }
+
+  try {
+    const res = await fetch('/api/atlassian/sync-jira', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const result = await res.json();
+    if (result.success) {
+      displaySyncResultBanner(
+        `🎯 Successfully synced ${result.totalEpics} Epics and ${result.totalStories} Stories to JIRA (${result.projectKey})!`,
+        'jira',
+      );
+      renderAtlassianSuite(true);
+    } else {
+      alert('⚠️ JIRA Sync error: ' + (result.error || 'Failed to sync'));
+    }
+  } catch (err) {
+    alert('⚠️ Network error during JIRA sync: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+};
+
+window.executeJiraPull = async function () {
+  const btn = document.getElementById('btnPullJira');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Pulling from JIRA Board...';
+  }
+
+  try {
+    const res = await fetch('/api/atlassian/pull-jira', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const result = await res.json();
+    if (result.success) {
+      let bannerMsg = '';
+      if (result.updatedCount === 0 && result.createdCount === 0) {
+        bannerMsg =
+          '📥 JIRA Pull Complete: All ' +
+          (result.unchangedCount || result.totalFetched) +
+          ' stories are already up to date! Zero changes detected, all approval statuses preserved.';
+      } else {
+        bannerMsg =
+          '📥 Successfully pulled from JIRA (' +
+          result.projectKey +
+          '): ' +
+          result.updatedCount +
+          " changed stories set to 'In Review', " +
+          result.createdCount +
+          ' new stories created. (' +
+          (result.unchangedCount || 0) +
+          ' unchanged stories kept untouched)';
+      }
+      displaySyncResultBanner(bannerMsg, 'jira');
+      renderAtlassianSuite(true);
+      if (typeof window.refreshTree === 'function') window.refreshTree();
+    } else {
+      alert('⚠️ JIRA Pull error: ' + (result.error || 'Failed to pull from JIRA'));
+    }
+  } catch (err) {
+    alert('⚠️ Network error during JIRA pull: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+};
+
+window.executeConfluenceSync = async function () {
+  // Auto-save any active dirty editor changes before pushing to Confluence
+  if (typeof window.saveCurrentFile === 'function') {
+    try {
+      await window.saveCurrentFile();
+    } catch (e) {}
+  }
+
+  const btn = document.getElementById('btnSyncConfluence');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Syncing Deliverables to Confluence...';
+  }
+
+  try {
+    const res = await fetch('/api/atlassian/sync-confluence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const result = await res.json();
+    if (result.success) {
+      const detailMsg =
+        result.updatedCount !== undefined
+          ? `(${result.updatedCount} updated in-place, ${result.createdCount} published - no duplicates!)`
+          : '';
+      displaySyncResultBanner(
+        `📘 Successfully synced ${result.totalPages} Phase Deliverables to Confluence Space ${result.spaceKey} ${detailMsg}`,
+        'confluence',
+      );
+      renderAtlassianSuite(true);
+    } else {
+      alert('⚠️ Confluence Sync error: ' + (result.error || 'Failed to sync'));
+    }
+  } catch (err) {
+    alert('⚠️ Network error during Confluence sync: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+};
+
+window.executeConfluencePull = async function () {
+  const btn = document.getElementById('btnPullConfluence');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Pulling from Confluence Space...';
+  }
+
+  try {
+    const res = await fetch('/api/atlassian/pull-confluence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const result = await res.json();
+    if (result.success) {
+      let bannerMsg = '';
+      if (result.updatedCount === 0 && result.createdCount === 0) {
+        bannerMsg =
+          '📥 Confluence Pull Complete: All ' +
+          (result.unchangedCount || result.totalFetched) +
+          ' deliverables are already up to date! Zero changes detected, all approval statuses preserved.';
+      } else {
+        bannerMsg =
+          '📥 Successfully pulled from Confluence (' +
+          result.spaceKey +
+          '): ' +
+          result.updatedCount +
+          " changed deliverables set to 'In Review', " +
+          result.createdCount +
+          ' new deliverables created. (' +
+          (result.unchangedCount || 0) +
+          ' unchanged kept untouched)';
+      }
+      displaySyncResultBanner(bannerMsg, 'confluence');
+      renderAtlassianSuite(true);
+      if (typeof window.refreshTree === 'function') window.refreshTree();
+    } else {
+      alert('⚠️ Confluence Pull error: ' + (result.error || 'Failed to pull from Confluence'));
+    }
+  } catch (err) {
+    alert('⚠️ Network error during Confluence pull: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+};
+
+window.executeSyncAll = async function () {
+  const btn = document.getElementById('btnSyncAll');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Running Full Atlassian Synchronization...';
+  }
+
+  try {
+    await window.executeJiraSync();
+    await window.executeConfluenceSync();
+    displaySyncResultBanner('⚡ Full enterprise synchronization completed across JIRA & Confluence!', 'all');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>⚡</span> Sync All to Atlassian';
+    }
+  }
+};
+
+function displaySyncResultBanner(msg, type) {
+  const container = document.getElementById('atlassianSyncResultContainer');
+  if (container) {
+    container.style.display = 'block';
+    const alertDiv = document.createElement('div');
+    alertDiv.style.cssText =
+      'padding: 0.65rem 1rem; background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; border-radius: 6px; font-size: 0.84rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;';
+    alertDiv.innerHTML = `<span>${msg}</span><button onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; font-weight:bold; color:#065f46;">×</button>`;
+    container.prepend(alertDiv);
+  }
+}
+
+function renderSyncHistoryItems(history) {
+  if (!history || history.length === 0) {
+    return `<div style="text-align: center; padding: 1.5rem; color: #94a3b8; font-size: 0.8rem;">No synchronization runs yet. Click "Sync" above to publish your first deliverables.</div>`;
+  }
+
+  return history
+    .slice(0, 10)
+    .map(
+      (item) => `
+    <div class="atlassian-log-row">
+      <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 140px;">
+        <span class="atlassian-log-key">${item.action && item.action.includes('JIRA') ? '🎯 JIRA' : '📘 Confluence'}</span>
+        <span style="font-size: 0.74rem; color: #64748b;">${new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+      <div class="atlassian-log-title" title="${item.summary || ''}">
+        ${item.summary || 'Synchronized deliverables'}
+      </div>
+      <div>
+        <span style="font-size: 0.75rem; font-weight: 600; color: #16a34a; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">Verified</span>
+      </div>
+    </div>
+  `,
+    )
+    .join('');
 }

@@ -1787,6 +1787,146 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // =========================================================================
+  // ATLASSIAN JIRA & CONFLUENCE INTEGRATION ENDPOINTS
+  // =========================================================================
+  if (url.pathname.startsWith('/api/atlassian/')) {
+    try {
+      const atlassianMod = await import('./atlassian-service.mjs');
+      const projectRoot = PROJECT_ROOT;
+
+      if (url.pathname === '/api/atlassian/config') {
+        if (req.method === 'GET') {
+          const cfg = atlassianMod.getAtlassianConfig(projectRoot);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify(cfg));
+        }
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk) => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const payload = JSON.parse(body || '{}');
+              const saved = atlassianMod.saveAtlassianConfig(projectRoot, payload);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: true, config: saved }));
+            } catch (e) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+          });
+          return;
+        }
+      }
+
+      if (url.pathname === '/api/atlassian/discover' && req.method === 'GET') {
+        const stories = atlassianMod.discoverStoriesAndEpics(projectRoot);
+        const deliverables = atlassianMod.discoverDeliverables(projectRoot);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(
+          JSON.stringify({
+            epics: stories.epics,
+            stories: stories.stories,
+            deliverables: deliverables.map((d) => ({
+              filename: d.filename,
+              relPath: d.relPath,
+              type: d.type,
+              title: d.title,
+              status: d.status,
+            })),
+          }),
+        );
+      }
+
+      if (url.pathname === '/api/atlassian/sync-jira' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const result = await atlassianMod.syncToJira(projectRoot, payload);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, ...result }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/atlassian/pull-jira' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const result = await atlassianMod.pullFromJira(projectRoot, payload);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, ...result }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/atlassian/sync-confluence' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const result = await atlassianMod.syncToConfluence(projectRoot, payload);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, ...result }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/atlassian/pull-confluence' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const result = await atlassianMod.pullFromConfluence(projectRoot, payload);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, ...result }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/atlassian/sync-history' && req.method === 'GET') {
+        const history = atlassianMod.getSyncHistory(projectRoot);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(history));
+      }
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: err.message }));
+    }
+  }
+
   if (url.pathname === '/api/save-markdown' && req.method === 'POST') {
     let body = '';
     req.on('data', (chunk) => {

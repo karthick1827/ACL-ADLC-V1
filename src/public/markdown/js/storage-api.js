@@ -323,3 +323,8 @@ async function onStatusChange(newStatus) {
     }
   }
 }
+
+if (typeof window !== 'undefined') {
+  window.saveCurrentFile = saveCurrentFile;
+  window.syncFromLiveDisk = syncFromLiveDisk;
+}
