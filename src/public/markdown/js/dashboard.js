@@ -381,10 +381,7 @@ function renderDeliveryDashboard() {
             </div>
           </div>
 
-          <!-- ATLASSIAN JIRA & CONFLUENCE INTEGRATION SUITE -->
-        <div id="atlassianSuiteRoot"></div>
-
-        <!-- Footer -->
+          <!-- Footer -->
           <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1rem;">
             To edit documents or record official manager sign-offs, switch to <strong>Markdown Studio</strong> from the ☰ menu.
           </div>
@@ -1456,8 +1453,18 @@ async function renderGitDashboard() {
   `;
 
   try {
-    const res = await fetch('/api/git-details');
-    const data = await res.json();
+    let data = null;
+    try {
+      const res = await fetch('/api/git-details');
+      if (res.ok) {
+        data = await res.json();
+      }
+    } catch (e) {
+      data = null;
+    }
+    if (!data) {
+      data = { isPushed: false, userDetails: {}, projectDetails: {}, gitDetails: {} };
+    }
     const isPushed = Boolean(data && data.isPushed);
 
     // Update navbar identity
@@ -1654,6 +1661,9 @@ async function renderGitDashboard() {
           </div>
 
         </div>
+
+        <!-- ATLASSIAN JIRA & CONFLUENCE INTEGRATION SUITE -->
+        <div id="atlassianSuiteRoot" style="margin-top: 1.5rem;"></div>
 
         <!-- Footer -->
         <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1rem;">
