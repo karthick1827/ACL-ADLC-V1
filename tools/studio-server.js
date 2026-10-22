@@ -1342,209 +1342,10 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/api/list-agents') {
     try {
-      const agents = [];
-      const agentRoots = [
-        path.join(PROJECT_ROOT, '.agents', 'skills'),
-        path.join(PROJECT_ROOT, '.cursor', 'skills'),
-        path.join(PROJECT_ROOT, '.github', 'skills'),
-        path.join(PROJECT_ROOT, '_acl', 'skills'),
-        path.join(__dirname, '..', 'src', 'acl-skills'),
-        path.join(__dirname, '..', 'src', 'core-skills'),
-        path.join(PROJECT_ROOT, 'src', 'acl-skills'),
-        path.join(PROJECT_ROOT, 'src', 'core-skills'),
-      ];
-
-      const seenAgentNames = new Set();
-
-      function scanAgentDir(dirPath) {
-        if (!fs.existsSync(dirPath)) return;
-        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          const skillDir = path.join(dirPath, entry.name);
-          let skillPath = path.join(skillDir, 'SKILL.md');
-          if (!fs.existsSync(skillPath)) {
-            const found = fs.readdirSync(skillDir).find((f) => f.toLowerCase() === 'skill.md');
-            if (found) skillPath = path.join(skillDir, found);
-            else skillPath = null;
-          }
-
-          if (skillPath && fs.existsSync(skillPath)) {
-            addAgent(entry.name, skillDir, skillPath);
-          } else {
-            try {
-              const subEntries = fs.readdirSync(skillDir, { withFileTypes: true });
-              for (const sub of subEntries) {
-                if (!sub.isDirectory()) continue;
-                const nestedDir = path.join(skillDir, sub.name);
-                let nestedSkill = path.join(nestedDir, 'SKILL.md');
-                if (!fs.existsSync(nestedSkill)) {
-                  const found = fs.readdirSync(nestedDir).find((f) => f.toLowerCase() === 'skill.md');
-                  if (found) nestedSkill = path.join(nestedDir, found);
-                  else nestedSkill = null;
-                }
-                if (nestedSkill && fs.existsSync(nestedSkill)) {
-                  addAgent(sub.name, nestedDir, nestedSkill);
-                }
-              }
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-      }
-
-      function addAgent(agentName, agentFolder, skillPath) {
-        if (seenAgentNames.has(agentName)) return;
-        try {
-          const content = fs.readFileSync(skillPath, 'utf8');
-          seenAgentNames.add(agentName);
-
-          let displayName = agentName;
-          let description = '';
-          const nameMatch = content.match(/^name:\s*["']?([^"'\r\n]+)["']?/m);
-          if (nameMatch && nameMatch[1]) {
-            displayName = nameMatch[1].trim();
-          }
-          const descMatch = content.match(/^description:\s*["']?([^"'\r\n]+)["']?/m);
-          if (descMatch && descMatch[1]) {
-            description = descMatch[1].trim();
-          }
-
-          const SKILL_MODULE_MAP = {
-            'acl-agent-analyst': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-            'acl-agent-tech-writer': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-            'acl-document-project': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-            'acl-prfaq': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-            'acl-product-brief': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-            'acl-agent-pm': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-            'acl-agent-ux-designer': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-            'acl-prd': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-            'acl-spec': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-            'acl-ux': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-            'acl-agent-architect': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-            'acl-architecture': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-            'acl-check-implementation-readiness': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-            'acl-create-epics-and-stories': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-            'acl-generate-project-context': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-            'acl-agent-dev': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-checkpoint-preview': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-code-review': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-correct-course': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-dev-auto': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-qa-generate-e2e-tests': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-quick-dev': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-retrospective': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-sprint-planning': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-sprint-status': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-            'acl-advanced-elicitation': { module: 'core', label: 'Core · Elicitation', short: 'Core' },
-            'acl-brainstorming': { module: 'core', label: 'Core · Brainstorming', short: 'Core' },
-            'acl-customize': { module: 'core', label: 'Core · Customize', short: 'Core' },
-            'acl-deep-recon': { module: 'core', label: 'Core · Recon', short: 'Core' },
-            'acl-figma-bridge': { module: 'core', label: 'Core · Figma Bridge', short: 'Core' },
-            'acl-forge-idea': { module: 'core', label: 'Core · Ideation', short: 'Core' },
-            'acl-help': { module: 'core', label: 'Core · Help', short: 'Core' },
-            'acl-party-mode': { module: 'core', label: 'Core · Party Mode', short: 'Core' },
-            'acl-review': { module: 'core', label: 'Core · Review', short: 'Core' },
-            'acl-create-architecture': { module: 'v6-shims', label: 'V6 Shims · Architecture', short: 'V6 Shims' },
-            'acl-create-prd': { module: 'v6-shims', label: 'V6 Shims · PRD', short: 'V6 Shims' },
-            'acl-create-story': { module: 'v6-shims', label: 'V6 Shims · Story', short: 'V6 Shims' },
-            'acl-dev-story': { module: 'v6-shims', label: 'V6 Shims · Dev Story', short: 'V6 Shims' },
-            'acl-domain-research': { module: 'v6-shims', label: 'V6 Shims · Research', short: 'V6 Shims' },
-            'acl-edit-prd': { module: 'v6-shims', label: 'V6 Shims · PRD', short: 'V6 Shims' },
-            'acl-market-research': { module: 'v6-shims', label: 'V6 Shims · Research', short: 'V6 Shims' },
-            'acl-technical-research': { module: 'v6-shims', label: 'V6 Shims · Research', short: 'V6 Shims' },
-            'acl-validate-prd': { module: 'v6-shims', label: 'V6 Shims · PRD', short: 'V6 Shims' },
-            'acl-editorial-review': { module: 'v6-shims', label: 'V6 Shims · Editorial', short: 'V6 Shims' },
-            'acl-editorial-review-prose': { module: 'v6-shims', label: 'V6 Shims · Editorial', short: 'V6 Shims' },
-            'acl-editorial-review-structure': { module: 'v6-shims', label: 'V6 Shims · Editorial', short: 'V6 Shims' },
-            'acl-review-adversarial-general': { module: 'v6-shims', label: 'V6 Shims · Review', short: 'V6 Shims' },
-            'acl-review-edge-case-hunter': { module: 'v6-shims', label: 'V6 Shims · Review', short: 'V6 Shims' },
-            'acl-review-verification-gap': { module: 'v6-shims', label: 'V6 Shims · Review', short: 'V6 Shims' },
-          };
-
-          let moduleCode = 'acl';
-          let moduleLabel = 'ACL Method';
-          let moduleShort = 'ACL';
-
-          if (SKILL_MODULE_MAP[agentName]) {
-            const m = SKILL_MODULE_MAP[agentName];
-            moduleCode = m.module;
-            moduleLabel = m.label;
-            moduleShort = m.short;
-          } else {
-            const lowerFolder = (agentFolder || '').toLowerCase();
-            if (lowerFolder.includes('1-analysis')) {
-              moduleCode = '1-analysis';
-              moduleLabel = 'Phase 1 · Analysis';
-              moduleShort = 'Analysis';
-            } else if (lowerFolder.includes('2-plan') || lowerFolder.includes('plan-workflows')) {
-              moduleCode = '2-plan-workflows';
-              moduleLabel = 'Phase 2 · Planning';
-              moduleShort = 'Planning';
-            } else if (lowerFolder.includes('3-solutioning') || lowerFolder.includes('architecture')) {
-              moduleCode = '3-solutioning';
-              moduleLabel = 'Phase 3 · Solutioning';
-              moduleShort = 'Solutioning';
-            } else if (lowerFolder.includes('4-implementation') || lowerFolder.includes('quick-dev')) {
-              moduleCode = '4-implementation';
-              moduleLabel = 'Phase 4 · Implementation';
-              moduleShort = 'Implementation';
-            } else if (lowerFolder.includes('core-skills') || lowerFolder.includes('core')) {
-              moduleCode = 'core';
-              moduleLabel = 'Core Module';
-              moduleShort = 'Core';
-            } else if (lowerFolder.includes('v6-shims')) {
-              moduleCode = 'v6-shims';
-              moduleLabel = 'V6 Shims';
-              moduleShort = 'V6 Shims';
-            }
-          }
-
-          agents.push({
-            id: agentName,
-            name: agentName,
-            displayName: displayName,
-            description: description,
-            module: moduleCode,
-            moduleLabel: moduleLabel,
-            moduleShort: moduleShort,
-            folderPath: path.relative(PROJECT_ROOT, agentFolder).replaceAll('\\', '/'),
-            skillFile: {
-              filename: 'SKILL.md',
-              fullPath: path.relative(PROJECT_ROOT, skillPath).replaceAll('\\', '/'),
-              content: content,
-            },
-          });
-        } catch {
-          /* ignore */
-        }
-      }
-
-      for (const rootCandidate of agentRoots) {
-        scanAgentDir(rootCandidate);
-      }
-
-      agents.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
-      let frameworkVersion = '6.11.46';
-      try {
-        const pkgCandidates = [path.join(PROJECT_ROOT, 'package.json'), path.join(__dirname, '..', 'package.json')];
-        for (const cand of pkgCandidates) {
-          if (fs.existsSync(cand)) {
-            const p = JSON.parse(fs.readFileSync(cand, 'utf8'));
-            if (p.name === 'acl-adlc' && p.version) {
-              frameworkVersion = p.version;
-              break;
-            }
-          }
-        }
-      } catch {
-        /* ignore */
-      }
-
+      const { collectAgents } = require('../api/list-agents.js');
+      const payload = collectAgents(PROJECT_ROOT);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, count: agents.length, frameworkVersion, agents: agents }));
+      res.end(JSON.stringify(payload));
     } catch (error) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, agents: [], error: error.message }));
@@ -1785,6 +1586,146 @@ const server = http.createServer(async (req, res) => {
       }
     });
     return;
+  }
+
+  // =========================================================================
+  // ATLASSIAN JIRA & CONFLUENCE INTEGRATION ENDPOINTS
+  // =========================================================================
+  if (url.pathname.startsWith('/api/atlassian/')) {
+    try {
+      const atlassianMod = await import('./atlassian-service.mjs');
+      const projectRoot = PROJECT_ROOT;
+
+      if (url.pathname === '/api/atlassian/config') {
+        if (req.method === 'GET') {
+          const cfg = atlassianMod.getAtlassianConfig(projectRoot);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify(cfg));
+        }
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk) => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const payload = JSON.parse(body || '{}');
+              const saved = atlassianMod.saveAtlassianConfig(projectRoot, payload);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: true, config: saved }));
+            } catch (e) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+          });
+          return;
+        }
+      }
+
+      if (url.pathname === '/api/atlassian/discover' && req.method === 'GET') {
+        const stories = atlassianMod.discoverStoriesAndEpics(projectRoot);
+        const deliverables = atlassianMod.discoverDeliverables(projectRoot);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(
+          JSON.stringify({
+            epics: stories.epics,
+            stories: stories.stories,
+            deliverables: deliverables.map((d) => ({
+              filename: d.filename,
+              relPath: d.relPath,
+              type: d.type,
+              title: d.title,
+              status: d.status,
+            })),
+          }),
+        );
+      }
+
+      if (url.pathname === '/api/atlassian/sync-jira' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const result = await atlassianMod.syncToJira(projectRoot, payload);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, ...result }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/atlassian/pull-jira' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const result = await atlassianMod.pullFromJira(projectRoot, payload);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, ...result }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/atlassian/sync-confluence' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const result = await atlassianMod.syncToConfluence(projectRoot, payload);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, ...result }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/atlassian/pull-confluence' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const result = await atlassianMod.pullFromConfluence(projectRoot, payload);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, ...result }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/atlassian/sync-history' && req.method === 'GET') {
+        const history = atlassianMod.getSyncHistory(projectRoot);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(history));
+      }
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: err.message }));
+    }
   }
 
   if (url.pathname === '/api/save-markdown' && req.method === 'POST') {

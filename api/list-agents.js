@@ -1,18 +1,31 @@
 // Universal Serverless Function: list-agents.js
-// Lists the ACL agents & skills installed in the project (.agents/skills, .claude/skills, ...)
-// for the Markdown Studio "Agents" tab.
+// Lists the ACL agents & skills installed across all AI models:
+// Claude Code, Cursor, Windsurf, GitHub Copilot, Antigravity (AGY), Cline, Roo, Kiro, Codex, etc.
 // Works seamlessly across Vercel, Netlify, AWS Lambda, Firebase Functions, and local Node.js
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
-const AGENT_ROOTS = [
+const PROJECT_AGENT_ROOTS = [
   '.agents/skills',
   '.claude/skills',
+  '.agent/skills',
   '.cursor/skills',
+  '.windsurf/skills',
+  '.codeium/windsurf/skills',
   '.github/skills',
+  '.cline/skills',
+  '.roo/skills',
+  '.kiro/skills',
+  '.codex/skills',
+  '.cortex/skills',
+  '.factory/skills',
+  '.trae/skills',
   '_acl/skills',
   'src/acl-skills',
   'src/core-skills',
+  'node_modules/acl-adlc/src/acl-skills',
+  'node_modules/acl-adlc/src/core-skills',
 ];
 
 const PHASE_1 = { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' };
@@ -74,6 +87,16 @@ const SKILL_MODULE_MAP = {
   'acl-review-verification-gap': shim('Review'),
 };
 
+const SUPPORTED_AI_MODELS = [
+  { id: 'all', name: 'All Models', icon: '🌐' },
+  { id: 'claude', name: 'Claude Code', icon: '🟣' },
+  { id: 'cursor', name: 'Cursor', icon: '🔵' },
+  { id: 'windsurf', name: 'Windsurf', icon: '🌊' },
+  { id: 'copilot', name: 'GitHub Copilot', icon: '🐙' },
+  { id: 'antigravity', name: 'Antigravity (AGY)', icon: '⚡' },
+  { id: 'universal', name: 'Universal LLM', icon: '🤖' },
+];
+
 function resolveModule(agentName, agentFolder) {
   if (SKILL_MODULE_MAP[agentName]) return SKILL_MODULE_MAP[agentName];
   const lowerFolder = (agentFolder || '').toLowerCase().replaceAll('\\', '/');
@@ -101,24 +124,53 @@ function frontmatterValue(content, key) {
 }
 
 /**
- * Scan the project's skill directories and return the Agents tab payload.
+ * Scan project skill directories, user home global skill directories,
+ * and Copilot custom agent definitions across all supported AI models.
  * Exported so the installer can write the same data to a static acl-agents.json.
  */
 function collectAgents(projectRoot = process.cwd()) {
   const agents = [];
   const seen = new Set();
 
-  function addAgent(agentName, agentFolder, skillPath) {
+  function addAgent(agentName, agentFolder, skillPath, customContent = null) {
     if (seen.has(agentName)) return;
     try {
-      const content = fs.readFileSync(skillPath, 'utf8');
+      const content = customContent || fs.readFileSync(skillPath, 'utf8');
       seen.add(agentName);
       const mod = resolveModule(agentName, agentFolder);
+      const displayName = frontmatterValue(content, 'name') || agentName;
+      const description = frontmatterValue(content, 'description');
+
+      // Model-specific commands for 1-click execution across Claude, Cursor, Windsurf, Copilot, AGY, etc.
+      const commands = {
+        claude: `/${agentName}`,
+        cursor: `@${agentName}`,
+        windsurf: `/${agentName}`,
+        copilot: `@github /${agentName}`,
+        antigravity: `/${agentName}`,
+        universal: `Act as the ACL-ADLC ${displayName} (${agentName}). Adhere to the Phase-Gate Governance in Markdown Studio.`,
+      };
+
+      const supportedModels = [
+        { id: 'claude', name: 'Claude Code', icon: '🟣', command: `/${agentName}`, hint: 'Type in Claude Code terminal' },
+        { id: 'cursor', name: 'Cursor', icon: '🔵', command: `@${agentName}`, hint: 'Reference in Cursor Chat or Composer' },
+        { id: 'windsurf', name: 'Windsurf', icon: '🌊', command: `/${agentName}`, hint: 'Type in Windsurf Cascade' },
+        { id: 'copilot', name: 'GitHub Copilot', icon: '🐙', command: `@github /${agentName}`, hint: 'Invoke in Copilot Chat' },
+        { id: 'antigravity', name: 'Antigravity (AGY)', icon: '⚡', command: `/${agentName}`, hint: 'Type in Antigravity chat or agy' },
+        {
+          id: 'universal',
+          name: 'Universal LLM',
+          icon: '🤖',
+          command: `Execute the ACL-ADLC agent skill '${agentName}': ${description || displayName}.`,
+          hint: 'Paste into ChatGPT, Gemini, Claude Web, or DeepSeek',
+        },
+      ];
+
       agents.push({
         id: agentName,
         name: agentName,
-        displayName: frontmatterValue(content, 'name') || agentName,
-        description: frontmatterValue(content, 'description'),
+        displayName,
+        description,
         module: mod.module,
         moduleLabel: mod.label,
         moduleShort: mod.short,
@@ -128,15 +180,117 @@ function collectAgents(projectRoot = process.cwd()) {
           fullPath: path.relative(projectRoot, skillPath).replaceAll('\\', '/'),
           content,
         },
+        commands,
+        supportedModels,
       });
     } catch {
       // Skip unreadable skill
     }
   }
 
-  for (const rel of AGENT_ROOTS) {
+  // 1. Scan workspace root candidates across all models
+  for (const rel of PROJECT_AGENT_ROOTS) {
     const root = path.join(projectRoot, rel);
     if (!fs.existsSync(root)) continue;
+    scanSkillTree(root, addAgent);
+  }
+
+  // 2. Scan internal framework paths if running inside repo or npm package
+  const packageRoots = [
+    path.join(__dirname, '..', 'src', 'acl-skills'),
+    path.join(__dirname, '..', 'src', 'core-skills'),
+    path.join(__dirname, '..', '..', 'src', 'acl-skills'),
+    path.join(__dirname, '..', '..', 'src', 'core-skills'),
+  ];
+  for (const pkgRoot of packageRoots) {
+    if (fs.existsSync(pkgRoot)) {
+      scanSkillTree(pkgRoot, addAgent);
+    }
+  }
+
+  // 3. Scan user home directory global skill paths across all models
+  const userHome = os.homedir ? os.homedir() : '';
+  if (userHome) {
+    const globalRoots = [
+      path.join(userHome, '.agents', 'skills'),
+      path.join(userHome, '.claude', 'skills'),
+      path.join(userHome, '.gemini', 'antigravity-cli', 'skills'),
+      path.join(userHome, '.gemini', 'antigravity', 'skills'),
+      path.join(userHome, '.cursor', 'skills'),
+      path.join(userHome, '.windsurf', 'skills'),
+      path.join(userHome, '.codeium', 'windsurf', 'skills'),
+      path.join(userHome, '.cline', 'skills'),
+      path.join(userHome, '.roo', 'skills'),
+      path.join(userHome, '.kiro', 'skills'),
+      path.join(userHome, '.codex', 'skills'),
+      path.join(userHome, '.config', 'agents', 'skills'),
+    ];
+    for (const gRoot of globalRoots) {
+      if (fs.existsSync(gRoot)) {
+        scanSkillTree(gRoot, addAgent);
+      }
+    }
+  }
+
+  // 4. Scan GitHub Copilot custom agent definitions (.github/agents/*.agent.md)
+  const copilotAgentsDir = path.join(projectRoot, '.github', 'agents');
+  if (fs.existsSync(copilotAgentsDir)) {
+    try {
+      const files = fs.readdirSync(copilotAgentsDir);
+      for (const file of files) {
+        if (!file.endsWith('.md')) continue;
+        const agentName = file.replace(/\.agent\.md$/i, '').replace(/\.md$/i, '');
+        if (seen.has(agentName)) continue;
+        const fullAgentPath = path.join(copilotAgentsDir, file);
+        try {
+          const fileContent = fs.readFileSync(fullAgentPath, 'utf8');
+          // Check if it references an existing SKILL.md
+          const refMatch = fileContent.match(/(?:LOAD\s+the\s+FULL\s+)?([^\r\n"']+\/SKILL\.md)/i);
+          if (refMatch && refMatch[1]) {
+            const rawRef = refMatch[1].replace('{project-root}/', '').replace(/^\/+/, '');
+            const candidateSkill = path.isAbsolute(rawRef) ? rawRef : path.join(projectRoot, rawRef);
+            if (fs.existsSync(candidateSkill)) {
+              addAgent(agentName, path.dirname(candidateSkill), candidateSkill);
+              continue;
+            }
+          }
+          addAgent(agentName, copilotAgentsDir, fullAgentPath, fileContent);
+        } catch {
+          // Skip unreadable Copilot file
+        }
+      }
+    } catch {
+      // Skip unreadable .github/agents folder
+    }
+  }
+
+  agents.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+  let frameworkVersion = '6.11.47';
+  for (const pkgPath of [path.join(projectRoot, 'node_modules', 'acl-adlc', 'package.json'), path.join(projectRoot, 'package.json')]) {
+    try {
+      if (!fs.existsSync(pkgPath)) continue;
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      if (pkg.name === 'acl-adlc' && pkg.version) {
+        frameworkVersion = pkg.version;
+        break;
+      }
+    } catch {
+      // Keep default version
+    }
+  }
+
+  return {
+    success: true,
+    count: agents.length,
+    frameworkVersion,
+    supportedModels: SUPPORTED_AI_MODELS,
+    agents,
+  };
+}
+
+function scanSkillTree(root, addAgent) {
+  try {
     for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const skillDir = path.join(root, entry.name);
@@ -157,25 +311,9 @@ function collectAgents(projectRoot = process.cwd()) {
         // Ignore unreadable folder
       }
     }
+  } catch {
+    // Ignore unreadable root
   }
-
-  agents.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
-  let frameworkVersion = '6.11.46';
-  for (const pkgPath of [path.join(projectRoot, 'node_modules', 'acl-adlc', 'package.json'), path.join(projectRoot, 'package.json')]) {
-    try {
-      if (!fs.existsSync(pkgPath)) continue;
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      if (pkg.name === 'acl-adlc' && pkg.version) {
-        frameworkVersion = pkg.version;
-        break;
-      }
-    } catch {
-      // Keep default version
-    }
-  }
-
-  return { success: true, count: agents.length, frameworkVersion, agents };
 }
 
 async function universalHandler(arg1, arg2) {
@@ -215,3 +353,4 @@ async function universalHandler(arg1, arg2) {
 module.exports = universalHandler;
 module.exports.handler = universalHandler;
 module.exports.collectAgents = collectAgents;
+module.exports.SUPPORTED_AI_MODELS = SUPPORTED_AI_MODELS;
