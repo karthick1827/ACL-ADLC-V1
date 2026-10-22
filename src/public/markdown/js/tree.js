@@ -346,8 +346,9 @@ function formatFileDisplayName(filename, folderPath = '', doc = null) {
 
 function renderFileTree() {
   const root = document.getElementById('fileTreeRoot');
-  const searchQuery = (document.getElementById('searchInput').value || '').trim().toLowerCase();
-  const filterStatus = document.getElementById('filterStatusSelect').value;
+  const searchQuery = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  const filterStatusSelect = document.getElementById('filterStatusSelect');
+  const filterStatus = filterStatusSelect ? filterStatusSelect.value : 'all';
   const sortSelect = document.getElementById('sortSelect');
   const sortType = (sortSelect && sortSelect.value) || 'default';
 
@@ -538,3 +539,54 @@ function renderFileTree() {
     root.appendChild(folderDiv);
   });
 }
+
+function toggleStatusFilterDropdown(event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const dropdown = document.getElementById('statusFilterDropdown');
+  if (dropdown) {
+    dropdown.classList.toggle('open');
+  }
+}
+
+function selectStatusFilter(status) {
+  const select = document.getElementById('filterStatusSelect');
+  if (select) {
+    select.value = status;
+  }
+  const btn = document.getElementById('btnStatusFilter');
+  if (btn) {
+    if (status !== 'all') {
+      btn.classList.add('active-filter');
+    } else {
+      btn.classList.remove('active-filter');
+    }
+  }
+  const items = document.querySelectorAll('.status-filter-item');
+  items.forEach((item) => {
+    if (item.getAttribute('data-status') === status) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
+  const dropdown = document.getElementById('statusFilterDropdown');
+  if (dropdown) {
+    dropdown.classList.remove('open');
+  }
+  renderFileTree();
+}
+
+document.addEventListener('click', (event) => {
+  const dropdown = document.getElementById('statusFilterDropdown');
+  const btn = document.getElementById('btnStatusFilter');
+  if (dropdown && dropdown.classList.contains('open')) {
+    if (!dropdown.contains(event.target) && !btn?.contains(event.target)) {
+      dropdown.classList.remove('open');
+    }
+  }
+});
+
+window.toggleStatusFilterDropdown = toggleStatusFilterDropdown;
+window.selectStatusFilter = selectStatusFilter;
