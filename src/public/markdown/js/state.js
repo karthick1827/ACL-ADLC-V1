@@ -1,3 +1,4 @@
+// ACL-ADLC Markdown Studio State Module
 let files = [];
 let activeFileId = null;
 let isDirty = false;

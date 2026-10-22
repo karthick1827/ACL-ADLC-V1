@@ -231,6 +231,9 @@ async function saveCurrentFile() {
   if (activeAppView === 'dashboard') {
     renderDeliveryDashboard();
   }
+  if (typeof updateGmailButtonState === 'function') {
+    updateGmailButtonState();
+  }
   return true;
 }
 
@@ -321,6 +324,10 @@ async function onStatusChange(newStatus) {
         pill.innerHTML = `<span class="dot"></span>${normStatus}`;
       }
     }
+  }
+
+  if (typeof updateGmailButtonState === 'function') {
+    updateGmailButtonState();
   }
 }
 

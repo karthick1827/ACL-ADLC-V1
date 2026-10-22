@@ -585,3 +585,588 @@
 }
 
 /* =================================================== */
+/* Gmail Review Notification Modal */
+/* =================================================== */
+
+.gmail-modal-card {
+  max-width: 620px;
+  width: 92vw;
+  border-radius: 14px;
+}
+
+.gmail-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  background: #f8fafc;
+}
+
+.gmail-modal-body {
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.gmail-banner {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.gmail-banner-doc {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.88rem;
+}
+
+.gmail-banner-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Status Notification Description */
+.gmail-status-notification-desc {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.gmail-status-notification-desc.in-review {
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  color: #854d0e;
+}
+
+.gmail-status-notification-desc.approved {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.gmail-status-notification-desc.rejected {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+/* Team Organization Section */
+.team-organize-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.95rem 1.05rem;
+}
+
+.team-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.team-count-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.team-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-text-action {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #2563eb;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.btn-text-action:hover {
+  color: #1d4ed8;
+}
+
+.team-add-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.team-input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  outline: none;
+  background: #f8fafc;
+  transition: all 0.15s ease;
+}
+
+.team-input:focus {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.team-input.email-input {
+  flex: 2;
+}
+
+.team-input.name-input {
+  flex: 1.2;
+}
+
+.btn-add-member {
+  padding: 0.5rem 0.95rem;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-add-member:hover {
+  background: #1d4ed8;
+}
+
+.team-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.team-member-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.7rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.team-member-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.team-member-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+}
+
+.team-member-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+
+.team-member-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4338ca;
+  font-size: 0.74rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.team-member-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.team-member-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.team-member-role-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  letter-spacing: 0.02em;
+}
+
+.team-member-role-badge.role-manager {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.team-member-role-badge.role-senior-developer {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #ddd6fe;
+}
+
+.team-member-role-badge.role-developer {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: #bae6fd;
+}
+
+.team-member-email {
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.btn-remove-member {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.45rem;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-remove-member:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
+.team-empty-state {
+  text-align: center;
+  padding: 1.25rem 1rem;
+  color: #64748b;
+  font-size: 0.82rem;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
+/* Manual Method Section Card */
+.gmail-manual-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+
+.gmail-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Attachment Card (.md file) */
+.gmail-attachment-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 9px;
+  transition: all 0.15s ease;
+}
+
+.gmail-attachment-card:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.gmail-attachment-icon {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.gmail-attachment-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.gmail-attachment-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.gmail-attachment-meta {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.attachment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.btn-download-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  background: #ffffff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-download-attachment:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+/* Sender credentials settings drawer inside Gmail modal */
+.gmail-sender-details {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 0.6rem 0.85rem;
+  transition: all 0.15s ease;
+}
+
+.gmail-sender-details[open] {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.gmail-sender-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+  user-select: none;
+}
+
+.gmail-sender-status-tag {
+  font-size: 0.72rem;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-weight: normal;
+}
+
+.gmail-sender-status-tag.active {
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 600;
+}
+
+.gmail-sender-status-tag.warning {
+  background: #fef3c7;
+  color: #b45309;
+  font-weight: 600;
+}
+
+.gmail-sender-status-tag.error {
+  background: #fee2e2;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.btn-register-smtp {
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-register-smtp:hover {
+  background: #1e293b;
+}
+
+.btn-register-smtp:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gmail-sender-fields {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gmail-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.gmail-select,
+.gmail-input,
+.gmail-textarea {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #0f172a;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.gmail-select:focus,
+.gmail-input:focus,
+.gmail-textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.gmail-textarea {
+  resize: vertical;
+  min-height: 120px;
+  font-family: 'Fira Code', monospace, Consolas, sans-serif;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.gmail-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.9rem 1.4rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  gap: 0.75rem;
+}
+
+.btn-gmail-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  background: #ea4335;
+  color: #ffffff;
+  border: 1px solid #dc2626;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(234, 67, 53, 0.25);
+}
+
+.btn-gmail-primary:hover:not(:disabled) {
+  background: #d93025;
+  border-color: #b91c1c;
+  box-shadow: 0 2px 6px rgba(234, 67, 53, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-gmail-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-gmail-primary:disabled,
+.btn-gmail-primary.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #94a3b8;
+  border-color: #94a3b8;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-cancel {
+  padding: 0.55rem 0.95rem;
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-cancel:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}

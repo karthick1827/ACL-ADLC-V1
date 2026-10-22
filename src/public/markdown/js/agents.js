@@ -297,6 +297,9 @@ function selectAgentSkill(agentId) {
   activeAgentId = agentId;
   renderAgentsTree();
   previewAgentSkill(agentId);
+  if (typeof updateGmailButtonState === 'function') {
+    updateGmailButtonState();
+  }
 }
 
 /**

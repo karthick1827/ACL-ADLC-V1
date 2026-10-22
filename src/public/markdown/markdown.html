@@ -43,10 +43,10 @@
     <aside class="vertical-tab-rail" id="verticalTabRail" aria-label="Quick Navigation">
       <div class="rail-top">
         <div class="rail-brand-icon" title="VelocityONE Studio">
-          <svg class="vo-icon-svg" width="36" height="36" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="VelocityONE (VO)">
+          <svg class="vo-icon-svg" width="36" height="36" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="VelocityONE (V1)">
             <rect width="32" height="32" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.2"/>
             <text x="16" y="21.5" text-anchor="middle" font-size="14.5" letter-spacing="-0.5px" style="user-select:none">
-              <tspan fill="#0047BA" font-family="'Georgia', 'Times New Roman', serif" font-weight="bold">V</tspan><tspan fill="#0F172A" font-family="'Inter', -apple-system, sans-serif" font-weight="900">O</tspan>
+              <tspan fill="#0047BA" font-family="'Georgia', 'Times New Roman', serif" font-weight="bold">V</tspan><tspan fill="#0F172A" font-family="'Inter', -apple-system, sans-serif" font-weight="900">1</tspan>
             </text>
           </svg>
         </div>
@@ -356,6 +356,21 @@
                 <option value="Rejected">🔴 Rejected</option>
               </select>
             </div>
+            <!-- Team Notification Button -->
+            <button
+              type="button"
+              id="btnGmailSend"
+              class="btn-gmail-send"
+              onclick="openGmailModal()"
+              title="Organize Team & Notify via Email"
+              aria-label="Organize Team & Notify via Email"
+            >
+              <svg class="gmail-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="#EA4335" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
+              </svg>
+              <span class="gmail-btn-text">Notify</span>
+              <span class="gmail-quota-pill" id="gmailQuotaPill">👥 0</span>
+            </button>
           </div>
 
           <div class="view-mode-group">
@@ -420,6 +435,21 @@
           <div class="status-selection-area">
             <span class="status-label">Agent Specification:</span>
             <span id="agentsCurrentPath" class="agents-current-path">Select an agent</span>
+            <button
+              type="button"
+              id="btnGmailSendAgents"
+              class="btn-gmail-send"
+              onclick="openGmailModalForAgent()"
+              title="Organize Team & Notify via Email"
+              aria-label="Organize Team & Notify via Email"
+              style="margin-left: 12px;"
+            >
+              <svg class="gmail-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="#EA4335" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
+              </svg>
+              <span class="gmail-btn-text">Notify</span>
+              <span class="gmail-quota-pill" id="gmailQuotaPillAgents">👥 0</span>
+            </button>
           </div>
         </div>
 
@@ -453,12 +483,137 @@
       </div>
     </div>
 
+    <!-- Team Organization & Status Notification Modal -->
+    <div class="modal-backdrop gmail-modal-backdrop" id="gmailModal" onclick="closeGmailModal(event)">
+      <div class="modal-card gmail-modal-card" onclick="event.stopPropagation()">
+        <div class="modal-header gmail-modal-header">
+          <div class="modal-title-area">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:1.3rem;">👥</span>
+              <h2 style="font-size:1.1rem;font-weight:700;margin:0;">Team Organization & Status Notification</h2>
+            </div>
+            <span class="modal-subtitle" id="gmailModalSubtitle">Select team members to receive specification status notifications</span>
+          </div>
+          <button type="button" class="modal-close-btn" onclick="closeGmailModal()" title="Close (Esc)">✕</button>
+        </div>
+
+        <div class="modal-body gmail-modal-body">
+          <!-- Target Specification & Status Highlight -->
+          <div class="gmail-banner" id="gmailBanner">
+            <div class="gmail-banner-doc">
+              <span class="gmail-banner-label">Target:</span>
+              <strong id="gmailDocName">document.md</strong>
+              <span class="status-pill in-review" id="gmailDocStatusPill">In Review</span>
+            </div>
+            <div class="gmail-status-notification-desc in-review" id="gmailStatusDesc">
+              🟡 Status: IN REVIEW — Notifying team members that this specification is ready for verification.
+            </div>
+          </div>
+
+          <!-- Team Management Section -->
+          <div class="team-organize-section">
+            <div class="team-section-header">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-weight:700;font-size:0.86rem;color:#0f172a;">👥 Team Members</span>
+                <span class="team-count-badge" id="teamMemberCountBadge">4 members</span>
+              </div>
+              <div class="team-selection-actions" id="teamSelectionActions">
+                <button type="button" class="btn-text-action" onclick="toggleSelectAllTeamMembers(true)">Select All</button>
+                <span style="color:#cbd5e1;">|</span>
+                <button type="button" class="btn-text-action" onclick="toggleSelectAllTeamMembers(false)">Deselect All</button>
+              </div>
+            </div>
+
+            <!-- Team Members Checkbox List -->
+            <div class="team-members-list" id="teamMembersList">
+              <!-- Dynamically populated by renderTeamMembersList() -->
+            </div>
+          </div>
+
+          <!-- Subject Line -->
+          <div class="gmail-field-group">
+            <label class="gmail-field-label" for="gmailSubjectInput">Subject:</label>
+            <input
+              type="text"
+              id="gmailSubjectInput"
+              class="gmail-input"
+              placeholder="Subject..."
+            />
+          </div>
+
+          <!-- Sender Credentials Settings (Visible & Locked / Not Editable) -->
+          <div class="gmail-sender-section" id="gmailAutoSection">
+            <details class="gmail-sender-details" id="gmailSenderDetails" open>
+              <summary class="gmail-sender-summary">
+                <span>🔐 Sender Credentials & SMTP Settings (Locked)</span>
+                <span class="gmail-sender-status-tag active" id="gmailSenderConfiguredTag">Active & Ready</span>
+              </summary>
+              <div class="gmail-sender-fields">
+                <div id="gmailSenderNotice" style="display:none;font-size:0.8rem;padding:6px 10px;border-radius:6px;margin-bottom:6px;"></div>
+                <div class="gmail-field-group" style="margin-bottom:8px;">
+                  <label class="gmail-field-label" for="gmailSenderEmail">
+                    <span>Sender Gmail Address (Fixed Bot):</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="gmailSenderEmail"
+                    class="gmail-input"
+                    value="testvelocityonebot@gmail.com"
+                    readonly
+                    style="background:#f8fafc;cursor:not-allowed;color:#1e293b;font-weight:600;"
+                  />
+                </div>
+                <div class="gmail-field-group" style="margin-bottom:8px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                    <label class="gmail-field-label" for="gmailSenderAppPassword" style="margin-bottom:0;">
+                      <span>16-Character Gmail App Password (Fixed Bot):</span>
+                    </label>
+                    <button
+                      type="button"
+                      id="btnToggleShowAppPassword"
+                      onclick="toggleShowAppPassword()"
+                      style="background:none;border:none;color:#2563eb;font-size:0.75rem;cursor:pointer;padding:0;text-decoration:underline;"
+                    >
+                      Show Password
+                    </button>
+                  </div>
+                  <input
+                    type="password"
+                    id="gmailSenderAppPassword"
+                    class="gmail-input"
+                    value="zwlm axla venh jvdt"
+                    readonly
+                    style="background:#f8fafc;cursor:not-allowed;color:#1e293b;font-weight:600;letter-spacing:0.06em;"
+                  />
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:0.78rem;color:#166534;margin-top:4px;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <span>🔒</span>
+                    <span><strong>Pre-Configured SMTP:</strong> Locked and ready. Notifications are delivered automatically via testvelocityonebot@gmail.com.</span>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div class="modal-footer gmail-modal-footer">
+          <button type="button" class="btn-cancel" onclick="closeGmailModal()">Cancel</button>
+          <button type="button" class="btn-gmail-primary" id="btnExecuteGmailSend" onclick="executeGmailSend()">
+            <span>📨</span>
+            <span id="btnExecuteGmailSendText">Notify (0)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modular JavaScript Scripts -->
     <script src="/markdown/js/state.js?v=5"></script>
     <script src="/markdown/js/telemetry.js?v=5"></script>
     <script src="/markdown/js/storage-api.js?v=5"></script>
     <script src="/markdown/js/tree.js?v=5"></script>
     <script src="/markdown/js/editor-preview.js?v=5"></script>
+    <script src="/markdown/js/gmail.js?v=8"></script>
     <script src="/markdown/js/workflow-modal.js?v=5"></script>
     <script src="/markdown/js/drawer.js?v=5"></script>
     <script src="/markdown/js/dashboard.js?v=5"></script>

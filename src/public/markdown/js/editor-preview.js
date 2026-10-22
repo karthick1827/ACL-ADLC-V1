@@ -36,6 +36,9 @@ function loadFile(id, openFolder = false) {
   renderPreview();
   isDirty = false;
   evaluateProceedButton();
+  if (typeof updateGmailButtonState === 'function') {
+    updateGmailButtonState();
+  }
 
   // Highlight selected file in left sidebar
   const root = document.getElementById('fileTreeRoot');
@@ -120,6 +123,9 @@ function setViewMode(mode) {
 function handleContentInput() {
   isDirty = true;
   setSyncStatus('Unsaved changes...', 'yellow');
+  if (typeof updateGmailButtonState === 'function') {
+    updateGmailButtonState();
+  }
 }
 
 function evaluateProceedButton() {}
