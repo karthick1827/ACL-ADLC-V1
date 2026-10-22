@@ -1044,9 +1044,35 @@ function aclMarkdownSaverPlugin() {
         next();
       });
 
-      // Workflow SVGs and Studio logo static serve
+      // Workflow SVGs, Studio logo, and acl-agents.json static serve
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url ? req.url.split('?')[0] : '';
+        if (rawUrl === '/acl-agents.json') {
+          try {
+            const fsMod = await import('node:fs');
+            const fs = fsMod.default || fsMod;
+            const pathMod = await import('node:path');
+            const path = pathMod.default || pathMod;
+            const projectRoot = process.cwd();
+            const candidates = [
+              path.join(projectRoot, 'public', 'acl-agents.json'),
+              path.join(projectRoot, 'acl-agents.json'),
+              path.join(projectRoot, 'dist', 'acl-agents.json'),
+            ];
+            for (const cand of candidates) {
+              if (fs.existsSync(cand)) {
+                res.writeHead(200, {
+                  'Content-Type': 'application/json; charset=utf-8',
+                  'Cache-Control': 'no-cache',
+                });
+                res.end(fs.readFileSync(cand));
+                return;
+              }
+            }
+          } catch {
+            // Fall through to next middleware
+          }
+        }
         if (rawUrl === '/greenfield.svg' || rawUrl === '/brownfield.svg' || rawUrl === '/velocityone-studio-logo.png' || rawUrl === '/vo-icon.svg') {
           try {
             const svgName = rawUrl.slice(1);
@@ -1209,18 +1235,87 @@ function aclMarkdownSaverPlugin() {
             const pathMod = await import('node:path');
             const path = pathMod.default || pathMod;
             const projectRoot = process.cwd();
+
+            // 1. Try reading pre-generated acl-agents.json first
+            const manifestCandidates = [
+              path.join(projectRoot, 'public', 'acl-agents.json'),
+              path.join(projectRoot, 'acl-agents.json'),
+              path.join(projectRoot, 'dist', 'acl-agents.json'),
+            ];
+            for (const mCand of manifestCandidates) {
+              if (fs.existsSync(mCand)) {
+                try {
+                  const data = JSON.parse(fs.readFileSync(mCand, 'utf8'));
+                  if (data && Array.isArray(data.agents) && data.agents.length > 0) {
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.end(JSON.stringify(data));
+                    return;
+                  }
+                } catch {}
+              }
+            }
+
+            // 2. Try loading from package or api folder
+            const listAgentCandidates = [
+              path.join(projectRoot, 'node_modules', 'acl-adlc', 'api', 'list-agents.js'),
+              path.join(projectRoot, 'api', 'list-agents.js'),
+              path.join(__dirname, '..', '..', '..', 'api', 'list-agents.js'),
+              path.join(__dirname, '..', 'api', 'list-agents.js'),
+            ];
+            for (const aCand of listAgentCandidates) {
+              if (fs.existsSync(aCand)) {
+                try {
+                  const { collectAgents } = require(aCand);
+                  const payload = collectAgents(projectRoot);
+                  if (payload && Array.isArray(payload.agents) && payload.agents.length > 0) {
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.end(JSON.stringify(payload));
+                    return;
+                  }
+                } catch {}
+              }
+            }
+
+            // 3. Fallback: direct multi-model scan
             const agents = [];
+            const seenAgentNames = new Set();
+            const osMod = await import('node:os');
+            const os = osMod.default || osMod;
+            const userHome = os.homedir ? os.homedir() : '';
 
             const agentRoots = [
               path.join(projectRoot, '.agents', 'skills'),
+              path.join(projectRoot, '.claude', 'skills'),
+              path.join(projectRoot, '.agent', 'skills'),
               path.join(projectRoot, '.cursor', 'skills'),
+              path.join(projectRoot, '.windsurf', 'skills'),
+              path.join(projectRoot, '.codeium', 'windsurf', 'skills'),
               path.join(projectRoot, '.github', 'skills'),
+              path.join(projectRoot, '.cline', 'skills'),
+              path.join(projectRoot, '.roo', 'skills'),
+              path.join(projectRoot, '.kiro', 'skills'),
+              path.join(projectRoot, '.codex', 'skills'),
               path.join(projectRoot, '_acl', 'skills'),
               path.join(projectRoot, 'src', 'acl-skills'),
               path.join(projectRoot, 'src', 'core-skills'),
+              path.join(projectRoot, 'node_modules', 'acl-adlc', 'src', 'acl-skills'),
+              path.join(projectRoot, 'node_modules', 'acl-adlc', 'src', 'core-skills'),
             ];
 
-            const seenAgentNames = new Set();
+            if (userHome) {
+              agentRoots.push(
+                path.join(userHome, '.agents', 'skills'),
+                path.join(userHome, '.claude', 'skills'),
+                path.join(userHome, '.gemini', 'antigravity-cli', 'skills'),
+                path.join(userHome, '.gemini', 'antigravity', 'skills'),
+                path.join(userHome, '.cursor', 'skills'),
+                path.join(userHome, '.windsurf', 'skills'),
+                path.join(userHome, '.cline', 'skills'),
+                path.join(userHome, '.roo', 'skills'),
+                path.join(userHome, '.kiro', 'skills'),
+                path.join(userHome, '.codex', 'skills')
+              );
+            }
 
             function scanAgentDir(dirPath) {
               if (!fs.existsSync(dirPath)) return;
@@ -1263,104 +1358,21 @@ function aclMarkdownSaverPlugin() {
               try {
                 const content = fs.readFileSync(skillPath, 'utf8');
                 seenAgentNames.add(agentName);
-
                 let displayName = agentName;
                 let description = '';
                 const nameMatch = content.match(/^name:[ \t]*["']?([^"'\\r\\n]+)["']?/m);
-                if (nameMatch && nameMatch[1]) {
-                  displayName = nameMatch[1].trim();
-                }
+                if (nameMatch && nameMatch[1]) displayName = nameMatch[1].trim();
                 const descMatch = content.match(/^description:[ \t]*["']?([^"'\\r\\n]+)["']?/m);
-                if (descMatch && descMatch[1]) {
-                  description = descMatch[1].trim();
-                }
-
-                const SKILL_MODULE_MAP = {
-                  'acl-agent-analyst': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-                  'acl-agent-tech-writer': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-                  'acl-document-project': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-                  'acl-prfaq': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-                  'acl-product-brief': { module: '1-analysis', label: 'Phase 1 · Analysis', short: 'Analysis' },
-                  'acl-agent-pm': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-                  'acl-agent-ux-designer': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-                  'acl-prd': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-                  'acl-spec': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-                  'acl-ux': { module: '2-plan-workflows', label: 'Phase 2 · Planning', short: 'Planning' },
-                  'acl-agent-architect': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-                  'acl-architecture': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-                  'acl-check-implementation-readiness': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-                  'acl-create-epics-and-stories': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-                  'acl-generate-project-context': { module: '3-solutioning', label: 'Phase 3 · Solutioning', short: 'Solutioning' },
-                  'acl-agent-dev': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-checkpoint-preview': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-code-review': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-correct-course': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-dev-auto': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-qa-generate-e2e-tests': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-quick-dev': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-retrospective': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-sprint-planning': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-sprint-status': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
-                  'acl-advanced-elicitation': { module: 'core', label: 'Core · Elicitation', short: 'Core' },
-                  'acl-brainstorming': { module: 'core', label: 'Core · Brainstorming', short: 'Core' },
-                  'acl-customize': { module: 'core', label: 'Core · Customize', short: 'Core' },
-                  'acl-deep-recon': { module: 'core', label: 'Core · Recon', short: 'Core' },
-                  'acl-figma-bridge': { module: 'core', label: 'Core · Figma Bridge', short: 'Core' },
-                  'acl-forge-idea': { module: 'core', label: 'Core · Ideation', short: 'Core' },
-                  'acl-help': { module: 'core', label: 'Core · Help', short: 'Core' },
-                  'acl-party-mode': { module: 'core', label: 'Core · Party Mode', short: 'Core' },
-                  'acl-review': { module: 'core', label: 'Core · Review', short: 'Core' },
-                  'acl-create-architecture': { module: 'v6-shims', label: 'V6 Shims · Architecture', short: 'V6 Shims' },
-                  'acl-create-prd': { module: 'v6-shims', label: 'V6 Shims · PRD', short: 'V6 Shims' },
-                  'acl-create-story': { module: 'v6-shims', label: 'V6 Shims · Story', short: 'V6 Shims' },
-                  'acl-dev-story': { module: 'v6-shims', label: 'V6 Shims · Dev Story', short: 'V6 Shims' },
-                  'acl-domain-research': { module: 'v6-shims', label: 'V6 Shims · Research', short: 'V6 Shims' },
-                  'acl-edit-prd': { module: 'v6-shims', label: 'V6 Shims · PRD', short: 'V6 Shims' },
-                  'acl-market-research': { module: 'v6-shims', label: 'V6 Shims · Research', short: 'V6 Shims' },
-                  'acl-technical-research': { module: 'v6-shims', label: 'V6 Shims · Research', short: 'V6 Shims' },
-                  'acl-validate-prd': { module: 'v6-shims', label: 'V6 Shims · PRD', short: 'V6 Shims' },
-                  'acl-editorial-review': { module: 'v6-shims', label: 'V6 Shims · Editorial', short: 'V6 Shims' },
-                  'acl-editorial-review-prose': { module: 'v6-shims', label: 'V6 Shims · Editorial', short: 'V6 Shims' },
-                  'acl-editorial-review-structure': { module: 'v6-shims', label: 'V6 Shims · Editorial', short: 'V6 Shims' },
-                  'acl-review-adversarial-general': { module: 'v6-shims', label: 'V6 Shims · Review', short: 'V6 Shims' },
-                  'acl-review-edge-case-hunter': { module: 'v6-shims', label: 'V6 Shims · Review', short: 'V6 Shims' },
-                  'acl-review-verification-gap': { module: 'v6-shims', label: 'V6 Shims · Review', short: 'V6 Shims' },
-                };
-
-                let moduleCode = 'acl';
-                let moduleLabel = 'ACL Method';
-                let moduleShort = 'ACL';
-
-                if (SKILL_MODULE_MAP[agentName]) {
-                  const m = SKILL_MODULE_MAP[agentName];
-                  moduleCode = m.module;
-                  moduleLabel = m.label;
-                  moduleShort = m.short;
-                } else {
-                  const lowerFolder = (agentFolder || '').toLowerCase();
-                  if (lowerFolder.includes('1-analysis')) {
-                    moduleCode = '1-analysis'; moduleLabel = 'Phase 1 · Analysis'; moduleShort = 'Analysis';
-                  } else if (lowerFolder.includes('2-plan') || lowerFolder.includes('plan-workflows')) {
-                    moduleCode = '2-plan-workflows'; moduleLabel = 'Phase 2 · Planning'; moduleShort = 'Planning';
-                  } else if (lowerFolder.includes('3-solutioning') || lowerFolder.includes('architecture')) {
-                    moduleCode = '3-solutioning'; moduleLabel = 'Phase 3 · Solutioning'; moduleShort = 'Solutioning';
-                  } else if (lowerFolder.includes('4-implementation') || lowerFolder.includes('quick-dev')) {
-                    moduleCode = '4-implementation'; moduleLabel = 'Phase 4 · Implementation'; moduleShort = 'Implementation';
-                  } else if (lowerFolder.includes('core-skills') || lowerFolder.includes('core')) {
-                    moduleCode = 'core'; moduleLabel = 'Core Module'; moduleShort = 'Core';
-                  } else if (lowerFolder.includes('v6-shims')) {
-                    moduleCode = 'v6-shims'; moduleLabel = 'V6 Shims'; moduleShort = 'V6 Shims';
-                  }
-                }
+                if (descMatch && descMatch[1]) description = descMatch[1].trim();
 
                 agents.push({
                   id: agentName,
                   name: agentName,
                   displayName: displayName,
                   description: description,
-                  module: moduleCode,
-                  moduleLabel: moduleLabel,
-                  moduleShort: moduleShort,
+                  module: 'acl',
+                  moduleLabel: 'ACL Method',
+                  moduleShort: 'ACL',
                   folderPath: path.relative(projectRoot, agentFolder).replaceAll('\\\\', '/'),
                   skillFile: {
                     filename: 'SKILL.md',
@@ -1375,32 +1387,27 @@ function aclMarkdownSaverPlugin() {
               scanAgentDir(rootCandidate);
             }
 
-            agents.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
-            let frameworkVersion = '6.11.46';
-            try {
-              const pkgCandidates = [
-                path.join(projectRoot, 'node_modules', 'acl-adlc', 'package.json'),
-                path.join(projectRoot, 'package.json'),
-              ];
-              for (const cand of pkgCandidates) {
-                if (fs.existsSync(cand)) {
-                  const p = JSON.parse(fs.readFileSync(cand, 'utf8'));
-                  if (p.name === 'acl-adlc' && p.version) {
-                    frameworkVersion = p.version;
-                    break;
-                  }
-                  const dep = p?.dependencies?.['acl-adlc'] || p?.devDependencies?.['acl-adlc'];
-                  if (dep) {
-                    frameworkVersion = String(dep).replace(/^[^0-9]*/, '');
-                    break;
+            const copilotDir = path.join(projectRoot, '.github', 'agents');
+            if (fs.existsSync(copilotDir)) {
+              try {
+                for (const cFile of fs.readdirSync(copilotDir)) {
+                  if (!cFile.endsWith('.md')) continue;
+                  const aName = cFile.replace(/\\.agent\\.md$/i, '').replace(/\\.md$/i, '');
+                  if (!seenAgentNames.has(aName)) {
+                    const cPath = path.join(copilotDir, cFile);
+                    try {
+                      const cContent = fs.readFileSync(cPath, 'utf8');
+                      addAgent(aName, copilotDir, cPath);
+                    } catch (e) {}
                   }
                 }
-              }
-            } catch (e) {}
+              } catch (e) {}
+            }
 
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ success: true, count: agents.length, frameworkVersion, agents }));
+            agents.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ success: true, count: agents.length, agents }));
           } catch (err) {
             res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
@@ -2293,24 +2300,49 @@ export default async function handler(req, res) {
   /**
    * Write acl-agents.json next to markdown.html. The Agents tab falls back to this static
    * snapshot when /api/list-agents is not served (custom dev servers, static hosting).
+   * Also embeds window.__ACL_EMBEDDED_AGENTS__ directly into markdown.html for instant display.
    */
   async _writeAgentsManifest(projectRoot) {
     if (!projectRoot) return;
     try {
-      const studioDir = (await fs.pathExists(path.join(projectRoot, 'public', 'markdown.html')))
-        ? path.join(projectRoot, 'public')
-        : (await fs.pathExists(path.join(projectRoot, 'markdown.html')))
-          ? projectRoot
-          : null;
-      if (!studioDir) return;
-
       const { collectAgents } = require(path.join(__dirname, '..', '..', '..', 'api', 'list-agents.js'));
       const payload = collectAgents(projectRoot);
-      if (payload.agents.length === 0) return;
+      if (!payload || !Array.isArray(payload.agents) || payload.agents.length === 0) return;
 
-      const targetFile = path.join(studioDir, 'acl-agents.json');
-      await fs.writeFile(targetFile, JSON.stringify(payload), 'utf8');
-      this.installedFiles.add(targetFile);
+      const manifestContent = JSON.stringify(payload);
+
+      // 1. Write acl-agents.json to both public/ and projectRoot
+      const publicDir = path.join(projectRoot, 'public');
+      if (await fs.pathExists(publicDir)) {
+        const publicJson = path.join(publicDir, 'acl-agents.json');
+        await fs.writeFile(publicJson, manifestContent, 'utf8');
+        this.installedFiles.add(publicJson);
+      }
+      const rootJson = path.join(projectRoot, 'acl-agents.json');
+      await fs.writeFile(rootJson, manifestContent, 'utf8');
+      this.installedFiles.add(rootJson);
+
+      // 2. Embed window.__ACL_EMBEDDED_AGENTS__ into markdown.html files
+      const mdTargets = [path.join(projectRoot, 'public', 'markdown.html'), path.join(projectRoot, 'markdown.html')];
+      for (const mdTarget of mdTargets) {
+        if (await fs.pathExists(mdTarget)) {
+          let html = await fs.readFile(mdTarget, 'utf8');
+          const scriptTag = `  <script>window.__ACL_EMBEDDED_AGENTS__ = ${manifestContent};</script>\n`;
+          if (html.includes('window.__ACL_EMBEDDED_AGENTS__ = [];')) {
+            html = html.replace('window.__ACL_EMBEDDED_AGENTS__ = [];', `window.__ACL_EMBEDDED_AGENTS__ = ${manifestContent};`);
+            await fs.writeFile(mdTarget, html, 'utf8');
+          } else if (html.includes('window.__ACL_EMBEDDED_AGENTS__ =')) {
+            html = html.replace(
+              /window\.__ACL_EMBEDDED_AGENTS__\s*=\s*\[[\s\S]*?\];/,
+              `window.__ACL_EMBEDDED_AGENTS__ = ${manifestContent};`,
+            );
+            await fs.writeFile(mdTarget, html, 'utf8');
+          } else if (html.includes('</head>')) {
+            html = html.replace('</head>', `${scriptTag}</head>`);
+            await fs.writeFile(mdTarget, html, 'utf8');
+          }
+        }
+      }
     } catch {
       // Best-effort: the Agents tab still works wherever /api/list-agents is served
     }
