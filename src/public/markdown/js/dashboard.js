@@ -1793,7 +1793,7 @@ async function renderAtlassianSuite(isPushed) {
               </div>
               <div style="display: flex; gap: 0.5rem;">
                 <button type="button" class="atlassian-toggle-btn" onclick="toggleAtlassianConfigPanel()">Cancel</button>
-                <button type="submit" class="atlassian-btn-sync jira" style="width: auto; padding: 0.45rem 1rem;">Save & Connect</button>
+                <button type="button" class="atlassian-btn-sync jira" onclick="saveAtlassianConfig(event)" style="width: auto; padding: 0.45rem 1rem;">Save & Connect</button>
               </div>
             </div>
           </form>
@@ -1915,6 +1915,23 @@ window.togglePasswordVisibility = function (inputId) {
   }
 };
 
+window.safeFetchJson = async function (url, options = {}) {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  let data = {};
+  try {
+    data = JSON.parse(text || '{}');
+  } catch {
+    throw new Error(
+      `Server returned HTTP ${res.status}: ${text || 'Empty response. Verify that your project dev server port is correct and running.'}`,
+    );
+  }
+  if (!res.ok) {
+    throw new Error(data.error || data.message || `Server returned HTTP ${res.status}`);
+  }
+  return data;
+};
+
 window.saveAtlassianConfig = async function (e) {
   if (e && e.preventDefault) e.preventDefault();
   const domain = document.getElementById('atlDomain')?.value?.trim();
@@ -1925,7 +1942,7 @@ window.saveAtlassianConfig = async function (e) {
   const isDemoMode = Boolean(document.getElementById('atlDemoMode')?.checked);
 
   try {
-    const res = await fetch('/api/atlassian/config', {
+    const data = await window.safeFetchJson('/api/atlassian/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1938,7 +1955,6 @@ window.saveAtlassianConfig = async function (e) {
         connected: true,
       }),
     });
-    const data = await res.json();
     if (data.success) {
       alert('✅ Atlassian credentials and workspace keys saved successfully!');
       renderAtlassianSuite(true);
@@ -1966,12 +1982,11 @@ window.executeJiraSync = async function () {
   }
 
   try {
-    const res = await fetch('/api/atlassian/sync-jira', {
+    const result = await window.safeFetchJson('/api/atlassian/sync-jira', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    const result = await res.json();
     if (result.success) {
       displaySyncResultBanner(
         `🎯 Successfully synced ${result.totalEpics} Epics and ${result.totalStories} Stories to JIRA (${result.projectKey})!`,
@@ -2000,12 +2015,11 @@ window.executeJiraPull = async function () {
   }
 
   try {
-    const res = await fetch('/api/atlassian/pull-jira', {
+    const result = await window.safeFetchJson('/api/atlassian/pull-jira', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    const result = await res.json();
     if (result.success) {
       let bannerMsg = '';
       if (result.updatedCount === 0 && result.createdCount === 0) {
@@ -2057,12 +2071,11 @@ window.executeConfluenceSync = async function () {
   }
 
   try {
-    const res = await fetch('/api/atlassian/sync-confluence', {
+    const result = await window.safeFetchJson('/api/atlassian/sync-confluence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    const result = await res.json();
     if (result.success) {
       const detailMsg =
         result.updatedCount !== undefined
@@ -2095,12 +2108,11 @@ window.executeConfluencePull = async function () {
   }
 
   try {
-    const res = await fetch('/api/atlassian/pull-confluence', {
+    const result = await window.safeFetchJson('/api/atlassian/pull-confluence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    const result = await res.json();
     if (result.success) {
       let bannerMsg = '';
       if (result.updatedCount === 0 && result.createdCount === 0) {
