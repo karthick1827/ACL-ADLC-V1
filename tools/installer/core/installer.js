@@ -1696,7 +1696,38 @@ function aclMarkdownSaverPlugin() {
         }
         // Runs even when the saver plugin is already present, so older projects gain the API routes.
         await this._registerViteStudioApi(configPath);
+        await this._upgradeGitDetailsHandler(configPath);
       }
+    }
+  }
+
+  /**
+   * Rewrites the git-details handler in an existing Vite config so it no longer
+   * hardcodes a user's Git path and always defines projectRoot. Idempotent.
+   */
+  async _upgradeGitDetailsHandler(configPath) {
+    try {
+      let content = await fs.readFile(configPath, 'utf8');
+      const original = content;
+
+      // Legacy hardcoded Git path for any user, e.g. ';C:\\Users\\<name>\\AppData\\Local\\Programs\\Git\\cmd;C:\\Program Files\\Git\\cmd'
+      const legacyPath = /';C:\\+Users\\+[^\\']+\\+AppData\\+Local\\+Programs\\+Git\\+cmd;C:\\+Program Files\\+Git\\+cmd'/g;
+      content = content.replaceAll(
+        legacyPath,
+        () =>
+          String.raw`';' + (process.env.LOCALAPPDATA || process.env.USERPROFILE + '\\AppData\\Local') + '\\Programs\\Git\\cmd;C:\\Program Files\\Git\\cmd'`,
+      );
+
+      // Declare projectRoot inside the git-details handler (it was referenced but never defined).
+      content = content.replace(/(Dynamic User Control Centre Telemetry[\s\S]*?)(\n\s*)(const env = \{)/, (match, head, indent, envLine) =>
+        head.includes('const projectRoot') ? match : head + indent + 'const projectRoot = process.cwd();' + indent + envLine,
+      );
+
+      if (content !== original) {
+        await fs.writeFile(configPath, content, 'utf8');
+      }
+    } catch {
+      // Best-effort config upgrade
     }
   }
 
