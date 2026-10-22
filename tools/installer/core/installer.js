@@ -983,6 +983,15 @@ class Installer {
         this.installedFiles.add(targetAtlassian);
       }
 
+      // Vite plugin that serves /api/atlassian/* (imports the service above)
+      const srcStudioApi = path.join(__dirname, '..', '..', 'acl-studio-api.mjs');
+      const targetStudioApi = path.join(targetToolsDir, 'acl-studio-api.mjs');
+      if (await fs.pathExists(srcStudioApi)) {
+        await fs.ensureDir(targetToolsDir);
+        await fs.copy(srcStudioApi, targetStudioApi, { overwrite: true });
+        this.installedFiles.add(targetStudioApi);
+      }
+
       // Auto-configure Vite middleware if Vite config exists in project
       await this._configureViteProject(projectRoot);
 
@@ -1423,15 +1432,22 @@ function aclMarkdownSaverPlugin() {
         if (req.method === 'GET') {
           try {
             const { execFileSync } = await import('node:child_process');
+            const { homedir } = await import('node:os');
+            const { join } = await import('node:path');
             const url = new URL(req.url, 'http://localhost');
             const simulateUnpushed =
               url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true';
 
+            const projectRoot = process.cwd();
+            const userGitCmd = join(
+              process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'),
+              'Programs',
+              'Git',
+              'cmd',
+            );
             const env = {
               ...process.env,
-              PATH:
-                (process.env.PATH || '') +
-                ';C:\\\\Users\\\\karthick.natarajan\\\\AppData\\\\Local\\\\Programs\\\\Git\\\\cmd;C:\\\\Program Files\\\\Git\\\\cmd',
+              PATH: (process.env.PATH || '') + ';' + userGitCmd + ';C:\\\\Program Files\\\\Git\\\\cmd',
             };
 
             if (simulateUnpushed) {
@@ -1664,167 +1680,6 @@ function aclMarkdownSaverPlugin() {
           next();
         }
       });
-
-      // API Endpoints: Atlassian JIRA & Confluence Integration
-      server.middlewares.use(async (req, res, next) => {
-        const url = new URL(req.url, 'http://localhost');
-        if (!url.pathname.startsWith('/api/atlassian/')) {
-          return next();
-        }
-
-        try {
-          const { pathToFileURL } = require('node:url');
-          const candidatePaths = [
-            path.resolve(process.cwd(), 'tools', 'atlassian-service.mjs'),
-            path.resolve(__dirname, '..', '..', 'atlassian-service.mjs'),
-            path.resolve(__dirname, '..', '..', '..', 'tools', 'atlassian-service.mjs'),
-          ];
-          const servicePath = candidatePaths.find((p) => fs.existsSync(p));
-          if (!servicePath) {
-            throw new Error('Atlassian service module not found in project or framework.');
-          }
-          const atlassianMod = await import(pathToFileURL(servicePath).href);
-          const projectRoot = process.cwd();
-
-          if (url.pathname === '/api/atlassian/config') {
-            if (req.method === 'GET') {
-              const cfg = atlassianMod.getAtlassianConfig(projectRoot);
-              res.setHeader('Content-Type', 'application/json');
-              return res.end(JSON.stringify(cfg));
-            }
-            if (req.method === 'POST') {
-              let body = '';
-              req.on('data', (chunk) => {
-                body += chunk;
-              });
-              req.on('end', async () => {
-                try {
-                  const payload = JSON.parse(body || '{}');
-                  const saved = atlassianMod.saveAtlassianConfig(projectRoot, payload);
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ success: true, config: saved }));
-                } catch (e) {
-                  res.statusCode = 400;
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ success: false, error: e.message }));
-                }
-              });
-              return;
-            }
-          }
-
-          if (url.pathname === '/api/atlassian/discover' && req.method === 'GET') {
-            const stories = atlassianMod.discoverStoriesAndEpics(projectRoot);
-            const deliverables = atlassianMod.discoverDeliverables(projectRoot);
-            res.setHeader('Content-Type', 'application/json');
-            return res.end(
-              JSON.stringify({
-                epics: stories.epics,
-                stories: stories.stories,
-                deliverables: deliverables.map((d) => ({
-                  filename: d.filename,
-                  relPath: d.relPath,
-                  type: d.type,
-                  title: d.title,
-                  status: d.status,
-                })),
-              }),
-            );
-          }
-
-          if (url.pathname === '/api/atlassian/sync-jira' && req.method === 'POST') {
-            let body = '';
-            req.on('data', (chunk) => {
-              body += chunk;
-            });
-            req.on('end', async () => {
-              try {
-                const payload = JSON.parse(body || '{}');
-                const result = await atlassianMod.syncToJira(projectRoot, payload);
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: true, ...result }));
-              } catch (e) {
-                res.statusCode = 500;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: false, error: e.message }));
-              }
-            });
-            return;
-          }
-
-          if (url.pathname === '/api/atlassian/pull-jira' && req.method === 'POST') {
-            let body = '';
-            req.on('data', (chunk) => {
-              body += chunk;
-            });
-            req.on('end', async () => {
-              try {
-                const payload = JSON.parse(body || '{}');
-                const result = await atlassianMod.pullFromJira(projectRoot, payload);
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: true, ...result }));
-              } catch (e) {
-                res.statusCode = 500;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: false, error: e.message }));
-              }
-            });
-            return;
-          }
-
-          if (url.pathname === '/api/atlassian/sync-confluence' && req.method === 'POST') {
-            let body = '';
-            req.on('data', (chunk) => {
-              body += chunk;
-            });
-            req.on('end', async () => {
-              try {
-                const payload = JSON.parse(body || '{}');
-                const result = await atlassianMod.syncToConfluence(projectRoot, payload);
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: true, ...result }));
-              } catch (e) {
-                res.statusCode = 500;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: false, error: e.message }));
-              }
-            });
-            return;
-          }
-
-          if (url.pathname === '/api/atlassian/pull-confluence' && req.method === 'POST') {
-            let body = '';
-            req.on('data', (chunk) => {
-              body += chunk;
-            });
-            req.on('end', async () => {
-              try {
-                const payload = JSON.parse(body || '{}');
-                const result = await atlassianMod.pullFromConfluence(projectRoot, payload);
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: true, ...result }));
-              } catch (e) {
-                res.statusCode = 500;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: false, error: e.message }));
-              }
-            });
-            return;
-          }
-
-          if (url.pathname === '/api/atlassian/sync-history' && req.method === 'GET') {
-            const history = atlassianMod.getSyncHistory(projectRoot);
-            res.setHeader('Content-Type', 'application/json');
-            return res.end(JSON.stringify(history));
-          }
-
-          next();
-        } catch (err) {
-          res.statusCode = 500;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: err.message }));
-        }
-      });
     }
   };
 }
@@ -1839,7 +1694,27 @@ function aclMarkdownSaverPlugin() {
         } catch {
           // Best-effort config wiring
         }
+        // Runs even when the saver plugin is already present, so older projects gain the API routes.
+        await this._registerViteStudioApi(configPath);
       }
+    }
+  }
+
+  /**
+   * Adds aclStudioApiPlugin (tools/acl-studio-api.mjs) to a Vite config, once.
+   * Skips configs that already register it, or that have no plugins array to extend.
+   */
+  async _registerViteStudioApi(configPath) {
+    try {
+      const content = await fs.readFile(configPath, 'utf8');
+      if (content.includes('aclStudioApiPlugin')) return;
+      if (!content.includes('plugins: [')) return;
+
+      const importLine = "import { aclStudioApiPlugin } from './tools/acl-studio-api.mjs';\n";
+      const updated = importLine + content.replace('plugins: [', 'plugins: [\n    aclStudioApiPlugin(),');
+      await fs.writeFile(configPath, updated, 'utf8');
+    } catch {
+      // Best-effort config wiring
     }
   }
 

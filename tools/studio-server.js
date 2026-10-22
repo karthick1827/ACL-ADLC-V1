@@ -1358,9 +1358,15 @@ const server = http.createServer(async (req, res) => {
       const { execFileSync } = require('node:child_process');
       const simulateUnpushed = url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true';
 
+      const userGitCmd = path.join(
+        process.env.LOCALAPPDATA || path.join(require('node:os').homedir(), 'AppData', 'Local'),
+        'Programs',
+        'Git',
+        'cmd',
+      );
       const env = {
         ...process.env,
-        PATH: (process.env.PATH || '') + ';C:\\Users\\karthick.natarajan\\AppData\\Local\\Programs\\Git\\cmd;C:\\Program Files\\Git\\cmd',
+        PATH: (process.env.PATH || '') + ';' + userGitCmd + ';C:\\Program Files\\Git\\cmd',
       };
 
       if (simulateUnpushed) {
