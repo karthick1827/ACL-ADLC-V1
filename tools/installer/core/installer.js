@@ -1673,7 +1673,17 @@ function aclMarkdownSaverPlugin() {
         }
 
         try {
-          const atlassianMod = await import('./tools/atlassian-service.mjs');
+          const { pathToFileURL } = require('node:url');
+          const candidatePaths = [
+            path.resolve(process.cwd(), 'tools', 'atlassian-service.mjs'),
+            path.resolve(__dirname, '..', '..', 'atlassian-service.mjs'),
+            path.resolve(__dirname, '..', '..', '..', 'tools', 'atlassian-service.mjs'),
+          ];
+          const servicePath = candidatePaths.find((p) => fs.existsSync(p));
+          if (!servicePath) {
+            throw new Error('Atlassian service module not found in project or framework.');
+          }
+          const atlassianMod = await import(pathToFileURL(servicePath).href);
           const projectRoot = process.cwd();
 
           if (url.pathname === '/api/atlassian/config') {

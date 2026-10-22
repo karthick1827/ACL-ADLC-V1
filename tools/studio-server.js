@@ -1593,7 +1593,16 @@ const server = http.createServer(async (req, res) => {
   // =========================================================================
   if (url.pathname.startsWith('/api/atlassian/')) {
     try {
-      const atlassianMod = await import('./atlassian-service.mjs');
+      const { pathToFileURL } = require('node:url');
+      const candidatePaths = [
+        path.resolve(__dirname, 'atlassian-service.mjs'),
+        path.resolve(PROJECT_ROOT, 'tools', 'atlassian-service.mjs'),
+      ];
+      const servicePath = candidatePaths.find((p) => fs.existsSync(p));
+      if (!servicePath) {
+        throw new Error('Atlassian service module not found in project or studio tools.');
+      }
+      const atlassianMod = await import(pathToFileURL(servicePath).href);
       const projectRoot = PROJECT_ROOT;
 
       if (url.pathname === '/api/atlassian/config') {
