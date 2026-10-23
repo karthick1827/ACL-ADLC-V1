@@ -1449,6 +1449,7 @@ const server = http.createServer(async (req, res) => {
         res.end(
           JSON.stringify({
             isPushed: false,
+            repoConnected: false,
             remoteOrigin: remoteOrigin || null,
             userDetails: null,
             projectDetails: null,
@@ -1491,6 +1492,8 @@ const server = http.createServer(async (req, res) => {
 
       const responsePayload = {
         isPushed: true,
+        repoConnected: true,
+        repoDeleted: false,
         remoteOrigin,
         userDetails: {
           username: (ghUserData && ghUserData.login) || repoOwner || gitUserName,

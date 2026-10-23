@@ -974,10 +974,21 @@ class Installer {
       }
 
       // Auto-deploy Atlassian Integration Service to target tools/
-      const srcAtlassian = path.join(__dirname, '..', '..', 'atlassian-service.mjs');
+      const srcAtlassianCandidates = [
+        path.join(__dirname, '..', '..', 'atlassian-service.mjs'),
+        path.join(__dirname, '..', '..', '..', 'tools', 'atlassian-service.mjs'),
+        path.join(frameworkRoot, 'tools', 'atlassian-service.mjs'),
+      ];
+      let srcAtlassian = null;
+      for (const cand of srcAtlassianCandidates) {
+        if (await fs.pathExists(cand)) {
+          srcAtlassian = cand;
+          break;
+        }
+      }
       const targetToolsDir = path.join(projectRoot, 'tools');
       const targetAtlassian = path.join(targetToolsDir, 'atlassian-service.mjs');
-      if (await fs.pathExists(srcAtlassian)) {
+      if (srcAtlassian) {
         await fs.ensureDir(targetToolsDir);
         await fs.copy(srcAtlassian, targetAtlassian, { overwrite: true });
         this.installedFiles.add(targetAtlassian);
@@ -1002,8 +1013,7 @@ class Installer {
       if (await fs.pathExists(configPath)) {
         try {
           let content = await fs.readFile(configPath, 'utf8');
-          if (!content.includes('save-markdown') && !content.includes('aclMarkdownSaverPlugin')) {
-            const pluginCode = `
+          const pluginCode = `
 // ACL-ADLC Markdown Studio Live Middleware for Vite
 function aclMarkdownSaverPlugin() {
   return {
@@ -1520,6 +1530,8 @@ function aclMarkdownSaverPlugin() {
               res.end(
                 JSON.stringify({
                   isPushed: false,
+                  repoConnected: false,
+                  repoDeleted: Boolean(repoDeleted),
                   remoteOrigin: remoteOrigin || null,
                   userDetails: null,
                   projectDetails: null,
@@ -1574,6 +1586,8 @@ function aclMarkdownSaverPlugin() {
 
             const responsePayload = {
               isPushed: true,
+              repoConnected: true,
+              repoDeleted: false,
               remoteOrigin,
               userDetails: {
                 username: (ghUserData && ghUserData.login) || repoOwner || gitUserName,
@@ -1677,6 +1691,8 @@ function aclMarkdownSaverPlugin() {
           const { pathToFileURL } = require('node:url');
           const candidatePaths = [
             path.resolve(process.cwd(), 'tools', 'atlassian-service.mjs'),
+            path.resolve(process.cwd(), 'node_modules', 'acl-adlc', 'tools', 'atlassian-service.mjs'),
+            path.resolve(__dirname, 'tools', 'atlassian-service.mjs'),
             path.resolve(__dirname, '..', '..', 'atlassian-service.mjs'),
             path.resolve(__dirname, '..', '..', '..', 'tools', 'atlassian-service.mjs'),
           ];
@@ -1830,6 +1846,14 @@ function aclMarkdownSaverPlugin() {
   };
 }
 `;
+          const pluginRegex = /(?:\/\/[^\r\n]*\r?\n)*function aclMarkdownSaverPlugin\s*\(\)\s*\{[\s\S]*?\n\s*\}\s*;\s*\r?\n\s*\}/;
+
+          if (content.includes('aclMarkdownSaverPlugin') && pluginRegex.test(content)) {
+            if (!content.includes('/api/atlassian/config') || !content.includes('repoConnected')) {
+              content = content.replace(pluginRegex, pluginCode.trim());
+              await fs.writeFile(configPath, content, 'utf8');
+            }
+          } else if (!content.includes('save-markdown') && !content.includes('aclMarkdownSaverPlugin')) {
             if (content.includes('plugins: [')) {
               content = pluginCode + '\n' + content.replace('plugins: [', 'plugins: [\n    aclMarkdownSaverPlugin(),');
             } else {

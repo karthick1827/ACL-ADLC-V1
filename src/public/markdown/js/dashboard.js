@@ -1414,7 +1414,12 @@ function renderDeveloperDashboard() {
 // User Control Centre (Git Identity & Permissions Dashboard)
 // ===================================================
 function updateNavUserControlCentre(data) {
-  const isConnected = Boolean(data && data.repoConnected);
+  const isConnected = Boolean(
+    data &&
+    (data.repoConnected === true ||
+      (data.repoConnected !== false &&
+        (data.isPushed || (data.userDetails && Boolean(data.userDetails.username || data.userDetails.fullName))))),
+  );
   const hasUser = Boolean(isConnected && data.userDetails && (data.userDetails.fullName || data.userDetails.username));
   const navTitle = document.getElementById('navGitTitle');
   const navIcon = document.getElementById('navGitIcon');
@@ -1466,7 +1471,12 @@ async function renderGitDashboard() {
     if (!data) {
       data = { isPushed: false, repoConnected: false, userDetails: {}, projectDetails: {}, gitDetails: {} };
     }
-    const isConnected = Boolean(data && data.repoConnected);
+    const isConnected = Boolean(
+      data &&
+      (data.repoConnected === true ||
+        (data.repoConnected !== false &&
+          (data.isPushed || (data.userDetails && Boolean(data.userDetails.username || data.userDetails.fullName))))),
+    );
     const isPushed = Boolean(data && data.isPushed);
 
     // Update navbar identity
@@ -1756,7 +1766,13 @@ async function renderAtlassianSuite(isPushed) {
       safeFetchJson('/api/atlassian/sync-history'),
     ]);
 
-    const cfgRes = cfgResRaw.ok ? cfgResRaw.data : {};
+    let cfgRes = cfgResRaw.ok ? cfgResRaw.data : {};
+    if (!cfgRes || Object.keys(cfgRes).length === 0) {
+      try {
+        const localCfg = localStorage.getItem('__acl_atlassian_config__');
+        if (localCfg) cfgRes = JSON.parse(localCfg);
+      } catch (e) {}
+    }
     const discRes = discResRaw.ok ? discResRaw.data : { epics: [], stories: [], deliverables: [] };
     const histRes = histResRaw.ok && Array.isArray(histResRaw.data) ? histResRaw.data : [];
 
@@ -1982,6 +1998,10 @@ window.saveAtlassianConfig = async function (e) {
   };
 
   try {
+    localStorage.setItem('__acl_atlassian_config__', JSON.stringify(payload));
+  } catch (e) {}
+
+  try {
     const res = await safeFetchJson('/api/atlassian/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1990,6 +2010,9 @@ window.saveAtlassianConfig = async function (e) {
 
     if (res.ok && (res.data.success || res.data.config || Object.keys(res.data).length > 0)) {
       alert('✅ Atlassian credentials and workspace keys saved successfully!');
+      renderAtlassianSuite(true);
+    } else if (res.status === 404) {
+      alert('✅ Atlassian credentials saved! Tip: Restart your dev server (Ctrl+C then npm run dev) to activate background disk sync.');
       renderAtlassianSuite(true);
     } else {
       alert('⚠️ Error saving configuration: ' + (res.data.error || 'Server returned status ' + res.status));
