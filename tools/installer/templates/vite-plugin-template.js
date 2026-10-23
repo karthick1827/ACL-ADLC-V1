@@ -24,11 +24,7 @@ function aclMarkdownSaverPlugin() {
         if (rawUrl === '/markdownstudio' || rawUrl === '/markdownstudio.html') {
           req.url = req.url.replace(/^\/markdownstudio(\.html)?/, '/markdown.html');
         }
-        if (
-          rawUrl === '/markdown.html' ||
-          rawUrl === '/markdown' ||
-          rawUrl === '/markdown/'
-        ) {
+        if (rawUrl === '/markdown.html' || rawUrl === '/markdown' || rawUrl === '/markdown/') {
           try {
             const { fs, path, projectRoot } = await getUtils();
             const candidates = [
@@ -75,7 +71,12 @@ function aclMarkdownSaverPlugin() {
             // Fall through to next middleware
           }
         }
-        if (rawUrl === '/greenfield.svg' || rawUrl === '/brownfield.svg' || rawUrl === '/velocityone-studio-logo.png' || rawUrl === '/vo-icon.svg') {
+        if (
+          rawUrl === '/greenfield.svg' ||
+          rawUrl === '/brownfield.svg' ||
+          rawUrl === '/velocityone-studio-logo.png' ||
+          rawUrl === '/vo-icon.svg'
+        ) {
           try {
             const { fs, path, projectRoot } = await getUtils();
             const svgName = rawUrl.slice(1);
@@ -113,10 +114,22 @@ function aclMarkdownSaverPlugin() {
             const scanCandidates = ['_acl-output', '_acl_output', 'acl-output'];
 
             const EXCLUDED_CHILD_NAMES = new Set([
-              'skill.md', 'agents.md', 'readme.md', 'changelog.md', 'claude.md',
-              'contributing.md', 'security.md', 'addendum.md', 'sources.md',
-              'review-triage.md', 'patch-plan.md', 'research.md', 'test-summary.md',
-              'sprint-status.md', 'memlog.md', '.memlog.md'
+              'skill.md',
+              'agents.md',
+              'readme.md',
+              'changelog.md',
+              'claude.md',
+              'contributing.md',
+              'security.md',
+              'addendum.md',
+              'sources.md',
+              'review-triage.md',
+              'patch-plan.md',
+              'research.md',
+              'test-summary.md',
+              'sprint-status.md',
+              'memlog.md',
+              '.memlog.md',
             ]);
 
             function collect(currentDir, relPrefix) {
@@ -145,7 +158,8 @@ function aclMarkdownSaverPlugin() {
                   const match = content.match(/status:\s*([^\n\r]+)/i);
                   if (match && match[1]) {
                     const raw = match[1].trim().toLowerCase();
-                    if (raw.includes('accept') || raw.includes('approved') || raw.includes('final') || raw.includes('updated')) status = 'Approved';
+                    if (raw.includes('accept') || raw.includes('approved') || raw.includes('final') || raw.includes('updated'))
+                      status = 'Approved';
                     else if (raw.includes('reject')) status = 'Rejected';
                     else status = 'In Review';
                   }
@@ -162,7 +176,12 @@ function aclMarkdownSaverPlugin() {
                     const rawTier = tierMatch[1].trim().toLowerCase();
                     if (rawTier.includes('1') || rawTier.includes('spec') || rawTier.includes('self-contained')) {
                       tier = '1';
-                    } else if (rawTier.includes('2') || rawTier.includes('major') || rawTier.includes('enterprise') || rawTier.includes('architecture')) {
+                    } else if (
+                      rawTier.includes('2') ||
+                      rawTier.includes('major') ||
+                      rawTier.includes('enterprise') ||
+                      rawTier.includes('architecture')
+                    ) {
                       tier = '2';
                     }
                   }
@@ -175,7 +194,7 @@ function aclMarkdownSaverPlugin() {
                     projectType,
                     tier,
                     updatedAt: stat.mtime ? stat.mtime.toISOString() : new Date().toISOString(),
-                    content
+                    content,
                   });
                 }
               }
@@ -205,8 +224,13 @@ function aclMarkdownSaverPlugin() {
             uniqueFiles.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
 
             const activeTier = uniqueFiles.some(
-              (f) => (f.filename || '').toLowerCase().includes('epics.md') || (f.filename || '').toLowerCase().includes('spine') || f.tier === '2'
-            ) ? '2' : uniqueFiles.find((f) => f.tier)?.tier || '1';
+              (f) =>
+                (f.filename || '').toLowerCase().includes('epics.md') ||
+                (f.filename || '').toLowerCase().includes('spine') ||
+                f.tier === '2',
+            )
+              ? '2'
+              : uniqueFiles.find((f) => f.tier)?.tier || '1';
 
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ success: true, files: uniqueFiles, activeTier }));
@@ -298,7 +322,7 @@ function aclMarkdownSaverPlugin() {
                   const fullSub = path.join(dir, sub.name);
                   let skillPath = path.join(fullSub, 'SKILL.md');
                   if (!fs.existsSync(skillPath)) {
-                    const found = fs.readdirSync(fullSub).find(f => f.toLowerCase() === 'skill.md');
+                    const found = fs.readdirSync(fullSub).find((f) => f.toLowerCase() === 'skill.md');
                     if (found) skillPath = path.join(fullSub, found);
                     else skillPath = null;
                   }
@@ -312,7 +336,7 @@ function aclMarkdownSaverPlugin() {
                         const nestedDir = path.join(fullSub, n.name);
                         let nestedSkill = path.join(nestedDir, 'SKILL.md');
                         if (!fs.existsSync(nestedSkill)) {
-                          const found = fs.readdirSync(nestedDir).find(f => f.toLowerCase() === 'skill.md');
+                          const found = fs.readdirSync(nestedDir).find((f) => f.toLowerCase() === 'skill.md');
                           if (found) nestedSkill = path.join(nestedDir, found);
                           else nestedSkill = null;
                         }
@@ -396,8 +420,7 @@ function aclMarkdownSaverPlugin() {
           try {
             const { path, execFileSync, projectRoot } = await getUtils();
             const url = new URL(req.url, 'http://localhost');
-            const simulateUnpushed =
-              url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true';
+            const simulateUnpushed = url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true';
 
             const isWindows = process.platform === 'win32';
             const extraPaths = [];
@@ -507,8 +530,34 @@ function aclMarkdownSaverPlugin() {
             let isPushed = false;
             let ghUserData = null;
             let ghRepoData = null;
+            let liveRemoteExists = false;
+            let repoDeleted = false;
 
             if (remoteOrigin) {
+              try {
+                const lsOut = execFileSync('git', ['ls-remote', '--exit-code', 'origin', 'HEAD'], {
+                  cwd: projectRoot,
+                  env,
+                  encoding: 'utf8',
+                  timeout: 6000,
+                  stdio: ['ignore', 'pipe', 'pipe'],
+                }).trim();
+                if (lsOut && lsOut.length > 0) {
+                  liveRemoteExists = true;
+                }
+              } catch (err) {
+                const errText = (
+                  (err.stderr ? err.stderr.toString() : '') +
+                  ' ' +
+                  (err.stdout ? err.stdout.toString() : '') +
+                  ' ' +
+                  (err.message || '')
+                ).toLowerCase();
+                if (errText.includes('not found') || errText.includes('does not exist') || errText.includes('fatal: repository')) {
+                  repoDeleted = true;
+                }
+              }
+
               // Check unpushed commits relative to upstream
               try {
                 const unpushedCommits = execFileSync('git', ['log', '@{u}..HEAD', '--oneline'], {
@@ -534,40 +583,47 @@ function aclMarkdownSaverPlugin() {
               }
 
               // Fetch GitHub public profile for avatar & display name if repoOwner exists
-              if (repoOwner) {
+              if (repoOwner && !repoDeleted) {
                 const ghHeaders = { 'User-Agent': 'Node-ACL-ADLC-Studio' };
                 if (process.env.GITHUB_TOKEN || process.env.GH_TOKEN) {
                   ghHeaders['Authorization'] = 'token ' + (process.env.GITHUB_TOKEN || process.env.GH_TOKEN);
                 }
                 try {
-                  const userRes = await fetch('https://api.github.com/users/' + repoOwner, {
-                    headers: ghHeaders,
-                  });
-                  if (userRes.ok) {
-                    ghUserData = await userRes.json();
-                  }
-                } catch {}
-
-                try {
                   const repoRes = await fetch('https://api.github.com/repos/' + repoOwner + '/' + repoName, {
                     headers: ghHeaders,
                   });
-                  if (repoRes.ok) {
+                  if (repoRes.status === 404) {
+                    repoDeleted = true;
+                  } else if (repoRes.ok) {
                     ghRepoData = await repoRes.json();
+                    liveRemoteExists = true;
                   }
                 } catch {}
+
+                if (!repoDeleted) {
+                  try {
+                    const userRes = await fetch('https://api.github.com/users/' + repoOwner, {
+                      headers: ghHeaders,
+                    });
+                    if (userRes.ok) {
+                      ghUserData = await userRes.json();
+                    }
+                  } catch {}
+                }
               }
             }
 
-            if (!remoteOrigin) {
+            if (!remoteOrigin || repoDeleted) {
               res.setHeader('Content-Type', 'application/json');
               res.end(
                 JSON.stringify({
                   isPushed: false,
                   repoConnected: false,
-                  repoDeleted: false,
-                  remoteOrigin: null,
-                  message: 'No remote repository has been linked to this project.',
+                  repoDeleted: Boolean(repoDeleted),
+                  remoteOrigin: remoteOrigin || null,
+                  message: repoDeleted
+                    ? 'The remote repository (' + (remoteOrigin || 'origin') + ') was deleted or does not exist on GitHub.'
+                    : 'No remote repository has been linked to this project.',
                   userDetails: {
                     username: '',
                     fullName: '',
@@ -576,10 +632,10 @@ function aclMarkdownSaverPlugin() {
                     orgRole: '',
                   },
                   projectDetails: {
-                    projectName: '',
+                    projectName: repoName || path.basename(projectRoot),
                     userRole: '',
-                    projectStatus: 'No repository connected to GitHub',
-                    linkedRepositories: [],
+                    projectStatus: repoDeleted ? 'Remote repository was deleted on GitHub' : 'No repository connected to GitHub',
+                    linkedRepositories: remoteOrigin ? [remoteOrigin] : [],
                     assignedDate: '',
                   },
                   gitDetails: {
@@ -608,9 +664,7 @@ function aclMarkdownSaverPlugin() {
               projectDetails: {
                 projectName: (ghRepoData && ghRepoData.name) || repoName || path.basename(projectRoot),
                 userRole: 'Lead Developer',
-                projectStatus: isPushed
-                  ? 'Active (GitHub Linked)'
-                  : 'Active (Branch: ' + (currentBranch || 'main') + ' - Pending Push)',
+                projectStatus: isPushed ? 'Active (GitHub Linked)' : 'Active (Branch: ' + (currentBranch || 'main') + ' - Pending Push)',
                 linkedRepositories: [remoteOrigin],
                 assignedDate: lastActivityDate ? new Date(lastActivityDate).toLocaleDateString() : new Date().toLocaleDateString(),
               },
@@ -638,42 +692,49 @@ function aclMarkdownSaverPlugin() {
       server.middlewares.use('/api/save-markdown', (req, res, next) => {
         if (req.method === 'POST') {
           let body = '';
-          req.on('data', chunk => { body += chunk; });
+          req.on('data', (chunk) => {
+            body += chunk;
+          });
           req.on('end', async () => {
             try {
               const { fs, path, exec, projectRoot } = await getUtils();
               const { folderPath, filename, content, status, autoPush } = JSON.parse(body);
 
               let cleanFolder = (folderPath || '').replaceAll('\\', '/').trim();
-              if (!cleanFolder.startsWith('_acl-output') && !cleanFolder.startsWith('_acl_output') && !cleanFolder.startsWith('acl-output')) {
+              if (
+                !cleanFolder.startsWith('_acl-output') &&
+                !cleanFolder.startsWith('_acl_output') &&
+                !cleanFolder.startsWith('acl-output')
+              ) {
                 cleanFolder = cleanFolder && cleanFolder !== 'root' ? path.join('_acl-output', cleanFolder) : '_acl-output';
               }
               if (cleanFolder === '_acl-output' || cleanFolder === 'root' || cleanFolder === '.') {
                 const lowerName = (filename || '').toLowerCase();
                 switch (lowerName) {
-                case 'project-context.md': {
-                cleanFolder = '_acl-output';
-                break;
-                }
-                case 'brief.md': {
-                cleanFolder = '_acl-output/1-analysis/acl-product-brief';
-                break;
-                }
-                case 'prd.md': {
-                cleanFolder = '_acl-output/2-plan-workflows/acl-prd';
-                break;
-                }
-                case 'architecture-spine.md': 
-                case 'architecture.md': {
-                cleanFolder = '_acl-output/3-solutioning/acl-architecture';
-                break;
-                }
-                case 'epics.md': { {
-                cleanFolder = '_acl-output/3-solutioning/acl-create-epics-and-stories';
-                // No default
-                }
-                break;
-                }
+                  case 'project-context.md': {
+                    cleanFolder = '_acl-output';
+                    break;
+                  }
+                  case 'brief.md': {
+                    cleanFolder = '_acl-output/1-analysis/acl-product-brief';
+                    break;
+                  }
+                  case 'prd.md': {
+                    cleanFolder = '_acl-output/2-plan-workflows/acl-prd';
+                    break;
+                  }
+                  case 'architecture-spine.md':
+                  case 'architecture.md': {
+                    cleanFolder = '_acl-output/3-solutioning/acl-architecture';
+                    break;
+                  }
+                  case 'epics.md': {
+                    {
+                      cleanFolder = '_acl-output/3-solutioning/acl-create-epics-and-stories';
+                      // No default
+                    }
+                    break;
+                  }
                 }
               }
               const targetDir = path.resolve(projectRoot, cleanFolder);
@@ -684,7 +745,14 @@ function aclMarkdownSaverPlugin() {
               fs.writeFileSync(targetFile, content, 'utf8');
 
               if (autoPush) {
-                const gitCmd = 'git add "' + targetFile + '" && git commit -m "docs: update ' + filename + ' [' + (status || 'Approved') + ']" && git push';
+                const gitCmd =
+                  'git add "' +
+                  targetFile +
+                  '" && git commit -m "docs: update ' +
+                  filename +
+                  ' [' +
+                  (status || 'Approved') +
+                  ']" && git push';
                 exec(gitCmd, { cwd: projectRoot }, (gitErr, gitStdout, gitStderr) => {
                   if (gitErr) {
                     res.setHeader('Content-Type', 'application/json');
@@ -757,9 +825,15 @@ function aclMarkdownSaverPlugin() {
             }
             if (req.method === 'POST') {
               const payload = await readJsonBody();
-              const saved = atlassianMod.saveAtlassianConfig(projectRoot, payload);
-              res.setHeader('Content-Type', 'application/json');
-              return res.end(JSON.stringify({ success: true, config: saved }));
+              try {
+                const saved = await atlassianMod.saveAtlassianConfig(projectRoot, payload);
+                res.setHeader('Content-Type', 'application/json');
+                return res.end(JSON.stringify({ success: true, config: saved }));
+              } catch (saveErr) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                return res.end(JSON.stringify({ success: false, error: saveErr.message }));
+              }
             }
           }
 
@@ -823,6 +897,6 @@ function aclMarkdownSaverPlugin() {
           res.end(JSON.stringify({ error: err.message, success: false }));
         }
       });
-    }
+    },
   };
 }

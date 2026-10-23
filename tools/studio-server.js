@@ -1399,7 +1399,33 @@ const server = http.createServer(async (req, res) => {
       }
 
       let isPushed = false;
+      let liveRemoteExists = false;
+      let repoDeleted = false;
       if (remoteOrigin) {
+        try {
+          const lsOut = execFileSync('git', ['ls-remote', '--exit-code', 'origin', 'HEAD'], {
+            cwd: PROJECT_ROOT,
+            env,
+            encoding: 'utf8',
+            timeout: 6000,
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }).trim();
+          if (lsOut && lsOut.length > 0) {
+            liveRemoteExists = true;
+          }
+        } catch (err) {
+          const errText = (
+            (err.stderr ? err.stderr.toString() : '') +
+            ' ' +
+            (err.stdout ? err.stdout.toString() : '') +
+            ' ' +
+            (err.message || '')
+          ).toLowerCase();
+          if (errText.includes('not found') || errText.includes('does not exist') || errText.includes('fatal: repository')) {
+            repoDeleted = true;
+          }
+        }
+
         try {
           const unpushedCommits = execFileSync('git', ['log', '@{u}..HEAD', '--oneline'], {
             cwd: PROJECT_ROOT,
@@ -1423,21 +1449,6 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      if (!remoteOrigin) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            isPushed: false,
-            repoConnected: false,
-            remoteOrigin: null,
-            userDetails: null,
-            projectDetails: null,
-            gitDetails: null,
-          }),
-        );
-        return;
-      }
-
       let gitUserName = '';
       let gitUserEmail = '';
       let lastActivityDate = new Date().toISOString();
@@ -1456,17 +1467,53 @@ const server = http.createServer(async (req, res) => {
       }
 
       let ghUserData = null;
-      if (repoOwner) {
+      let ghRepoData = null;
+      if (repoOwner && !repoDeleted) {
         try {
-          const userRes = await fetch(`https://api.github.com/users/${repoOwner}`, {
+          const repoRes = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}`, {
             headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
           });
-          if (userRes.ok) {
-            ghUserData = await userRes.json();
+          if (repoRes.status === 404) {
+            repoDeleted = true;
+          } else if (repoRes.ok) {
+            ghRepoData = await repoRes.json();
+            liveRemoteExists = true;
           }
         } catch {
           /* ignore */
         }
+
+        if (!repoDeleted) {
+          try {
+            const userRes = await fetch(`https://api.github.com/users/${repoOwner}`, {
+              headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
+            });
+            if (userRes.ok) {
+              ghUserData = await userRes.json();
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      if (!remoteOrigin || repoDeleted) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            isPushed: false,
+            repoConnected: false,
+            repoDeleted: Boolean(repoDeleted),
+            remoteOrigin: remoteOrigin || null,
+            message: repoDeleted
+              ? `The remote repository (${remoteOrigin || 'origin'}) was deleted or does not exist on GitHub.`
+              : 'No remote repository has been linked to this project.',
+            userDetails: null,
+            projectDetails: null,
+            gitDetails: null,
+          }),
+        );
+        return;
       }
 
       const responsePayload = {
@@ -1601,10 +1648,10 @@ const server = http.createServer(async (req, res) => {
           req.on('data', (chunk) => {
             body += chunk;
           });
-          req.on('end', () => {
+          req.on('end', async () => {
             try {
               const payload = JSON.parse(body || '{}');
-              const saved = atlassianMod.saveAtlassianConfig(projectRoot, payload);
+              const saved = await atlassianMod.saveAtlassianConfig(projectRoot, payload);
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: true, config: saved }));
             } catch (e) {

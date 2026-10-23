@@ -837,12 +837,12 @@ class Installer {
             const svgSrc = path.join(sDir, svgName);
             if (await fs.pathExists(svgSrc)) {
               const targetSvg = path.join(targetDir, svgName);
-              await fs.copy(svgSrc, targetSvg);
+              await fs.copy(svgSrc, targetSvg, { overwrite: true });
               this.installedFiles.add(targetSvg);
               if (publicDir && (await fs.pathExists(publicDir))) {
                 const publicSvg = path.join(publicDir, svgName);
                 if (publicSvg !== targetSvg) {
-                  await fs.copy(svgSrc, publicSvg);
+                  await fs.copy(svgSrc, publicSvg, { overwrite: true });
                   this.installedFiles.add(publicSvg);
                 }
               }
@@ -877,7 +877,7 @@ class Installer {
             const subSrc = path.join(markdownSrcDir, sub);
             if (await fs.pathExists(subSrc)) {
               const subDest = path.join(assetTargetDir, sub);
-              await fs.copy(subSrc, subDest);
+              await fs.copy(subSrc, subDest, { overwrite: true });
               await trackDirFiles(subDest);
             }
           }
@@ -1028,7 +1028,8 @@ class Installer {
           if (!pluginCode) {
             continue;
           }
-          const pluginRegex = /(?:\/\/[^\r\n]*\r?\n)*function aclMarkdownSaverPlugin\s*\(\)\s*\{[\s\S]*?\n\s*\}\s*;\s*\r?\n\s*\}|function aclMarkdownSaverPlugin\s*\(\)\s*\{[\s\S]*?\n\s*\}/;
+          const pluginRegex =
+            /(?:\/\/[^\r\n]*\r?\n)*function aclMarkdownSaverPlugin\s*\(\)\s*\{[\s\S]*?\n\s*\}\s*;\s*\r?\n\s*\}|function aclMarkdownSaverPlugin\s*\(\)\s*\{[\s\S]*?\n\s*\}/;
 
           if (content.includes('aclMarkdownSaverPlugin')) {
             content = content.replace(pluginRegex, pluginCode.trim());

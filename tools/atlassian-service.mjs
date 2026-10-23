@@ -21,14 +21,17 @@ export function getAtlassianConfig(projectRoot) {
   if (fs.existsSync(configPath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const hasRealCredentials = Boolean(parsed.domain && parsed.email);
+      const isDemo = Boolean(parsed.isDemoMode);
+      const isConnected = Boolean(parsed.connected && (hasRealCredentials || isDemo));
       return {
         domain: parsed.domain || '',
         email: parsed.email || '',
         apiToken: parsed.apiToken || '',
         jiraProjectKey: parsed.jiraProjectKey || defaultProjectKey,
         confluenceSpaceKey: parsed.confluenceSpaceKey || defaultProjectKey,
-        connected: Boolean(parsed.connected),
-        isDemoMode: parsed.isDemoMode !== undefined ? parsed.isDemoMode : true,
+        connected: isConnected,
+        isDemoMode: isDemo,
         lastSynced: parsed.lastSynced || null,
       };
     } catch {
@@ -48,14 +51,86 @@ export function getAtlassianConfig(projectRoot) {
   };
 }
 
-export function saveAtlassianConfig(projectRoot, config) {
+export async function validateAtlassianConfig(config) {
+  if (config.isDemoMode) {
+    return { valid: true, message: 'Sandbox Simulation Mode active' };
+  }
+  let domain = (config.domain || '').trim();
+  if (!domain) {
+    return { valid: false, error: 'Atlassian Domain is required' };
+  }
+  if (!domain.startsWith('http://') && !domain.startsWith('https://')) {
+    domain = 'https://' + domain;
+  }
+  domain = domain.replace(/\/+$/, '');
+  const email = (config.email || '').trim();
+  const token = (config.apiToken || '').trim();
+
+  if (!email || !token) {
+    return { valid: false, error: 'Email and API Token are required to connect to Atlassian Cloud' };
+  }
+
+  const authHeader = 'Basic ' + Buffer.from(email + ':' + token).toString('base64');
+  try {
+    const res = await fetch(`${domain}/rest/api/3/myself`, {
+      headers: {
+        Authorization: authHeader,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (res.status === 200) {
+      const user = await res.json().catch(() => ({}));
+      return { valid: true, user: user.displayName || user.emailAddress || email };
+    }
+    if (res.status === 401 || res.status === 403) {
+      return { valid: false, error: 'Authentication failed: Invalid email or API token (HTTP ' + res.status + ')' };
+    }
+    if (res.status === 404) {
+      return { valid: false, error: 'Atlassian Cloud site not found: ' + domain + ' (HTTP 404)' };
+    }
+    return { valid: false, error: 'Atlassian returned HTTP ' + res.status };
+  } catch (err) {
+    return { valid: false, error: 'Unable to reach ' + domain + ': ' + err.message };
+  }
+}
+
+export async function saveAtlassianConfig(projectRoot, config) {
+  if (!config.connected && !config.domain && !config.email) {
+    const aclDir = path.join(projectRoot, '_acl');
+    if (!fs.existsSync(aclDir)) {
+      fs.mkdirSync(aclDir, { recursive: true });
+    }
+    const configPath = path.join(aclDir, 'atlassian-config.json');
+    const cleared = {
+      domain: '',
+      email: '',
+      apiToken: '',
+      jiraProjectKey: '',
+      confluenceSpaceKey: '',
+      isDemoMode: false,
+      connected: false,
+      lastSynced: null,
+    };
+    fs.writeFileSync(configPath, JSON.stringify(cleared, null, 2), 'utf8');
+    return cleared;
+  }
+  const validation = await validateAtlassianConfig(config);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
   const aclDir = path.join(projectRoot, '_acl');
   if (!fs.existsSync(aclDir)) {
     fs.mkdirSync(aclDir, { recursive: true });
   }
   const configPath = path.join(aclDir, 'atlassian-config.json');
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-  return config;
+  const payloadToSave = {
+    ...config,
+    connected: true,
+  };
+  fs.writeFileSync(configPath, JSON.stringify(payloadToSave, null, 2), 'utf8');
+  return payloadToSave;
 }
 
 export function getAtlassianMapping(projectRoot) {
