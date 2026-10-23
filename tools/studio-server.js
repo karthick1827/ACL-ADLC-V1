@@ -1399,58 +1399,37 @@ const server = http.createServer(async (req, res) => {
       }
 
       let isPushed = false;
-      if (isGitHub) {
-        let liveRemoteExists = false;
+      if (remoteOrigin) {
         try {
-          const lsOut = execFileSync('git', ['ls-remote', '--exit-code', 'origin', 'HEAD'], {
+          const unpushedCommits = execFileSync('git', ['log', '@{u}..HEAD', '--oneline'], {
             cwd: PROJECT_ROOT,
             env,
             encoding: 'utf8',
-            timeout: 5000,
             stdio: ['ignore', 'pipe', 'ignore'],
           }).trim();
-          liveRemoteExists = Boolean(lsOut && lsOut.length > 0);
+          isPushed = unpushedCommits.length === 0;
         } catch {
-          liveRemoteExists = false;
-        }
-
-        if (!liveRemoteExists && repoOwner && repoName) {
           try {
-            const repoRes = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}`, {
-              headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
-            });
-            if (repoRes.ok) {
-              liveRemoteExists = true;
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-
-        if (liveRemoteExists) {
-          try {
-            const unpushedCommits = execFileSync('git', ['log', '@{u}..HEAD', '--oneline'], {
+            const localCommits = execFileSync('git', ['log', '-1', '--oneline'], {
               cwd: PROJECT_ROOT,
               env,
               encoding: 'utf8',
               stdio: ['ignore', 'pipe', 'ignore'],
             }).trim();
-            isPushed = unpushedCommits.length === 0;
+            isPushed = Boolean(localCommits);
           } catch {
             isPushed = true;
           }
-        } else {
-          isPushed = false;
         }
       }
 
-      if (!isPushed) {
+      if (!remoteOrigin) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
             isPushed: false,
             repoConnected: false,
-            remoteOrigin: remoteOrigin || null,
+            remoteOrigin: null,
             userDetails: null,
             projectDetails: null,
             gitDetails: null,
@@ -1491,7 +1470,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const responsePayload = {
-        isPushed: true,
+        isPushed: Boolean(isPushed),
         repoConnected: true,
         repoDeleted: false,
         remoteOrigin,

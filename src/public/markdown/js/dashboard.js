@@ -1417,6 +1417,7 @@ function updateNavUserControlCentre(data) {
   const isConnected = Boolean(
     data &&
     (data.repoConnected === true ||
+      Boolean(data.remoteOrigin && !data.repoDeleted) ||
       (data.repoConnected !== false &&
         (data.isPushed || (data.userDetails && Boolean(data.userDetails.username || data.userDetails.fullName))))),
   );
@@ -1474,6 +1475,7 @@ async function renderGitDashboard() {
     const isConnected = Boolean(
       data &&
       (data.repoConnected === true ||
+        Boolean(data.remoteOrigin && !data.repoDeleted) ||
         (data.repoConnected !== false &&
           (data.isPushed || (data.userDetails && Boolean(data.userDetails.username || data.userDetails.fullName))))),
     );
