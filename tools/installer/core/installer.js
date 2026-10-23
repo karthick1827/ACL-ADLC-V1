@@ -1427,11 +1427,12 @@ function aclMarkdownSaverPlugin() {
             const simulateUnpushed =
               url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true';
 
+            const localAppData =
+              process.env.LOCALAPPDATA || (process.env.USERPROFILE ? process.env.USERPROFILE + '\\\\AppData\\\\Local' : '');
+            const gitUserPath = localAppData ? localAppData + '\\\\Programs\\\\Git\\\\cmd' : '';
             const env = {
               ...process.env,
-              PATH:
-                (process.env.PATH || '') +
-                ';C:\\\\Users\\\\karthick.natarajan\\\\AppData\\\\Local\\\\Programs\\\\Git\\\\cmd;C:\\\\Program Files\\\\Git\\\\cmd',
+              PATH: [process.env.PATH || '', gitUserPath, 'C:\\\\Program Files\\\\Git\\\\cmd'].filter(Boolean).join(';'),
             };
 
             if (simulateUnpushed) {
@@ -1683,7 +1684,7 @@ function aclMarkdownSaverPlugin() {
           if (!servicePath) {
             throw new Error('Atlassian service module not found in project or framework.');
           }
-          const atlassianMod = await import(pathToFileURL(servicePath).href);
+          const atlassianMod = await import(pathToFileURL(servicePath).href + '?t=' + Date.now());
           const projectRoot = process.cwd();
 
           if (url.pathname === '/api/atlassian/config') {

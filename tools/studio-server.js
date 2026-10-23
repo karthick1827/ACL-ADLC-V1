@@ -1358,9 +1358,12 @@ const server = http.createServer(async (req, res) => {
       const { execFileSync } = require('node:child_process');
       const simulateUnpushed = url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true';
 
+      const localAppData =
+        process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : '');
+      const gitUserPath = localAppData ? path.join(localAppData, 'Programs', 'Git', 'cmd') : '';
       const env = {
         ...process.env,
-        PATH: (process.env.PATH || '') + ';C:\\Users\\karthick.natarajan\\AppData\\Local\\Programs\\Git\\cmd;C:\\Program Files\\Git\\cmd',
+        PATH: [process.env.PATH || '', gitUserPath, 'C:\\Program Files\\Git\\cmd'].filter(Boolean).join(';'),
       };
 
       if (simulateUnpushed) {
@@ -1602,7 +1605,7 @@ const server = http.createServer(async (req, res) => {
       if (!servicePath) {
         throw new Error('Atlassian service module not found in project or studio tools.');
       }
-      const atlassianMod = await import(pathToFileURL(servicePath).href);
+      const atlassianMod = await import(pathToFileURL(servicePath).href + '?t=' + Date.now());
       const projectRoot = PROJECT_ROOT;
 
       if (url.pathname === '/api/atlassian/config') {

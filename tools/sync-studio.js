@@ -24,10 +24,7 @@ const isWatch = args.includes('--watch') || args.includes('-w');
 const isServe = args.includes('--serve') || args.includes('-s');
 const customTarget = args.find((arg) => !arg.startsWith('-'));
 
-const DEFAULT_TARGETS = [
-  'C:\\Users\\ashwin.premnath\\Documents\\my-react-app',
-  'C:\\Users\\ashwin.premnath\\Desktop\\Project\\Check-ACL-ADLC\\vite-project',
-];
+const DEFAULT_TARGETS = [];
 
 const targetProjects = customTarget
   ? [customTarget]
