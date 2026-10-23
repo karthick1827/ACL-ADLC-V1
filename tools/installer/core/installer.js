@@ -977,7 +977,7 @@ class Installer {
       const srcAtlassianCandidates = [
         path.join(__dirname, '..', '..', 'atlassian-service.mjs'),
         path.join(__dirname, '..', '..', '..', 'tools', 'atlassian-service.mjs'),
-        path.join(frameworkRoot, 'tools', 'atlassian-service.mjs'),
+        path.resolve(__dirname, '../../..', 'tools', 'atlassian-service.mjs'),
       ];
       let srcAtlassian = null;
       for (const cand of srcAtlassianCandidates) {
