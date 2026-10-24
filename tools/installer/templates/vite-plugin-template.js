@@ -737,14 +737,66 @@ function aclMarkdownSaverPlugin() {
                   }
                 }
               }
-              const targetDir = path.resolve(projectRoot, cleanFolder);
+              let targetDir = path.resolve(projectRoot, cleanFolder);
+              let targetFile = path.join(targetDir, filename);
+
+              // If file does not exist at default cleanFolder, check if it already exists elsewhere in _acl-output
+              if (!fs.existsSync(targetFile)) {
+                function searchFile(dir) {
+                  if (!fs.existsSync(dir)) return null;
+                  const entries = fs.readdirSync(dir, { withFileTypes: true });
+                  for (const entry of entries) {
+                    const full = path.join(dir, entry.name);
+                    if (entry.isDirectory() && !entry.name.startsWith('.')) {
+                      const res = searchFile(full);
+                      if (res) return res;
+                    } else if (entry.isFile() && entry.name.toLowerCase() === filename.toLowerCase()) {
+                      return full;
+                    }
+                  }
+                  return null;
+                }
+                const existing = searchFile(path.resolve(projectRoot, '_acl-output'));
+                if (existing) {
+                  targetFile = existing;
+                  targetDir = path.dirname(existing);
+                }
+              }
+
               if (!fs.existsSync(targetDir)) {
                 fs.mkdirSync(targetDir, { recursive: true });
               }
-              const targetFile = path.join(targetDir, filename);
               fs.writeFileSync(targetFile, content, 'utf8');
 
-              if (autoPush) {
+              // Check GitHub remote connectivity
+              const isWindows = process.platform === 'win32';
+              const localAppData = process.env.LOCALAPPDATA || '';
+              const gitUserPath = localAppData ? path.join(localAppData, 'Programs', 'Git', 'cmd') : '';
+              const env = {
+                ...process.env,
+                PATH: [process.env.PATH || '', gitUserPath, 'C:\\Program Files\\Git\\cmd'].filter(Boolean).join(isWindows ? ';' : ':'),
+              };
+
+              let remoteOrigin = '';
+              try {
+                remoteOrigin = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: projectRoot, env, encoding: 'utf8' }).trim();
+              } catch {}
+
+              let repoConnected = false;
+              if (remoteOrigin) {
+                try {
+                  const lsOut = execFileSync('git', ['ls-remote', '--exit-code', 'origin', 'HEAD'], {
+                    cwd: projectRoot,
+                    env,
+                    encoding: 'utf8',
+                    timeout: 5000,
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                  }).trim();
+                  if (lsOut && lsOut.length > 0) repoConnected = true;
+                } catch {}
+              }
+
+              if (autoPush && repoConnected) {
                 const gitCmd =
                   'git add "' +
                   targetFile +
@@ -753,18 +805,27 @@ function aclMarkdownSaverPlugin() {
                   ' [' +
                   (status || 'Approved') +
                   ']" && git push';
-                exec(gitCmd, { cwd: projectRoot }, (gitErr, gitStdout, gitStderr) => {
+                exec(gitCmd, { cwd: projectRoot, env }, (gitErr) => {
+                  res.setHeader('Content-Type', 'application/json');
                   if (gitErr) {
-                    res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify({ success: true, path: targetFile, gitPushed: false, gitError: gitErr.message }));
+                    res.end(
+                      JSON.stringify({ success: true, path: targetFile, repoConnected: true, gitPushed: false, gitError: gitErr.message }),
+                    );
                   } else {
-                    res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify({ success: true, path: targetFile, gitPushed: true }));
+                    res.end(JSON.stringify({ success: true, path: targetFile, repoConnected: true, gitPushed: true }));
                   }
                 });
               } else {
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: true, path: targetFile, gitPushed: false }));
+                res.end(
+                  JSON.stringify({
+                    success: true,
+                    path: targetFile,
+                    repoConnected: Boolean(repoConnected),
+                    gitPushed: false,
+                    message: repoConnected ? 'Saved to IDE (push pending)' : 'Saved to IDE (Not synced with GitHub)',
+                  }),
+                );
               }
             } catch (err) {
               res.statusCode = 500;

@@ -129,7 +129,12 @@ async function syncFromLiveDisk(quiet = false) {
         if (data && data.source === 'github') {
           setSyncStatus(`Synced live with GitHub (${data.repo || 'origin'})`, 'green');
         } else {
-          setSyncStatus('Synced with VS code and Github', 'green');
+          const isGitConnected = Boolean(window.__ACL_GIT_CONNECTED__);
+          if (isGitConnected) {
+            setSyncStatus('Synced with IDE and GitHub', 'green');
+          } else {
+            setSyncStatus('Synced with IDE (Not synced with GitHub)', 'yellow');
+          }
         }
         evaluateProceedButton();
         return true;
@@ -197,10 +202,12 @@ async function saveCurrentFile() {
     const resData = await resp.json().catch(() => ({}));
     if (resp.ok && resData.success !== false) {
       lastSaveTime = Date.now();
-      if (resData && resData.repo) {
-        setSyncStatus(`Committed to GitHub (${resData.repo}@${resData.branch || 'main'}) ✔`, 'green');
+      if (resData && resData.gitPushed) {
+        setSyncStatus(`Saved to IDE & pushed to GitHub ✔`, 'green');
+      } else if (resData && resData.repoConnected) {
+        setSyncStatus(`Saved to IDE (GitHub push pending) ✔`, 'yellow');
       } else {
-        setSyncStatus('Saved locally to disk, VS Code & Github ✔', 'green');
+        setSyncStatus('Saved locally to IDE (Not synced with GitHub) ✔', 'yellow');
       }
     } else {
       const errorMsg = resData.error || resData.message || `Server error (${resp.status})`;
@@ -219,12 +226,13 @@ async function saveCurrentFile() {
 
   isDirty = false;
 
+  const syncSuffix = resData && resData.gitPushed ? ' (Synced to GitHub)' : ' (Updated in IDE, not synced with GitHub)';
   if (status === 'Approved' || status === 'Accepted') {
-    showToast(`🎉 Approved '${file.filename}'!`, 'success');
+    showToast(`🎉 Approved '${file.filename}'!${syncSuffix}`, 'success');
   } else if (status === 'Rejected') {
-    showToast(`🔴 Rejected '${file.filename}'`, 'error');
+    showToast(`🔴 Rejected '${file.filename}'${syncSuffix}`, 'error');
   } else {
-    showToast(`Saved '${file.filename}' [${status}]`, 'info');
+    showToast(`Saved '${file.filename}' [${status}]${syncSuffix}`, 'info');
   }
   renderFileTree();
   evaluateProceedButton();

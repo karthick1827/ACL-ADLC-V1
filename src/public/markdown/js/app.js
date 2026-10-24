@@ -23,6 +23,18 @@ async function init() {
   } catch (e) {}
   updateDrawerFrameworkVersion();
   updateWorkflowModeUI();
+  fetch('/api/git-details?t=' + Date.now())
+    .then((r) => r.json())
+    .then((d) => {
+      window.__ACL_GIT_CONNECTED__ = Boolean(d && d.repoConnected === true && !d.repoDeleted);
+      if (typeof updateNavUserControlCentre === 'function') updateNavUserControlCentre(d);
+      if (!window.__ACL_GIT_CONNECTED__) {
+        setSyncStatus('Synced with IDE (Not synced with GitHub)', 'yellow');
+      } else {
+        setSyncStatus('Synced with IDE and GitHub', 'green');
+      }
+    })
+    .catch(() => {});
   const synced = await syncFromLiveDisk(true);
 
   if (!synced && files.length === 0) {

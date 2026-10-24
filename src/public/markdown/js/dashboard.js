@@ -1467,6 +1467,7 @@ async function renderGitDashboard() {
       data = { isPushed: false, repoConnected: false, userDetails: {}, projectDetails: {}, gitDetails: {} };
     }
     const isConnected = Boolean(data && data.repoConnected === true && !data.repoDeleted);
+    window.__ACL_GIT_CONNECTED__ = isConnected;
     const isPushed = Boolean(data && data.isPushed);
 
     // Update navbar identity
@@ -2029,18 +2030,26 @@ window.saveAtlassianConfig = async function (e) {
       body: JSON.stringify(payload),
     });
 
-    if (res.ok && res.data && (res.data.success || res.data.config)) {
+    if (res.ok && res.data && res.data.success && res.data.config && res.data.config.connected) {
       try {
-        localStorage.setItem('__acl_atlassian_config__', JSON.stringify(payload));
+        localStorage.setItem('__acl_atlassian_config__', JSON.stringify(res.data.config));
       } catch (e) {}
       alert('✅ Atlassian credentials verified and workspace keys saved successfully!');
       renderAtlassianSuite(true);
     } else {
+      try {
+        localStorage.removeItem('__acl_atlassian_config__');
+      } catch (e) {}
       const errMsg = (res.data && res.data.error) || (res.data && res.data.message) || 'Server returned HTTP ' + res.status;
       alert('⚠️ Error saving configuration: ' + errMsg);
+      renderAtlassianSuite(true);
     }
   } catch (err) {
+    try {
+      localStorage.removeItem('__acl_atlassian_config__');
+    } catch (e) {}
     alert('⚠️ Failed to save Atlassian configuration: ' + err.message);
+    renderAtlassianSuite(true);
   } finally {
     if (saveBtn) {
       saveBtn.disabled = false;

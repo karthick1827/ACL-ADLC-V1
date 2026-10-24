@@ -52,7 +52,8 @@ export function getAtlassianConfig(projectRoot) {
 }
 
 export async function validateAtlassianConfig(config) {
-  if (config.isDemoMode) {
+  const isDemoOnly = Boolean(config.isDemoMode && !config.domain && !config.email);
+  if (isDemoOnly) {
     return { valid: true, message: 'Sandbox Simulation Mode active' };
   }
   let domain = (config.domain || '').trim();
@@ -65,44 +66,107 @@ export async function validateAtlassianConfig(config) {
   domain = domain.replace(/\/+$/, '');
   const email = (config.email || '').trim();
   const token = (config.apiToken || '').trim();
+  const jiraKey = (config.jiraProjectKey || '').trim().toUpperCase();
+  const spaceKey = (config.confluenceSpaceKey || '').trim().toUpperCase();
 
   if (!email || !token) {
     return { valid: false, error: 'Email and API Token are required to connect to Atlassian Cloud' };
   }
 
   const authHeader = 'Basic ' + Buffer.from(email + ':' + token).toString('base64');
+  const headers = {
+    Authorization: authHeader,
+    Accept: 'application/json',
+  };
+
+  // 1. Verify user credentials and domain access
+  let userDisplay = email;
   try {
-    const res = await fetch(`${domain}/rest/api/3/myself`, {
-      headers: {
-        Authorization: authHeader,
-        Accept: 'application/json',
-      },
+    let res = await fetch(`${domain}/rest/api/3/myself`, {
+      headers,
       signal: AbortSignal.timeout(8000),
     });
+    if (!res.ok && res.status === 404) {
+      res = await fetch(`${domain}/rest/api/2/myself`, {
+        headers,
+        signal: AbortSignal.timeout(8000),
+      });
+    }
 
-    if (res.status === 200) {
-      const user = await res.json().catch(() => ({}));
-      return { valid: true, user: user.displayName || user.emailAddress || email };
+    switch (res.status) {
+      case 200: {
+        const user = await res.json().catch(() => ({}));
+        userDisplay = user.displayName || user.emailAddress || email;
+        break;
+      }
+      case 401:
+      case 403: {
+        return { valid: false, error: 'Authentication failed: Invalid email or API token (HTTP ' + res.status + ')' };
+      }
+      case 404: {
+        return { valid: false, error: 'Atlassian Cloud site not found: ' + domain + ' (HTTP 404)' };
+      }
+      default: {
+        return { valid: false, error: 'Atlassian returned HTTP ' + res.status };
+      }
     }
-    if (res.status === 401 || res.status === 403) {
-      return { valid: false, error: 'Authentication failed: Invalid email or API token (HTTP ' + res.status + ')' };
-    }
-    if (res.status === 404) {
-      return { valid: false, error: 'Atlassian Cloud site not found: ' + domain + ' (HTTP 404)' };
-    }
-    return { valid: false, error: 'Atlassian returned HTTP ' + res.status };
   } catch (err) {
     return { valid: false, error: 'Unable to reach ' + domain + ': ' + err.message };
   }
+
+  // 2. Verify JIRA Project Key if provided
+  if (jiraKey) {
+    try {
+      let pRes = await fetch(`${domain}/rest/api/3/project/${jiraKey}`, {
+        headers,
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!pRes.ok && pRes.status === 404) {
+        pRes = await fetch(`${domain}/rest/api/2/project/${jiraKey}`, {
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+      }
+      if (pRes.status === 404) {
+        return { valid: false, error: `JIRA Project Key "${jiraKey}" not found in your Atlassian Cloud workspace (HTTP 404)` };
+      }
+      if (pRes.status === 401 || pRes.status === 403) {
+        return { valid: false, error: `Access denied to JIRA Project "${jiraKey}" (HTTP ${pRes.status})` };
+      }
+    } catch (err) {
+      return { valid: false, error: `Failed to verify JIRA Project "${jiraKey}": ` + err.message };
+    }
+  }
+
+  // 3. Verify Confluence Space Key if provided
+  if (spaceKey) {
+    try {
+      const sRes = await fetch(`${domain}/wiki/rest/api/space/${spaceKey}`, {
+        headers,
+        signal: AbortSignal.timeout(8000),
+      });
+      if (sRes.status === 404) {
+        return { valid: false, error: `Confluence Space Key "${spaceKey}" not found in your Atlassian Cloud workspace (HTTP 404)` };
+      }
+      if (sRes.status === 401 || sRes.status === 403) {
+        return { valid: false, error: `Access denied to Confluence Space "${spaceKey}" (HTTP ${sRes.status})` };
+      }
+    } catch (err) {
+      return { valid: false, error: `Failed to verify Confluence Space "${spaceKey}": ` + err.message };
+    }
+  }
+
+  return { valid: true, user: userDisplay };
 }
 
 export async function saveAtlassianConfig(projectRoot, config) {
+  const aclDir = path.join(projectRoot, '_acl');
+  if (!fs.existsSync(aclDir)) {
+    fs.mkdirSync(aclDir, { recursive: true });
+  }
+  const configPath = path.join(aclDir, 'atlassian-config.json');
+
   if (!config.connected && !config.domain && !config.email) {
-    const aclDir = path.join(projectRoot, '_acl');
-    if (!fs.existsSync(aclDir)) {
-      fs.mkdirSync(aclDir, { recursive: true });
-    }
-    const configPath = path.join(aclDir, 'atlassian-config.json');
     const cleared = {
       domain: '',
       email: '',
@@ -116,18 +180,27 @@ export async function saveAtlassianConfig(projectRoot, config) {
     fs.writeFileSync(configPath, JSON.stringify(cleared, null, 2), 'utf8');
     return cleared;
   }
+
   const validation = await validateAtlassianConfig(config);
   if (!validation.valid) {
+    // Write disconnected status so subsequent requests don't show old connected state
+    try {
+      const disconnectedState = {
+        ...config,
+        connected: false,
+        lastError: validation.error,
+      };
+      fs.writeFileSync(configPath, JSON.stringify(disconnectedState, null, 2), 'utf8');
+    } catch {
+      // ignore write errors when disconnected
+    }
     throw new Error(validation.error);
   }
-  const aclDir = path.join(projectRoot, '_acl');
-  if (!fs.existsSync(aclDir)) {
-    fs.mkdirSync(aclDir, { recursive: true });
-  }
-  const configPath = path.join(aclDir, 'atlassian-config.json');
+
   const payloadToSave = {
     ...config,
     connected: true,
+    lastError: null,
   };
   fs.writeFileSync(configPath, JSON.stringify(payloadToSave, null, 2), 'utf8');
   return payloadToSave;
@@ -364,15 +437,18 @@ function parseStoryFile(filePath, results) {
       }
     }
 
-    // User Story text (As a... I want... So that... OR ## Description section)
+    // User Story text (As a... I want... So that... OR ## Description/Intent section)
     let userStory = '';
     const usMatch = raw.match(/(As a[\s\S]*?So that[^\r\n]+)/i);
     if (usMatch) {
       userStory = usMatch[1].replaceAll('\r', '').trim();
     } else {
-      const descMatch = raw.match(/##\s+(?:Description|User Story|Overview & User Story)[\s\S]*?(?=\n##\s+|$)/i);
+      const descMatch = raw.match(/##\s+(?:Description|User Story|Overview & User Story|Overview|Intent)[\s\S]*?(?=\n##\s+|$)/i);
       if (descMatch) {
-        userStory = descMatch[0].replace(/^##\s+[^\r\n]+\r?\n/, '').trim();
+        userStory = descMatch[0]
+          .replace(/^##\s+[^\r\n]+\r?\n/, '')
+          .replaceAll(/<\/?frozen-after-approval[^>]*>/gi, '')
+          .trim();
       }
     }
 
@@ -655,6 +731,17 @@ export async function syncToJira(projectRoot, customConfig = {}) {
               url: `${domain}/browse/${existingKey}`,
             });
             continue;
+          } else {
+            const errBody = await putRes.text().catch(() => '');
+            console.warn(`[JIRA Sync] PUT Epic failed for ${existingKey}: HTTP ${putRes.status} ${errBody}`);
+            syncResults.items.push({
+              type: 'Epic',
+              key: existingKey,
+              title: ep.title,
+              status: `Failed (${putRes.status})`,
+              url: `${domain}/browse/${existingKey}`,
+            });
+            continue; // Prevent creating duplicate ticket on PUT failure
           }
         }
 
@@ -768,9 +855,21 @@ export async function syncToJira(projectRoot, customConfig = {}) {
               url: `${domain}/browse/${existingKey}`,
             });
 
-            // Write jira_key to local story frontmatter if missing
+            // Write jira_key to local story frontmatter if missing (preserving status)
             updateStoryFileFrontmatter(st.filePath, { jiraKey: existingKey });
             continue;
+          } else {
+            const errBody = await putRes.text().catch(() => '');
+            console.warn(`[JIRA Sync] PUT Story failed for ${existingKey}: HTTP ${putRes.status} ${errBody}`);
+            syncResults.items.push({
+              type: 'Story',
+              storyId: st.storyId,
+              key: existingKey,
+              title: cleanTitle,
+              status: `Failed (${putRes.status})`,
+              url: `${domain}/browse/${existingKey}`,
+            });
+            continue; // Prevent creating duplicate ticket on PUT failure
           }
         }
 
@@ -977,7 +1076,17 @@ export async function pullFromJira(projectRoot, customConfig = {}) {
 
     // Check if this story exists locally
     const slugId = storyId.replace('.', '-');
-    const existing = localStoriesByJiraKey.get(issue.key) || localStoriesById.get(storyId) || localStoriesBySlug.get(slugId);
+    let existing = localStoriesByJiraKey.get(issue.key);
+
+    if (!existing) {
+      const mappedKeyForStory = mapping.stories[storyId];
+      if (mappedKeyForStory && mappedKeyForStory !== issue.key) {
+        // This local story is already mapped to a different Jira issue (e.g. PROJ-20 vs PROJ-10).
+        // This issue is an unmapped or duplicate ticket on JIRA board; skip to avoid overwriting active story!
+        continue;
+      }
+      existing = localStoriesById.get(storyId) || localStoriesBySlug.get(slugId);
+    }
 
     if (existing && fs.existsSync(existing.filePath)) {
       // ─────────────────────────────────────────────────────────────────
@@ -991,7 +1100,7 @@ export async function pullFromJira(projectRoot, customConfig = {}) {
           for (const [idx, jiraCriterion] of jiraCriteria.entries()) {
             if (
               jiraCriterion.checked !== existing.criteria[idx].checked ||
-              jiraCriterion.text.trim().toLowerCase() !== existing.criteria[idx].text.trim().toLowerCase()
+              normalizeDiffText(jiraCriterion.text) !== normalizeDiffText(existing.criteria[idx].text)
             ) {
               criteriaDiff = true;
               break;
@@ -1000,12 +1109,23 @@ export async function pullFromJira(projectRoot, customConfig = {}) {
         }
       }
 
+      const cleanLocalTitle = sanitizeStoryTitle(existing.title, storyId);
       const titleDiff =
-        Boolean(cleanTitle) && Boolean(existing.title) && cleanTitle.toLowerCase().trim() !== existing.title.toLowerCase().trim();
+        Boolean(cleanTitle) && Boolean(cleanLocalTitle) && normalizeDiffText(cleanTitle) !== normalizeDiffText(cleanLocalTitle);
 
-      const normJiraStory = (jiraUserStory || '').replaceAll(/\s+/g, ' ').trim().toLowerCase();
-      const normLocalStory = (existing.userStory || '').replaceAll(/\s+/g, ' ').trim().toLowerCase();
-      const descriptionDiff = Boolean(normJiraStory) && normJiraStory !== normLocalStory;
+      const normJiraStory = normalizeDiffText(jiraUserStory || '');
+      const normLocalStory = normalizeDiffText(existing.userStory || '');
+
+      let descriptionDiff = false;
+      if (normJiraStory && normLocalStory) {
+        descriptionDiff = normJiraStory !== normLocalStory;
+      } else if (normJiraStory && !normLocalStory) {
+        // If local file had no userStory, syncToJira pushed cleanTitle as fallback
+        const normLocalTitle = normalizeDiffText(cleanLocalTitle);
+        if (normJiraStory !== normLocalTitle) {
+          descriptionDiff = true;
+        }
+      }
 
       const hasRealChanges = criteriaDiff || titleDiff || descriptionDiff;
 
@@ -1154,6 +1274,11 @@ function updateExistingStoryFile(filePath, data) {
       } else {
         fm = 'status: In Review\n' + fm;
       }
+      if (/reviewed_by:\s*.+/i.test(fm)) {
+        fm = fm.replace(/reviewed_by:\s*.+/i, 'reviewed_by: Pending Manager Review');
+      } else {
+        fm = fm.trim() + '\nreviewed_by: Pending Manager Review\n';
+      }
     }
 
     if (data.jiraKey) {
@@ -1172,9 +1297,9 @@ function updateExistingStoryFile(filePath, data) {
     }
 
     // Update User Story / Description section if edited in JIRA
-    if (data.userStoryText && /##\s+(?:Description|User Story|Overview & User Story)[\s\S]*?(?=\n##\s+|$)/i.test(body)) {
+    if (data.userStoryText && /##\s+(?:Description|User Story|Overview & User Story|Overview|Intent)[\s\S]*?(?=\n##\s+|$)/i.test(body)) {
       body = body.replace(
-        /##\s+(?:Description|User Story|Overview & User Story)[\s\S]*?(?=\n##\s+|$)/i,
+        /##\s+(?:Description|User Story|Overview & User Story|Overview|Intent)[\s\S]*?(?=\n##\s+|$)/i,
         `## Description\n\n${data.userStoryText.trim()}\n\n`,
       );
     }
@@ -2025,7 +2150,28 @@ function normalizeMarkdownForDiff(md) {
   }
   return unescapeHtml(body)
     .replaceAll(/\r?\n/g, '\n')
+    .replaceAll(/[“”]/g, '"')
+    .replaceAll(/[‘’]/g, "'")
+    .replaceAll(/[—–]/g, '-')
+    .replaceAll('…', '...')
+    .replaceAll('\u00A0', ' ')
     .replaceAll(/[ \t]+$/gm, '')
+    .replaceAll(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function normalizeDiffText(str) {
+  if (!str) return '';
+  return unescapeHtml(String(str))
+    .toLowerCase()
+    .replaceAll(/\r?\n/g, '\n')
+    .replaceAll(/[“”]/g, '"')
+    .replaceAll(/[‘’]/g, "'")
+    .replaceAll(/[—–]/g, '-')
+    .replaceAll('…', '...')
+    .replaceAll('\u00A0', ' ')
+    .replaceAll(/[ \t]+/g, ' ')
+    .replaceAll(/[.,;:!?]+$/g, '')
     .trim();
 }
 
