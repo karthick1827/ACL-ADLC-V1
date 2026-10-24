@@ -731,6 +731,9 @@ export async function syncToJira(projectRoot, customConfig = {}) {
               url: `${domain}/browse/${existingKey}`,
             });
             continue;
+          } else if (putRes.status === 404) {
+            // Ticket was deleted from JIRA; clear stale key and recreate via POST below
+            delete mapping.epics[epicNumStr];
           } else {
             const errBody = await putRes.text().catch(() => '');
             console.warn(`[JIRA Sync] PUT Epic failed for ${existingKey}: HTTP ${putRes.status} ${errBody}`);
@@ -741,7 +744,7 @@ export async function syncToJira(projectRoot, customConfig = {}) {
               status: `Failed (${putRes.status})`,
               url: `${domain}/browse/${existingKey}`,
             });
-            continue; // Prevent creating duplicate ticket on PUT failure
+            continue; // Prevent creating duplicate ticket on non-404 failure
           }
         }
 
@@ -858,6 +861,9 @@ export async function syncToJira(projectRoot, customConfig = {}) {
             // Write jira_key to local story frontmatter if missing (preserving status)
             updateStoryFileFrontmatter(st.filePath, { jiraKey: existingKey });
             continue;
+          } else if (putRes.status === 404) {
+            // Ticket was deleted from JIRA; clear stale key and recreate via POST below
+            delete mapping.stories[storyIdStr];
           } else {
             const errBody = await putRes.text().catch(() => '');
             console.warn(`[JIRA Sync] PUT Story failed for ${existingKey}: HTTP ${putRes.status} ${errBody}`);
@@ -869,7 +875,7 @@ export async function syncToJira(projectRoot, customConfig = {}) {
               status: `Failed (${putRes.status})`,
               url: `${domain}/browse/${existingKey}`,
             });
-            continue; // Prevent creating duplicate ticket on PUT failure
+            continue; // Prevent creating duplicate ticket on non-404 failure
           }
         }
 
