@@ -21,14 +21,17 @@ export function getAtlassianConfig(projectRoot) {
   if (fs.existsSync(configPath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const hasRealCredentials = Boolean(parsed.domain && parsed.email);
+      const isDemo = Boolean(parsed.isDemoMode);
+      const isConnected = Boolean(parsed.connected && (hasRealCredentials || isDemo));
       return {
         domain: parsed.domain || '',
         email: parsed.email || '',
         apiToken: parsed.apiToken || '',
         jiraProjectKey: parsed.jiraProjectKey || defaultProjectKey,
         confluenceSpaceKey: parsed.confluenceSpaceKey || defaultProjectKey,
-        connected: Boolean(parsed.connected),
-        isDemoMode: parsed.isDemoMode !== undefined ? parsed.isDemoMode : true,
+        connected: isConnected,
+        isDemoMode: isDemo,
         lastSynced: parsed.lastSynced || null,
       };
     } catch {
@@ -37,25 +40,97 @@ export function getAtlassianConfig(projectRoot) {
   }
 
   return {
-    domain: 'https://velocityone.atlassian.net',
-    email: 'user@company.com',
+    domain: '',
+    email: '',
     apiToken: '',
     jiraProjectKey: defaultProjectKey,
     confluenceSpaceKey: defaultProjectKey,
     connected: false,
-    isDemoMode: true,
+    isDemoMode: false,
     lastSynced: null,
   };
 }
 
-export function saveAtlassianConfig(projectRoot, config) {
+export async function validateAtlassianConfig(config) {
+  if (config.isDemoMode) {
+    return { valid: true, message: 'Sandbox Simulation Mode active' };
+  }
+  let domain = (config.domain || '').trim();
+  if (!domain) {
+    return { valid: false, error: 'Atlassian Domain is required' };
+  }
+  if (!domain.startsWith('http://') && !domain.startsWith('https://')) {
+    domain = 'https://' + domain;
+  }
+  domain = domain.replace(/\/+$/, '');
+  const email = (config.email || '').trim();
+  const token = (config.apiToken || '').trim();
+
+  if (!email || !token) {
+    return { valid: false, error: 'Email and API Token are required to connect to Atlassian Cloud' };
+  }
+
+  const authHeader = 'Basic ' + Buffer.from(email + ':' + token).toString('base64');
+  try {
+    const res = await fetch(`${domain}/rest/api/3/myself`, {
+      headers: {
+        Authorization: authHeader,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (res.status === 200) {
+      const user = await res.json().catch(() => ({}));
+      return { valid: true, user: user.displayName || user.emailAddress || email };
+    }
+    if (res.status === 401 || res.status === 403) {
+      return { valid: false, error: 'Authentication failed: Invalid email or API token (HTTP ' + res.status + ')' };
+    }
+    if (res.status === 404) {
+      return { valid: false, error: 'Atlassian Cloud site not found: ' + domain + ' (HTTP 404)' };
+    }
+    return { valid: false, error: 'Atlassian returned HTTP ' + res.status };
+  } catch (err) {
+    return { valid: false, error: 'Unable to reach ' + domain + ': ' + err.message };
+  }
+}
+
+export async function saveAtlassianConfig(projectRoot, config) {
+  if (!config.connected && !config.domain && !config.email) {
+    const aclDir = path.join(projectRoot, '_acl');
+    if (!fs.existsSync(aclDir)) {
+      fs.mkdirSync(aclDir, { recursive: true });
+    }
+    const configPath = path.join(aclDir, 'atlassian-config.json');
+    const cleared = {
+      domain: '',
+      email: '',
+      apiToken: '',
+      jiraProjectKey: '',
+      confluenceSpaceKey: '',
+      isDemoMode: false,
+      connected: false,
+      lastSynced: null,
+    };
+    fs.writeFileSync(configPath, JSON.stringify(cleared, null, 2), 'utf8');
+    return cleared;
+  }
+  const validation = await validateAtlassianConfig(config);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
   const aclDir = path.join(projectRoot, '_acl');
   if (!fs.existsSync(aclDir)) {
     fs.mkdirSync(aclDir, { recursive: true });
   }
   const configPath = path.join(aclDir, 'atlassian-config.json');
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-  return config;
+  const payloadToSave = {
+    ...config,
+    connected: true,
+  };
+  fs.writeFileSync(configPath, JSON.stringify(payloadToSave, null, 2), 'utf8');
+  return payloadToSave;
 }
 
 export function getAtlassianMapping(projectRoot) {
@@ -289,11 +364,16 @@ function parseStoryFile(filePath, results) {
       }
     }
 
-    // User Story text (As a... I want... So that...)
+    // User Story text (As a... I want... So that... OR ## Description section)
     let userStory = '';
     const usMatch = raw.match(/(As a[\s\S]*?So that[^\r\n]+)/i);
     if (usMatch) {
       userStory = usMatch[1].replaceAll('\r', '').trim();
+    } else {
+      const descMatch = raw.match(/##\s+(?:Description|User Story|Overview & User Story)[\s\S]*?(?=\n##\s+|$)/i);
+      if (descMatch) {
+        userStory = descMatch[0].replace(/^##\s+[^\r\n]+\r?\n/, '').trim();
+      }
     }
 
     results.stories.push({
@@ -496,7 +576,7 @@ export async function syncToJira(projectRoot, customConfig = {}) {
   const mapping = getAtlassianMapping(projectRoot);
 
   const isLive = Boolean(config.domain && config.email && config.apiToken && !config.isDemoMode);
-  const domain = (config.domain || 'https://velocityone.atlassian.net').replace(/\/+$/, '');
+  const domain = (config.domain || '').replace(/\/+$/, '');
   const projectKey = (config.jiraProjectKey || 'PROJ').toUpperCase();
 
   const syncResults = {
@@ -787,7 +867,7 @@ export async function pullFromJira(projectRoot, customConfig = {}) {
   const localData = discoverStoriesAndEpics(projectRoot);
 
   const isLive = Boolean(config.domain && config.email && config.apiToken && !config.isDemoMode);
-  const domain = (config.domain || 'https://velocityone.atlassian.net').replace(/\/+$/, '');
+  const domain = (config.domain || '').replace(/\/+$/, '');
   const projectKey = (config.jiraProjectKey || 'PROJ').toUpperCase();
 
   const pullResults = {
@@ -889,8 +969,11 @@ export async function pullFromJira(projectRoot, customConfig = {}) {
       }
     }
 
-    // Parse deduplicated acceptance criteria checklist from JIRA description
+    // Convert ADF or text description to clean markdown string
+    const markdownDescription = typeof rawDescription === 'object' ? convertAdfToMarkdown(rawDescription) : String(rawDescription || '');
+    // Parse deduplicated acceptance criteria checklist from JIRA description (supports ADF & plain text)
     const jiraCriteria = parseCriteriaFromJiraDescription(rawDescription);
+    const jiraUserStory = extractUserStoryFromJiraDescription(markdownDescription);
 
     // Check if this story exists locally
     const slugId = storyId.replace('.', '-');
@@ -920,7 +1003,11 @@ export async function pullFromJira(projectRoot, customConfig = {}) {
       const titleDiff =
         Boolean(cleanTitle) && Boolean(existing.title) && cleanTitle.toLowerCase().trim() !== existing.title.toLowerCase().trim();
 
-      const hasRealChanges = criteriaDiff || titleDiff;
+      const normJiraStory = (jiraUserStory || '').replaceAll(/\s+/g, ' ').trim().toLowerCase();
+      const normLocalStory = (existing.userStory || '').replaceAll(/\s+/g, ' ').trim().toLowerCase();
+      const descriptionDiff = Boolean(normJiraStory) && normJiraStory !== normLocalStory;
+
+      const hasRealChanges = criteriaDiff || titleDiff || descriptionDiff;
 
       mapping.stories[storyId] = issue.key;
 
@@ -929,9 +1016,11 @@ export async function pullFromJira(projectRoot, customConfig = {}) {
         // CASE A-1: REAL CHANGES DETECTED -> UPDATE AND SET TO 'In Review'
         // ───────────────────────────────────────────────────────────────
         updateExistingStoryFile(existing.filePath, {
+          storyId,
           jiraKey: issue.key,
           cleanTitle,
-          description: rawDescription,
+          description: markdownDescription,
+          userStoryText: jiraUserStory,
           criteria: jiraCriteria,
           resetStatusToInReview: true,
         });
@@ -975,7 +1064,8 @@ export async function pullFromJira(projectRoot, customConfig = {}) {
         storyId,
         jiraKey: issue.key,
         title: cleanTitle,
-        description: rawDescription,
+        description: markdownDescription,
+        userStoryText: jiraUserStory,
         criteria: jiraCriteria,
       });
 
@@ -997,7 +1087,7 @@ export async function pullFromJira(projectRoot, customConfig = {}) {
           storyId,
           epicId: storyId.split('.')[0] || '1',
           title: cleanTitle,
-          description: rawDescription,
+          description: markdownDescription,
           criteria: jiraCriteria,
         });
       }
@@ -1076,6 +1166,19 @@ function updateExistingStoryFile(filePath, data) {
 
     let body = content.slice(fmMatch[0].length);
 
+    // Update story heading if title changed
+    if (data.cleanTitle && data.storyId) {
+      body = body.replace(/^#\s+Story\s+[\d.]+[:\s-]*[^\r\n]*/im, `# Story ${data.storyId}: ${data.cleanTitle}`);
+    }
+
+    // Update User Story / Description section if edited in JIRA
+    if (data.userStoryText && /##\s+(?:Description|User Story|Overview & User Story)[\s\S]*?(?=\n##\s+|$)/i.test(body)) {
+      body = body.replace(
+        /##\s+(?:Description|User Story|Overview & User Story)[\s\S]*?(?=\n##\s+|$)/i,
+        `## Description\n\n${data.userStoryText.trim()}\n\n`,
+      );
+    }
+
     // If new acceptance criteria were parsed from JIRA, clean and update the Acceptance Criteria section
     if (data.criteria && data.criteria.length > 0) {
       // Deduplicate criteria
@@ -1127,6 +1230,8 @@ function createNewStoryFile(filePath, data) {
       criteriaLines = unique.map((c) => `- [${c.checked ? 'x' : ' '}] ${c.text}`).join('\n');
     }
 
+    const descText = data.userStoryText || data.description || `Imported automatically from JIRA issue ${data.jiraKey}.`;
+
     const fileContent = `---
 status: In Review
 title: ${data.title}
@@ -1142,7 +1247,7 @@ tier: Tier 1 (Self-Contained)
 
 ## Description
 
-${data.description || `Imported automatically from JIRA issue ${data.jiraKey}.`}
+${descText}
 
 ## Acceptance Criteria
 
@@ -1209,8 +1314,149 @@ ${criteriaText}
   }
 }
 
-function parseCriteriaFromJiraDescription(desc) {
+export function convertAdfToMarkdown(node) {
+  if (!node) return '';
+  if (typeof node === 'string') return node;
+  if (typeof node !== 'object') return String(node);
+
+  const type = node.type || '';
+  const content = Array.isArray(node.content) ? node.content : [];
+
+  switch (type) {
+    case 'doc': {
+      return content.map(convertAdfToMarkdown).filter(Boolean).join('\n\n');
+    }
+
+    case 'paragraph': {
+      return content.map(convertAdfToMarkdown).join('');
+    }
+
+    case 'heading': {
+      const level = node.attrs?.level || 1;
+      const prefix = '#'.repeat(Math.min(6, Math.max(1, level)));
+      const text = content.map(convertAdfToMarkdown).join('');
+      return `${prefix} ${text}`;
+    }
+
+    case 'text': {
+      let t = node.text || '';
+      if (Array.isArray(node.marks)) {
+        for (const mark of node.marks) {
+          switch (mark.type) {
+            case 'strong': {
+              t = `**${t}**`;
+              break;
+            }
+            case 'em': {
+              t = `*${t}*`;
+              break;
+            }
+            case 'code': {
+              t = `\`${t}\``;
+              break;
+            }
+            default: {
+              if (mark.type === 'link' && mark.attrs?.href) t = `[${t}](${mark.attrs.href})`;
+            }
+          }
+        }
+      }
+      return t;
+    }
+
+    case 'bulletList': {
+      return content.map((item) => `- ${convertAdfToMarkdown(item).trim()}`).join('\n');
+    }
+
+    case 'orderedList': {
+      const start = node.attrs?.order || 1;
+      return content.map((item, idx) => `${start + idx}. ${convertAdfToMarkdown(item).trim()}`).join('\n');
+    }
+
+    case 'listItem': {
+      return content.map(convertAdfToMarkdown).join('\n');
+    }
+
+    case 'taskList': {
+      return content.map(convertAdfToMarkdown).filter(Boolean).join('\n');
+    }
+
+    case 'taskItem': {
+      const isDone = node.attrs?.state === 'DONE';
+      const text = content.map(convertAdfToMarkdown).join('').trim();
+      return `- [${isDone ? 'x' : ' '}] ${text}`;
+    }
+
+    case 'codeBlock': {
+      const lang = node.attrs?.language || '';
+      const code = content.map((c) => c.text || '').join('');
+      return `\`\`\`${lang}\n${code}\n\`\`\``;
+    }
+
+    case 'blockquote': {
+      return content
+        .map(convertAdfToMarkdown)
+        .join('\n')
+        .split('\n')
+        .map((l) => `> ${l}`)
+        .join('\n');
+    }
+
+    case 'rule': {
+      return '---';
+    }
+
+    case 'hardBreak': {
+      return '\n';
+    }
+
+    default: {
+      if (content.length > 0) {
+        return content.map(convertAdfToMarkdown).join('');
+      }
+      return node.text || '';
+    }
+  }
+}
+
+export function parseCriteriaFromJiraDescription(desc) {
   if (!desc) return [];
+
+  // If desc is an ADF object, extract taskItems directly OR convert to markdown
+  if (typeof desc === 'object') {
+    const taskItems = [];
+    function walkAdf(node) {
+      if (!node) return;
+      if (node.type === 'taskItem') {
+        const checked = node.attrs?.state === 'DONE';
+        const text = (node.content || [])
+          .map((c) => c.text || (c.content ? c.content.map((x) => x.text || '').join('') : ''))
+          .join('')
+          .trim();
+        if (text) taskItems.push({ checked, text });
+      }
+      if (Array.isArray(node.content)) {
+        for (const child of node.content) walkAdf(child);
+      }
+    }
+    walkAdf(desc);
+    if (taskItems.length > 0) {
+      const seen = new Set();
+      const unique = [];
+      for (const item of taskItems) {
+        const norm = item.text.toLowerCase().trim();
+        if (!seen.has(norm)) {
+          seen.add(norm);
+          unique.push(item);
+        }
+      }
+      return unique;
+    }
+    desc = convertAdfToMarkdown(desc);
+  }
+
+  if (typeof desc !== 'string') return [];
+
   const lines = desc.split(/\r?\n/);
   const items = [];
   const seen = new Set();
@@ -1231,6 +1477,22 @@ function parseCriteriaFromJiraDescription(desc) {
     }
   }
   return items;
+}
+
+export function extractUserStoryFromJiraDescription(desc) {
+  if (!desc) return '';
+  const text = typeof desc === 'object' ? convertAdfToMarkdown(desc) : String(desc);
+  const m = text.match(
+    /(?:(?:h3\.|###|\*\*|#)?\s*(?:User Story|Description)[\s:]*)([\s\S]*?)(?=(?:h3\.|###|\*\*|#|##)?\s*Acceptance Criteria|----+|\*Source File:\*|$)/i,
+  );
+  if (m && m[1].trim()) {
+    return m[1].trim();
+  }
+  return text
+    .split(/\r?\n/)
+    .filter((line) => !line.match(/^[*-]\s*\[[ xX]\]/) && !line.includes('*Source File:*') && !line.includes('Acceptance Criteria'))
+    .join('\n')
+    .trim();
 }
 
 function sanitizeStoryTitle(title, storyId) {
@@ -1270,7 +1532,7 @@ export async function syncToConfluence(projectRoot, customConfig = {}) {
   if (!mapping.confluence) mapping.confluence = {};
 
   const isLive = Boolean(config.domain && config.email && config.apiToken && !config.isDemoMode);
-  const domain = (config.domain || 'https://velocityone.atlassian.net').replace(/\/+$/, '');
+  const domain = (config.domain || '').replace(/\/+$/, '');
   const spaceKey = (config.confluenceSpaceKey || 'DOCS').toUpperCase();
 
   const syncResults = {
@@ -1290,12 +1552,16 @@ export async function syncToConfluence(projectRoot, customConfig = {}) {
     const pageTitle = `${doc.title} (${path.basename(projectRoot)})`;
     const mappedPageId = doc.confluencePageId || mapping.confluence[doc.filename];
 
-    // Markdown storage format wrapped cleanly in pre block
+    // Native Atlassian Confluence Code Macro with CDATA markdown body
+    // Preserves 100% of indentation, newlines, frontmatter, and headings without Confluence rich-text mangling
     const storageHtml =
       `<p><strong>Document Type:</strong> ${doc.type}</p>` +
       `<p><strong>Approval Status:</strong> <span style="color:#16a34a; font-weight:bold;">${doc.status}</span></p>` +
       `<hr/>` +
-      `<pre style="background:#f8fafc; padding:12px; border-radius:6px; font-family:monospace;">${escapeHtml(doc.content)}</pre>` +
+      `<ac:structured-macro ac:name="code" ac:schema-version="1">` +
+      `<ac:parameter ac:name="language">markdown</ac:parameter>` +
+      `<ac:plain-text-body><![CDATA[${doc.content}]]></ac:plain-text-body>` +
+      `</ac:structured-macro>` +
       `<hr/>` +
       `<p><em>Automatically synchronized from VelocityONE Markdown Studio • ${new Date().toISOString()}</em></p>`;
 
@@ -1482,7 +1748,7 @@ export async function pullFromConfluence(projectRoot, customConfig = {}) {
   const localDeliverables = discoverDeliverables(projectRoot);
 
   const isLive = Boolean(config.domain && config.email && config.apiToken && !config.isDemoMode);
-  const domain = (config.domain || 'https://velocityone.atlassian.net').replace(/\/+$/, '');
+  const domain = (config.domain || '').replace(/\/+$/, '');
   const spaceKey = (config.confluenceSpaceKey || 'DOCS').toUpperCase();
 
   const pullResults = {
@@ -1573,21 +1839,24 @@ export async function pullFromConfluence(projectRoot, customConfig = {}) {
       if (hasRealChanges) {
         // CASE A-1: REAL CHANGES DETECTED -> UPDATE DELIVERABLE AND RESET TO 'In Review'
         let finalContent = extractedMarkdown;
-        const fmMatch = finalContent.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-        if (fmMatch) {
-          let fm = fmMatch[1];
-          if (/status:\s*.+/i.test(fm)) {
-            fm = fm.replace(/status:\s*.+/i, 'status: In Review');
-          } else {
-            fm = 'status: In Review\n' + fm;
-          }
-          if (!/confluence_page_id:\s*.+/i.test(fm)) {
-            fm = fm.trim() + `\nconfluence_page_id: ${page.id}\n`;
-          }
-          finalContent = `---\n${fm.trim()}\n---` + finalContent.slice(fmMatch[0].length);
+        const localFmMatch = existing.content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        const extractedFmMatch = finalContent.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+
+        let fm = extractedFmMatch ? extractedFmMatch[1] : localFmMatch ? localFmMatch[1] : `title: "${existing.title}"`;
+
+        if (/status:\s*.+/i.test(fm)) {
+          fm = fm.replace(/status:\s*.+/i, 'status: In Review');
         } else {
-          finalContent = `---\nstatus: In Review\ntitle: "${existing.title}"\nconfluence_page_id: ${page.id}\n---\n\n` + finalContent;
+          fm = 'status: In Review\n' + fm;
         }
+        if (/confluence_page_id:\s*.+/i.test(fm)) {
+          fm = fm.replace(/confluence_page_id:\s*.+/i, `confluence_page_id: ${page.id}`);
+        } else {
+          fm = fm.trim() + `\nconfluence_page_id: ${page.id}\n`;
+        }
+
+        const body = extractedFmMatch ? finalContent.slice(extractedFmMatch[0].length) : finalContent;
+        finalContent = `---\n${fm.trim()}\n---\n\n` + body.trimStart();
 
         fs.writeFileSync(existing.fullPath, finalContent, 'utf8');
         pullResults.updatedCount++;
@@ -1681,29 +1950,70 @@ function updateFileFrontmatter(filePath, updates = {}) {
   }
 }
 
-function extractMarkdownFromConfluenceStorage(storageHtml) {
+export function extractMarkdownFromConfluenceStorage(storageHtml) {
   if (!storageHtml) return '';
+
+  // 1. CDATA block inside Confluence code macro
+  const cdataMatch = storageHtml.match(/<!\[CDATA\[([\s\S]*?)\]\]>/i);
+  if (cdataMatch) {
+    return unescapeHtml(cdataMatch[1]).trim();
+  }
+
+  // 2. <pre> block
   const preMatch = storageHtml.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
   if (preMatch) {
-    return unescapeHtml(preMatch[1]);
+    return unescapeHtml(preMatch[1]).trim();
   }
-  let clean = storageHtml
-    .replaceAll(/<p><strong>Document Type:<\/strong>[^<]*<\/p>/gi, '')
-    .replaceAll(/<p><strong>Approval Status:<\/strong>[^<]*<\/p>/gi, '')
-    .replaceAll(/<p><em>Automatically synchronized[^<]*<\/em><\/p>/gi, '')
-    .replaceAll(/<hr\s*\/?>/gi, '\n---\n')
-    .replaceAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n# $1\n')
-    .replaceAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n## $1\n')
-    .replaceAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n### $1\n')
-    .replaceAll(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n')
-    .replaceAll(/<p[^>]*>([\s\S]*?)<\/p>/gi, '\n$1\n')
-    .replaceAll(/<br\s*\/?>/gi, '\n')
-    .replaceAll(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**')
-    .replaceAll(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*')
-    .replaceAll(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
 
-  clean = clean.replaceAll(/<[^>]+>/g, '');
-  return unescapeHtml(clean).trim();
+  // 3. Check for large <code> block or code block containing markdown frontmatter/headings
+  const codeBlockMatch = storageHtml.match(/<code[^>]*>([\s\S]*?)<\/code>/i);
+  if (codeBlockMatch && (codeBlockMatch[1].length > 100 || codeBlockMatch[1].includes('# ') || codeBlockMatch[1].includes('---'))) {
+    let codeText = unescapeHtml(codeBlockMatch[1]);
+    if (!codeText.includes('\n') && (codeText.includes('# ') || codeText.includes('--- '))) {
+      codeText = codeText
+        .replaceAll(/\s+---\s+/g, '\n\n---\n\n')
+        .replaceAll(/\s+(#{1,6}\s+)/g, '\n\n$1')
+        .replaceAll(/\s+(\*\s+\[[ xX]\]|-\s+\[[ xX]\]|-\s+)/g, '\n$1');
+    }
+    return codeText.trim();
+  }
+
+  // 4. Confluence rich-text XHTML
+  let clean = storageHtml
+    .replaceAll(/<p>\s*<strong>Document Type:<\/strong>[\s\S]*?<\/p>/gi, '')
+    .replaceAll(/<p>\s*<strong>Approval Status:<\/strong>[\s\S]*?<\/p>/gi, '')
+    .replaceAll(/<p>\s*<em>Automatically synchronized[\s\S]*?<\/em>\s*<\/p>/gi, '')
+    .replaceAll(/<hr\s*\/?>/gi, '\n\n---\n\n')
+    .replaceAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n\n# $1\n\n')
+    .replaceAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n\n## $1\n\n')
+    .replaceAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n\n### $1\n\n')
+    .replaceAll(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, '\n\n#### $1\n\n')
+    .replaceAll(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, '\n\n```\n$1\n```\n\n')
+    .replaceAll(/<code[^>]*>([\s\S]*?)<\/code>/gi, ' `$1` ')
+    .replaceAll(/<(?:strong|b)[^>]*>([\s\S]*?)<\/(?:strong|b)>/gi, ' **$1** ')
+    .replaceAll(/<(?:em|i)[^>]*>([\s\S]*?)<\/(?:em|i)>/gi, ' *$1* ')
+    .replaceAll(/<a\s+[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, ' [$2]($1) ')
+    .replaceAll(/<li[^>]*>([\s\S]*?)<\/li>/gi, '\n- $1')
+    .replaceAll(/<\/?(?:ul|ol)[^>]*>/gi, '\n')
+    .replaceAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi, '\n| $1')
+    .replaceAll(/<(?:th|td)[^>]*>([\s\S]*?)<\/(?:th|td)>/gi, ' $1 |')
+    .replaceAll(/<p[^>]*>([\s\S]*?)<\/p>/gi, '\n\n$1\n\n')
+    .replaceAll(/<div[^>]*>([\s\S]*?)<\/div>/gi, '\n$1\n')
+    .replaceAll(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, '\n\n> $1\n\n')
+    .replaceAll(/<br\s*\/?>/gi, '\n');
+
+  // CRITICAL: Replace any remaining tags with a single space to avoid word concatenation
+  clean = clean.replaceAll(/<[^>]+>/g, ' ');
+
+  // Unescape HTML entities (including &nbsp;)
+  clean = unescapeHtml(clean);
+
+  // Normalize intra-line spaces and collapse excess blank lines
+  const lines = clean.split(/\r?\n/).map((line) => line.replaceAll(/[ \t]+/g, ' ').trim());
+  return lines
+    .join('\n')
+    .replaceAll(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function normalizeMarkdownForDiff(md) {
@@ -1728,8 +2038,10 @@ function escapeHtml(str) {
     .replaceAll("'", '&#039;');
 }
 
-function unescapeHtml(str) {
+export function unescapeHtml(str) {
   return (str || '')
+    .replaceAll('&nbsp;', ' ')
+    .replaceAll('&#160;', ' ')
     .replaceAll('&amp;', '&')
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
@@ -1737,19 +2049,19 @@ function unescapeHtml(str) {
     .replaceAll('&#039;', "'")
     .replaceAll('&apos;', "'")
     .replaceAll('&middot;', '·')
-    .replaceAll('&ldquo;', '“')
-    .replaceAll('&rdquo;', '”')
-    .replaceAll('&lsquo;', '‘')
-    .replaceAll('&rsquo;', '’')
+    .replaceAll('&bull;', '•')
+    .replaceAll('&ldquo;', '"')
+    .replaceAll('&rdquo;', '"')
+    .replaceAll('&lsquo;', "'")
+    .replaceAll('&rsquo;', "'")
     .replaceAll('&mdash;', '—')
     .replaceAll('&ndash;', '–')
     .replaceAll('&times;', '×')
-    .replaceAll('&hellip;', '…')
-    .replaceAll('&nbsp;', ' ')
+    .replaceAll('&hellip;', '...')
     .replaceAll('&#8212;', '—')
     .replaceAll('&#8211;', '–')
-    .replaceAll('&#8220;', '“')
-    .replaceAll('&#8221;', '”')
-    .replaceAll('&#8216;', '‘')
-    .replaceAll('&#8217;', '’');
+    .replaceAll('&#8220;', '"')
+    .replaceAll('&#8221;', '"')
+    .replaceAll('&#8216;', "'")
+    .replaceAll('&#8217;', "'");
 }

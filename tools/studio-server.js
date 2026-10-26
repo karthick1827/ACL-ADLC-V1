@@ -1358,15 +1358,12 @@ const server = http.createServer(async (req, res) => {
       const { execFileSync } = require('node:child_process');
       const simulateUnpushed = url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true';
 
-      const userGitCmd = path.join(
-        process.env.LOCALAPPDATA || path.join(require('node:os').homedir(), 'AppData', 'Local'),
-        'Programs',
-        'Git',
-        'cmd',
-      );
+      const localAppData =
+        process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : '');
+      const gitUserPath = localAppData ? path.join(localAppData, 'Programs', 'Git', 'cmd') : '';
       const env = {
         ...process.env,
-        PATH: (process.env.PATH || '') + ';' + userGitCmd + ';C:\\Program Files\\Git\\cmd',
+        PATH: [process.env.PATH || '', gitUserPath, 'C:\\Program Files\\Git\\cmd'].filter(Boolean).join(';'),
       };
 
       if (simulateUnpushed) {
@@ -1402,63 +1399,54 @@ const server = http.createServer(async (req, res) => {
       }
 
       let isPushed = false;
-      if (isGitHub) {
-        let liveRemoteExists = false;
+      let liveRemoteExists = false;
+      let repoDeleted = false;
+      if (remoteOrigin) {
         try {
           const lsOut = execFileSync('git', ['ls-remote', '--exit-code', 'origin', 'HEAD'], {
             cwd: PROJECT_ROOT,
             env,
             encoding: 'utf8',
-            timeout: 5000,
-            stdio: ['ignore', 'pipe', 'ignore'],
+            timeout: 6000,
+            stdio: ['ignore', 'pipe', 'pipe'],
           }).trim();
-          liveRemoteExists = Boolean(lsOut && lsOut.length > 0);
-        } catch {
-          liveRemoteExists = false;
-        }
-
-        if (!liveRemoteExists && repoOwner && repoName) {
-          try {
-            const repoRes = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}`, {
-              headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
-            });
-            if (repoRes.ok) {
-              liveRemoteExists = true;
-            }
-          } catch {
-            /* ignore */
+          if (lsOut && lsOut.length > 0) {
+            liveRemoteExists = true;
+          }
+        } catch (err) {
+          const errText = (
+            (err.stderr ? err.stderr.toString() : '') +
+            ' ' +
+            (err.stdout ? err.stdout.toString() : '') +
+            ' ' +
+            (err.message || '')
+          ).toLowerCase();
+          if (errText.includes('not found') || errText.includes('does not exist') || errText.includes('fatal: repository')) {
+            repoDeleted = true;
           }
         }
 
-        if (liveRemoteExists) {
+        try {
+          const unpushedCommits = execFileSync('git', ['log', '@{u}..HEAD', '--oneline'], {
+            cwd: PROJECT_ROOT,
+            env,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+          }).trim();
+          isPushed = unpushedCommits.length === 0;
+        } catch {
           try {
-            const unpushedCommits = execFileSync('git', ['log', '@{u}..HEAD', '--oneline'], {
+            const localCommits = execFileSync('git', ['log', '-1', '--oneline'], {
               cwd: PROJECT_ROOT,
               env,
               encoding: 'utf8',
               stdio: ['ignore', 'pipe', 'ignore'],
             }).trim();
-            isPushed = unpushedCommits.length === 0;
+            isPushed = Boolean(localCommits);
           } catch {
             isPushed = true;
           }
-        } else {
-          isPushed = false;
         }
-      }
-
-      if (!isPushed) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            isPushed: false,
-            remoteOrigin: remoteOrigin || null,
-            userDetails: null,
-            projectDetails: null,
-            gitDetails: null,
-          }),
-        );
-        return;
       }
 
       let gitUserName = '';
@@ -1479,21 +1467,59 @@ const server = http.createServer(async (req, res) => {
       }
 
       let ghUserData = null;
-      if (repoOwner) {
+      let ghRepoData = null;
+      if (repoOwner && !repoDeleted) {
         try {
-          const userRes = await fetch(`https://api.github.com/users/${repoOwner}`, {
+          const repoRes = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}`, {
             headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
           });
-          if (userRes.ok) {
-            ghUserData = await userRes.json();
+          if (repoRes.status === 404) {
+            repoDeleted = true;
+          } else if (repoRes.ok) {
+            ghRepoData = await repoRes.json();
+            liveRemoteExists = true;
           }
         } catch {
           /* ignore */
         }
+
+        if (!repoDeleted) {
+          try {
+            const userRes = await fetch(`https://api.github.com/users/${repoOwner}`, {
+              headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
+            });
+            if (userRes.ok) {
+              ghUserData = await userRes.json();
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      if (!remoteOrigin || repoDeleted) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            isPushed: false,
+            repoConnected: false,
+            repoDeleted: Boolean(repoDeleted),
+            remoteOrigin: remoteOrigin || null,
+            message: repoDeleted
+              ? `The remote repository (${remoteOrigin || 'origin'}) was deleted or does not exist on GitHub.`
+              : 'No remote repository has been linked to this project.',
+            userDetails: null,
+            projectDetails: null,
+            gitDetails: null,
+          }),
+        );
+        return;
       }
 
       const responsePayload = {
-        isPushed: true,
+        isPushed: Boolean(isPushed),
+        repoConnected: true,
+        repoDeleted: false,
         remoteOrigin,
         userDetails: {
           username: (ghUserData && ghUserData.login) || repoOwner || gitUserName,
@@ -1608,7 +1634,7 @@ const server = http.createServer(async (req, res) => {
       if (!servicePath) {
         throw new Error('Atlassian service module not found in project or studio tools.');
       }
-      const atlassianMod = await import(pathToFileURL(servicePath).href);
+      const atlassianMod = await import(pathToFileURL(servicePath).href + '?t=' + Date.now());
       const projectRoot = PROJECT_ROOT;
 
       if (url.pathname === '/api/atlassian/config') {
@@ -1622,10 +1648,10 @@ const server = http.createServer(async (req, res) => {
           req.on('data', (chunk) => {
             body += chunk;
           });
-          req.on('end', () => {
+          req.on('end', async () => {
             try {
               const payload = JSON.parse(body || '{}');
-              const saved = atlassianMod.saveAtlassianConfig(projectRoot, payload);
+              const saved = await atlassianMod.saveAtlassianConfig(projectRoot, payload);
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: true, config: saved }));
             } catch (e) {

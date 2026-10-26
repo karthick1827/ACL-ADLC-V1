@@ -1414,13 +1414,14 @@ function renderDeveloperDashboard() {
 // User Control Centre (Git Identity & Permissions Dashboard)
 // ===================================================
 function updateNavUserControlCentre(data) {
-  const isConnected = Boolean(data && data.isPushed && data.userDetails);
+  const isConnected = Boolean(data && data.repoConnected === true && !data.repoDeleted);
+  const hasUser = Boolean(isConnected && data.userDetails && (data.userDetails.fullName || data.userDetails.username));
   const navTitle = document.getElementById('navGitTitle');
   const navIcon = document.getElementById('navGitIcon');
   const railIcon = document.getElementById('railGitIcon');
 
-  const ownerName = isConnected ? data.userDetails.fullName || data.userDetails.username || 'GitHub Owner' : 'Guest';
-  const avatarUrl = isConnected ? data.userDetails.avatarUrl : null;
+  const ownerName = hasUser ? data.userDetails.fullName || data.userDetails.username : isConnected ? 'Developer' : 'No Repo Connected';
+  const avatarUrl = hasUser ? data.userDetails.avatarUrl : null;
 
   if (navTitle) {
     navTitle.textContent = ownerName;
@@ -1429,14 +1430,14 @@ function updateNavUserControlCentre(data) {
     if (avatarUrl) {
       navIcon.innerHTML = `<img src="${avatarUrl}" alt="${ownerName}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
     } else {
-      navIcon.innerHTML = `<span style="font-size: 1.15rem;">👤</span>`;
+      navIcon.innerHTML = `<span style="font-size: 1.15rem;">${isConnected ? '🐙' : '👤'}</span>`;
     }
   }
   if (railIcon) {
     if (avatarUrl) {
-      railIcon.innerHTML = `<img src="${avatarUrl}" alt="${ownerName}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
+      railIcon.innerHTML = `<img src="${avatarUrl}" alt="${ownerName}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
     } else {
-      railIcon.innerHTML = `<span style="font-size: 1.15rem;">👤</span>`;
+      railIcon.innerHTML = `<span style="font-size: 1.15rem;">${isConnected ? '🐙' : '👤'}</span>`;
     }
   }
 }
@@ -1455,7 +1456,7 @@ async function renderGitDashboard() {
   try {
     let data = null;
     try {
-      const res = await fetch('/api/git-details');
+      const res = await fetch('/api/git-details?t=' + Date.now());
       if (res.ok) {
         data = await res.json();
       }
@@ -1463,8 +1464,9 @@ async function renderGitDashboard() {
       data = null;
     }
     if (!data) {
-      data = { isPushed: false, userDetails: {}, projectDetails: {}, gitDetails: {} };
+      data = { isPushed: false, repoConnected: false, userDetails: {}, projectDetails: {}, gitDetails: {} };
     }
+    const isConnected = Boolean(data && data.repoConnected === true && !data.repoDeleted);
     const isPushed = Boolean(data && data.isPushed);
 
     // Update navbar identity
@@ -1474,44 +1476,64 @@ async function renderGitDashboard() {
     const project = data.projectDetails || {};
     const git = data.gitDetails || {};
 
-    const hasUsername = Boolean(user.username);
-    const hasFullName = Boolean(user.fullName);
-    const hasEmail = Boolean(user.email);
-    const hasAvatar = Boolean(user.avatarUrl);
-    const hasOrgRole = Boolean(user.orgRole);
+    const hasUsername = isConnected && Boolean(user.username);
+    const hasFullName = isConnected && Boolean(user.fullName);
+    const hasEmail = isConnected && Boolean(user.email);
+    const hasAvatar = isConnected && Boolean(user.avatarUrl);
+    const hasOrgRole = isConnected && Boolean(user.orgRole);
 
-    const hasProjectName = Boolean(project.projectName);
-    const hasUserRole = Boolean(project.userRole);
+    const hasProjectName = isConnected && Boolean(project.projectName);
+    const hasUserRole = isConnected && Boolean(project.userRole);
     const hasProjectStatus = Boolean(project.projectStatus);
-    const hasLinkedRepos = Boolean(project.linkedRepositories && project.linkedRepositories.length > 0);
-    const hasAssignedDate = Boolean(project.assignedDate);
+    const hasLinkedRepos = isConnected && Boolean(project.linkedRepositories && project.linkedRepositories.length > 0);
+    const hasAssignedDate = isConnected && Boolean(project.assignedDate);
 
-    const hasPermission = Boolean(git.permissionLevel);
-    const hasTeams = Boolean(git.teams && git.teams.length > 0);
-    const has2FA = Boolean(git.twoFactorStatus);
-    const hasLastActivity = Boolean(git.lastActivity);
+    const hasPermission = isConnected && Boolean(git.permissionLevel);
+    const hasTeams = isConnected && Boolean(git.teams && git.teams.length > 0);
+    const has2FA = isConnected && Boolean(git.twoFactorStatus);
+    const hasLastActivity = isConnected && Boolean(git.lastActivity);
 
-    const bannerHtml = isPushed
+    const bannerHtml = isConnected
       ? `
-        <div class="git-status-banner pushed">
-          <div>
-            <strong>🟢 Connected to GitHub</strong> &nbsp;—&nbsp;
-            <span>Remote: <code style="font-size: 0.82rem; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${data.remoteOrigin || 'origin'}</code></span>
-            <span style="margin-left: 0.75rem; color: #15803d; font-size: 0.82rem;">(All fields synchronized and read-only)</span>
+        <div class="git-status-banner pushed" style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 1rem 1.25rem; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+              <strong style="font-size: 0.95rem;">🟢 Connected to GitHub</strong> &nbsp;—&nbsp;
+              <span>Remote: <code style="font-size: 0.82rem; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${data.remoteOrigin || 'origin'}</code></span>
+              <div style="font-size: 0.82rem; margin-top: 0.25rem; color: #15803d;">
+                ${isPushed ? 'All commits pushed and in sync with GitHub.' : 'Repository linked. Local commits pending push to remote.'}
+              </div>
+            </div>
+            <button type="button" class="git-toggle-btn" onclick="renderGitDashboard()" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; cursor: pointer; border-radius: 4px; border: 1px solid #86efac; background: #fff; color: #166534;">
+              🔄 Refresh GitHub
+            </button>
           </div>
         </div>
       `
       : `
-        <div class="git-status-banner unpushed">
-          <div>
-            <strong>⚠️ Project Not Pushed to GitHub / Remote Disconnected</strong> &nbsp;—&nbsp;
-            <span style="color: #c2410c;">Repository is local only. All fields are empty and strictly locked in read-only mode.</span>
+        <div class="git-status-banner unpushed" style="background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem 1.25rem; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+              <strong style="font-size: 0.95rem;">⚠️ No Repository Connected to GitHub</strong>
+              <div style="font-size: 0.82rem; margin-top: 0.25rem; color: #b91c1c;">
+                ${
+                  data.repoDeleted
+                    ? 'The remote repository (' + (data.remoteOrigin || 'origin') + ') was deleted or does not exist on GitHub.'
+                    : data.remoteOrigin
+                      ? 'Remote ' + data.remoteOrigin + ' not reachable on GitHub. Please verify repository or token.'
+                      : 'No remote repository has been linked to this project.'
+                }
+              </div>
+            </div>
+            <button type="button" class="git-toggle-btn" onclick="renderGitDashboard()" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; cursor: pointer; border-radius: 4px; border: 1px solid #fca5a5; background: #fff; color: #991b1b;">
+              🔄 Refresh Status
+            </button>
           </div>
         </div>
       `;
 
     const avatarHtml = hasAvatar
-      ? `<img src="${user.avatarUrl}" alt="${user.fullName || user.username || 'User Avatar'}" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\\'git-profile-avatar-placeholder\\'>👤</span>';" />`
+      ? `<img src="${user.avatarUrl}" alt="${user.fullName || user.username || 'User Avatar'}" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'git-profile-avatar-placeholder\'>👤</span>';" />`
       : `<span class="git-profile-avatar-placeholder">👤</span>`;
 
     const linkedReposHtml = hasLinkedRepos
@@ -1533,8 +1555,8 @@ async function renderGitDashboard() {
               <p>Git identity, project assignment, and repository permissions imported from GitHub / GitLab.</p>
             </div>
             <div>
-              <span class="project-type-badge ${isPushed ? 'badge-greenfield' : 'badge-brownfield'}">
-                ${isPushed ? '🟢 GitHub Linked' : '⚪ Guest / Local'}
+              <span class="project-type-badge ${isConnected ? 'badge-greenfield' : 'badge-brownfield'}" style="${!isConnected ? 'background: #fef2f2; color: #991b1b; border-color: #fecaca;' : ''}">
+                ${isConnected ? '🟢 GitHub Linked' : '⚪ No Repo Connected'}
               </span>
             </div>
           </div>
@@ -1558,9 +1580,9 @@ async function renderGitDashboard() {
             </div>
             <div class="git-integrations-bar">
               <span>Linked Workspaces:</span>
-              <span class="git-int-pill">${hasEmail ? '✅ Atlassian JIRA (Linked)' : '⚪ JIRA (Unlinked)'}</span>
-              <span class="git-int-pill">${hasEmail ? '✅ Confluence (Linked)' : '⚪ Confluence (Unlinked)'}</span>
-              <span class="git-int-pill">🔒 Read-Only Identity</span>
+              <span class="git-int-pill">${isConnected && hasEmail ? '✅ Atlassian JIRA (Linked)' : '⚪ JIRA (Unlinked)'}</span>
+              <span class="git-int-pill">${isConnected && hasEmail ? '✅ Confluence (Linked)' : '⚪ Confluence (Unlinked)'}</span>
+              <span class="git-int-pill">${isConnected ? '🔒 Read-Only Identity' : '⚪ Disconnected'}</span>
             </div>
           </div>
         </div>
@@ -1596,7 +1618,7 @@ async function renderGitDashboard() {
               <div class="git-field-row">
                 <div class="git-field-label">Project Status</div>
                 <div class="git-field-value ${hasProjectStatus ? '' : 'empty'}">
-                  ${hasProjectStatus ? `🟢 ${project.projectStatus}` : '—'}
+                  ${hasProjectStatus ? `${isConnected ? '🟢' : '⚪'} ${project.projectStatus}` : '—'}
                 </div>
               </div>
 
@@ -1693,6 +1715,25 @@ if (typeof window !== 'undefined') {
     .catch(() => updateNavUserControlCentre(null));
 }
 
+// Safe JSON Fetch Helper (Resilient against HTML error pages or empty response bodies)
+async function safeFetchJson(url, options = {}) {
+  try {
+    const res = await fetch(url, options);
+    const text = await res.text();
+    let data = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        data = { error: text || `HTTP ${res.status}` };
+      }
+    }
+    return { ok: res.ok, status: res.status, data };
+  } catch (netErr) {
+    return { ok: false, status: 0, data: { error: netErr.message } };
+  }
+}
+
 // ATLASSIAN JIRA & CONFLUENCE INTEGRATION CONTROLLER
 // =========================================================================
 
@@ -1709,22 +1750,26 @@ async function renderAtlassianSuite(isPushed) {
   `;
 
   try {
-    const [cfgRes, discRes, histRes] = await Promise.all([
-      fetch('/api/atlassian/config')
-        .then((r) => r.json())
-        .catch(() => ({})),
-      fetch('/api/atlassian/discover')
-        .then((r) => r.json())
-        .catch(() => ({ epics: [], stories: [], deliverables: [] })),
-      fetch('/api/atlassian/sync-history')
-        .then((r) => r.json())
-        .catch(() => []),
+    const [cfgResRaw, discResRaw, histResRaw] = await Promise.all([
+      safeFetchJson('/api/atlassian/config'),
+      safeFetchJson('/api/atlassian/discover'),
+      safeFetchJson('/api/atlassian/sync-history'),
     ]);
+
+    let cfgRes = cfgResRaw.ok ? cfgResRaw.data : {};
+    if (!cfgRes || Object.keys(cfgRes).length === 0) {
+      try {
+        const localCfg = localStorage.getItem('__acl_atlassian_config__');
+        if (localCfg) cfgRes = JSON.parse(localCfg);
+      } catch (e) {}
+    }
+    const discRes = discResRaw.ok ? discResRaw.data : { epics: [], stories: [], deliverables: [] };
+    const histRes = histResRaw.ok && Array.isArray(histResRaw.data) ? histResRaw.data : [];
 
     const epicsCount = (discRes.epics || []).length;
     const storiesCount = (discRes.stories || []).length;
     const deliverablesCount = (discRes.deliverables || []).length;
-    const isConnected = Boolean(cfgRes.connected);
+    const isConnected = Boolean(cfgRes.connected && cfgRes.domain && cfgRes.email);
     const isDemo = Boolean(cfgRes.isDemoMode);
 
     let statusBadgeHtml = '';
@@ -1733,7 +1778,7 @@ async function renderAtlassianSuite(isPushed) {
     } else if (isDemo) {
       statusBadgeHtml = `<span class="atlassian-status-badge demo">🟡 Interactive Sandbox Mode</span>`;
     } else {
-      statusBadgeHtml = `<span class="atlassian-status-badge standby">⚪ Standby (Offline)</span>`;
+      statusBadgeHtml = `<span class="atlassian-status-badge standby">⚪ Not Configured</span>`;
     }
 
     mount.innerHTML = `
@@ -1759,15 +1804,15 @@ async function renderAtlassianSuite(isPushed) {
             <span style="font-size: 0.78rem; color: #64748b;">Stored locally in <code>_acl/atlassian-config.json</code></span>
           </div>
 
-          <form id="atlassianConfigForm" onsubmit="saveAtlassianConfig(event)">
+          <form id="atlassianConfigForm" onsubmit="saveAtlassianConfig(event); return false;">
             <div class="atlassian-config-grid">
               <div class="atlassian-input-group">
                 <label>Atlassian Domain URL</label>
-                <input type="text" id="atlDomain" name="domain" value="${cfgRes.domain || 'https://velocityone.atlassian.net'}" placeholder="https://your-domain.atlassian.net" required />
+                <input type="text" id="atlDomain" name="domain" value="${cfgRes.domain || ''}" placeholder="https://your-domain.atlassian.net" required />
               </div>
               <div class="atlassian-input-group">
                 <label>Atlassian Account Email</label>
-                <input type="email" id="atlEmail" name="email" value="${cfgRes.email || 'nkarthick1827@gmail.com'}" placeholder="user@company.com" required />
+                <input type="email" id="atlEmail" name="email" value="${cfgRes.email || ''}" placeholder="user@company.com" required />
               </div>
               <div class="atlassian-input-group">
                 <label>API Token (Atlassian Cloud)</label>
@@ -1778,11 +1823,11 @@ async function renderAtlassianSuite(isPushed) {
               </div>
               <div class="atlassian-input-group">
                 <label>JIRA Project Key</label>
-                <input type="text" id="atlJiraKey" name="jiraProjectKey" value="${cfgRes.jiraProjectKey || 'PROJ'}" placeholder="e.g. FLEET" style="text-transform: uppercase;" required />
+                <input type="text" id="atlJiraKey" name="jiraProjectKey" value="${cfgRes.jiraProjectKey || ''}" placeholder="e.g. PROJ" style="text-transform: uppercase;" required />
               </div>
               <div class="atlassian-input-group">
                 <label>Confluence Space Key</label>
-                <input type="text" id="atlConfSpace" name="confluenceSpaceKey" value="${cfgRes.confluenceSpaceKey || 'DOCS'}" placeholder="e.g. DOCS" style="text-transform: uppercase;" required />
+                <input type="text" id="atlConfSpace" name="confluenceSpaceKey" value="${cfgRes.confluenceSpaceKey || ''}" placeholder="e.g. DOCS" style="text-transform: uppercase;" required />
               </div>
             </div>
 
@@ -1792,6 +1837,7 @@ async function renderAtlassianSuite(isPushed) {
                 <label for="atlDemoMode" style="cursor: pointer; font-size: 0.82rem; text-transform: none; color: #475569;">Use Sandbox Simulation Mode (generates live-preview keys without requiring active API token)</label>
               </div>
               <div style="display: flex; gap: 0.5rem;">
+                ${isConnected || isDemo ? '<button type="button" class="atlassian-toggle-btn" onclick="disconnectAtlassian()" style="color: #ef4444; border-color: #fca5a5;">Disconnect</button>' : ''}
                 <button type="button" class="atlassian-toggle-btn" onclick="toggleAtlassianConfigPanel()">Cancel</button>
                 <button type="button" class="atlassian-btn-sync jira" onclick="saveAtlassianConfig(event)" style="width: auto; padding: 0.45rem 1rem;">Save & Connect</button>
               </div>
@@ -1812,8 +1858,8 @@ async function renderAtlassianSuite(isPushed) {
                   <span>Sprint & Issue Management</span>
                 </div>
               </div>
-              <span class="atlassian-status-badge ${isConnected ? 'connected' : 'standby'}">
-                ${isConnected ? 'Ready to Sync' : 'Standby'}
+              <span class="atlassian-status-badge ${isConnected ? 'connected' : isDemo ? 'demo' : 'standby'}">
+                ${isConnected ? 'Ready to Sync' : isDemo ? 'Sandbox Ready' : '⚪ Not Configured'}
               </span>
             </div>
 
@@ -1844,8 +1890,8 @@ async function renderAtlassianSuite(isPushed) {
                   <span>Living Product & Architecture Pages</span>
                 </div>
               </div>
-              <span class="atlassian-status-badge ${isConnected ? 'connected' : 'standby'}">
-                ${isConnected ? 'Ready to Sync' : 'Standby'}
+              <span class="atlassian-status-badge ${isConnected ? 'connected' : isDemo ? 'demo' : 'standby'}">
+                ${isConnected ? 'Ready to Sync' : isDemo ? 'Sandbox Ready' : '⚪ Not Configured'}
               </span>
             </div>
 
@@ -1915,25 +1961,36 @@ window.togglePasswordVisibility = function (inputId) {
   }
 };
 
-window.safeFetchJson = async function (url, options = {}) {
-  const res = await fetch(url, options);
-  const text = await res.text();
-  let data = {};
+window.disconnectAtlassian = async function () {
+  if (!confirm('Are you sure you want to disconnect Atlassian JIRA & Confluence?')) return;
   try {
-    data = JSON.parse(text || '{}');
-  } catch {
-    throw new Error(
-      `Server returned HTTP ${res.status}: ${text || 'Empty response. Verify that your project dev server port is correct and running.'}`,
-    );
+    localStorage.removeItem('__acl_atlassian_config__');
+    const emptyPayload = {
+      domain: '',
+      email: '',
+      apiToken: '',
+      jiraProjectKey: '',
+      confluenceSpaceKey: '',
+      isDemoMode: false,
+      connected: false,
+    };
+    await safeFetchJson('/api/atlassian/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(emptyPayload),
+    });
+    alert('✅ Atlassian integration disconnected.');
+    renderAtlassianSuite(true);
+  } catch (err) {
+    alert('⚠️ Error disconnecting: ' + err.message);
   }
-  if (!res.ok) {
-    throw new Error(data.error || data.message || `Server returned HTTP ${res.status}`);
-  }
-  return data;
 };
 
 window.saveAtlassianConfig = async function (e) {
-  if (e && e.preventDefault) e.preventDefault();
+  if (e) {
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+  }
   const domain = document.getElementById('atlDomain')?.value?.trim();
   const email = document.getElementById('atlEmail')?.value?.trim();
   const apiToken = document.getElementById('atlToken')?.value?.trim();
@@ -1941,33 +1998,58 @@ window.saveAtlassianConfig = async function (e) {
   const confluenceSpaceKey = document.getElementById('atlConfSpace')?.value?.trim()?.toUpperCase();
   const isDemoMode = Boolean(document.getElementById('atlDemoMode')?.checked);
 
+  if (!isDemoMode && (!domain || !email || !apiToken || !jiraProjectKey || !confluenceSpaceKey)) {
+    alert(
+      '⚠️ Please fill in all required fields (Domain, Email, API Token, JIRA Key, Confluence Space Key) or enable Sandbox Simulation Mode.',
+    );
+    return;
+  }
+
+  const payload = {
+    domain: domain || '',
+    email: email || '',
+    apiToken: apiToken || '',
+    jiraProjectKey: jiraProjectKey || '',
+    confluenceSpaceKey: confluenceSpaceKey || '',
+    isDemoMode,
+    connected: true,
+  };
+
+  const saveBtn = document.querySelector('#atlassianConfigForm button[type="submit"]') || (e && e.target);
+  const origBtnText = saveBtn ? saveBtn.textContent : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Verifying...';
+  }
+
   try {
-    const data = await window.safeFetchJson('/api/atlassian/config', {
+    const res = await safeFetchJson('/api/atlassian/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        domain,
-        email,
-        apiToken,
-        jiraProjectKey,
-        confluenceSpaceKey,
-        isDemoMode,
-        connected: true,
-      }),
+      body: JSON.stringify(payload),
     });
-    if (data.success) {
-      alert('✅ Atlassian credentials and workspace keys saved successfully!');
+
+    if (res.ok && res.data && (res.data.success || res.data.config)) {
+      try {
+        localStorage.setItem('__acl_atlassian_config__', JSON.stringify(payload));
+      } catch (e) {}
+      alert('✅ Atlassian credentials verified and workspace keys saved successfully!');
       renderAtlassianSuite(true);
     } else {
-      alert('⚠️ Error saving configuration: ' + (data.error || 'Unknown error'));
+      const errMsg = (res.data && res.data.error) || (res.data && res.data.message) || 'Server returned HTTP ' + res.status;
+      alert('⚠️ Error saving configuration: ' + errMsg);
     }
   } catch (err) {
     alert('⚠️ Failed to save Atlassian configuration: ' + err.message);
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = origBtnText;
+    }
   }
 };
 
 window.executeJiraSync = async function () {
-  // Auto-save any active dirty editor changes before pushing to JIRA
   if (typeof window.saveCurrentFile === 'function') {
     try {
       await window.saveCurrentFile();
@@ -1982,12 +2064,13 @@ window.executeJiraSync = async function () {
   }
 
   try {
-    const result = await window.safeFetchJson('/api/atlassian/sync-jira', {
+    const res = await safeFetchJson('/api/atlassian/sync-jira', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    if (result.success) {
+    const result = res.data;
+    if (res.ok && result.success) {
       displaySyncResultBanner(
         `🎯 Successfully synced ${result.totalEpics} Epics and ${result.totalStories} Stories to JIRA (${result.projectKey})!`,
         'jira',
@@ -2015,12 +2098,13 @@ window.executeJiraPull = async function () {
   }
 
   try {
-    const result = await window.safeFetchJson('/api/atlassian/pull-jira', {
+    const res = await safeFetchJson('/api/atlassian/pull-jira', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    if (result.success) {
+    const result = res.data;
+    if (res.ok && result.success) {
       let bannerMsg = '';
       if (result.updatedCount === 0 && result.createdCount === 0) {
         bannerMsg =
@@ -2041,7 +2125,12 @@ window.executeJiraPull = async function () {
       }
       displaySyncResultBanner(bannerMsg, 'jira');
       renderAtlassianSuite(true);
-      if (typeof window.refreshTree === 'function') window.refreshTree();
+      if (typeof window.syncFromLiveDisk === 'function') {
+        await window.syncFromLiveDisk(false);
+      }
+      if (typeof loadFile === 'function' && typeof activeFileId !== 'undefined' && activeFileId) {
+        loadFile(activeFileId);
+      }
     } else {
       alert('⚠️ JIRA Pull error: ' + (result.error || 'Failed to pull from JIRA'));
     }
@@ -2056,7 +2145,6 @@ window.executeJiraPull = async function () {
 };
 
 window.executeConfluenceSync = async function () {
-  // Auto-save any active dirty editor changes before pushing to Confluence
   if (typeof window.saveCurrentFile === 'function') {
     try {
       await window.saveCurrentFile();
@@ -2071,12 +2159,13 @@ window.executeConfluenceSync = async function () {
   }
 
   try {
-    const result = await window.safeFetchJson('/api/atlassian/sync-confluence', {
+    const res = await safeFetchJson('/api/atlassian/sync-confluence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    if (result.success) {
+    const result = res.data;
+    if (res.ok && result.success) {
       const detailMsg =
         result.updatedCount !== undefined
           ? `(${result.updatedCount} updated in-place, ${result.createdCount} published - no duplicates!)`
@@ -2108,12 +2197,13 @@ window.executeConfluencePull = async function () {
   }
 
   try {
-    const result = await window.safeFetchJson('/api/atlassian/pull-confluence', {
+    const res = await safeFetchJson('/api/atlassian/pull-confluence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    if (result.success) {
+    const result = res.data;
+    if (res.ok && result.success) {
       let bannerMsg = '';
       if (result.updatedCount === 0 && result.createdCount === 0) {
         bannerMsg =
@@ -2134,7 +2224,12 @@ window.executeConfluencePull = async function () {
       }
       displaySyncResultBanner(bannerMsg, 'confluence');
       renderAtlassianSuite(true);
-      if (typeof window.refreshTree === 'function') window.refreshTree();
+      if (typeof window.syncFromLiveDisk === 'function') {
+        await window.syncFromLiveDisk(false);
+      }
+      if (typeof loadFile === 'function' && typeof activeFileId !== 'undefined' && activeFileId) {
+        loadFile(activeFileId);
+      }
     } else {
       alert('⚠️ Confluence Pull error: ' + (result.error || 'Failed to pull from Confluence'));
     }
@@ -2156,9 +2251,11 @@ window.executeSyncAll = async function () {
   }
 
   try {
-    await window.executeJiraSync();
-    await window.executeConfluenceSync();
-    displaySyncResultBanner('⚡ Full enterprise synchronization completed across JIRA & Confluence!', 'all');
+    await executeJiraSync();
+    await executeConfluenceSync();
+    displaySyncResultBanner('⚡ Full Enterprise Synchronization Pass Completed!', 'jira');
+  } catch (err) {
+    alert('⚠️ Error during batch sync: ' + err.message);
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -2169,28 +2266,29 @@ window.executeSyncAll = async function () {
 
 function displaySyncResultBanner(msg, type) {
   const container = document.getElementById('atlassianSyncResultContainer');
-  if (container) {
-    container.style.display = 'block';
-    const alertDiv = document.createElement('div');
-    alertDiv.style.cssText =
-      'padding: 0.65rem 1rem; background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; border-radius: 6px; font-size: 0.84rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;';
-    alertDiv.innerHTML = `<span>${msg}</span><button onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; font-weight:bold; color:#065f46;">×</button>`;
-    container.prepend(alertDiv);
+  if (container) container.style.display = 'block';
+  const logBox = document.getElementById('atlassianLogBox');
+  if (logBox) {
+    const banner = document.createElement('div');
+    banner.style.cssText =
+      'background: #f0fdf4; border: 1px solid #86efac; color: #166534; padding: 0.6rem 0.85rem; border-radius: 6px; margin-bottom: 0.5rem; font-size: 0.82rem; font-weight: 500;';
+    banner.textContent = msg;
+    logBox.prepend(banner);
   }
 }
 
 function renderSyncHistoryItems(history) {
   if (!history || history.length === 0) {
-    return `<div style="text-align: center; padding: 1.5rem; color: #94a3b8; font-size: 0.8rem;">No synchronization runs yet. Click "Sync" above to publish your first deliverables.</div>`;
+    return '<div style="text-align: center; color: #94a3b8; padding: 1.5rem;">No synchronization runs recorded yet. Click Sync to push deliverables.</div>';
   }
-
   return history
     .slice(0, 10)
     .map(
       (item) => `
-    <div class="atlassian-log-row">
-      <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 140px;">
-        <span class="atlassian-log-key">${item.action && item.action.includes('JIRA') ? '🎯 JIRA' : '📘 Confluence'}</span>
+    <div class="atlassian-log-item">
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <span class="atlassian-log-icon">${item.action && item.action.includes('JIRA') ? '🎯' : '📘'}</span>
+        <strong style="color: #1e293b;">${item.action || 'Sync Pass'}</strong>
         <span style="font-size: 0.74rem; color: #64748b;">${new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
       </div>
       <div class="atlassian-log-title" title="${item.summary || ''}">

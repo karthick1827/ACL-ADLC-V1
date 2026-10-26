@@ -327,4 +327,7 @@ async function onStatusChange(newStatus) {
 if (typeof window !== 'undefined') {
   window.saveCurrentFile = saveCurrentFile;
   window.syncFromLiveDisk = syncFromLiveDisk;
+  window.refreshTree = async function (quiet = false) {
+    return await syncFromLiveDisk(quiet);
+  };
 }

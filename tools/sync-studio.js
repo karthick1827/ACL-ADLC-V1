@@ -24,10 +24,7 @@ const isWatch = args.includes('--watch') || args.includes('-w');
 const isServe = args.includes('--serve') || args.includes('-s');
 const customTarget = args.find((arg) => !arg.startsWith('-'));
 
-const DEFAULT_TARGETS = [
-  'C:\\Users\\ashwin.premnath\\Documents\\my-react-app',
-  'C:\\Users\\ashwin.premnath\\Desktop\\Project\\Check-ACL-ADLC\\vite-project',
-];
+const DEFAULT_TARGETS = [];
 
 const targetProjects = customTarget
   ? [customTarget]
@@ -113,6 +110,31 @@ function replicateToTarget(targetProject) {
   if (fs.existsSync(srcAtlassian) && copyFileSafe(srcAtlassian, targetAtlassian)) {
     console.log(`  ✓ Replicated: tools/atlassian-service.mjs`);
     count++;
+  }
+
+  // 5. Update vite.config with latest vite-plugin-template if applicable
+  const viteConfigFiles = ['vite.config.js', 'vite.config.ts', 'vite.config.mjs', 'vite.config.cjs'];
+  for (const configFile of viteConfigFiles) {
+    const configPath = path.join(targetProject, configFile);
+    if (fs.existsSync(configPath)) {
+      const templatePath = path.join(REPO_ROOT, 'tools', 'installer', 'templates', 'vite-plugin-template.js');
+      if (fs.existsSync(templatePath)) {
+        try {
+          const pluginCode = fs.readFileSync(templatePath, 'utf8');
+          let content = fs.readFileSync(configPath, 'utf8');
+          const pluginRegex =
+            /(?:\/\/[^\r\n]*\r?\n)*function aclMarkdownSaverPlugin\s*\(\)\s*\{[\s\S]*?\n\s*\}\s*;\s*\r?\n\s*\}|function aclMarkdownSaverPlugin\s*\(\)\s*\{[\s\S]*?\n\s*\}/;
+          if (content.includes('aclMarkdownSaverPlugin')) {
+            content = content.replace(pluginRegex, pluginCode.trim());
+            fs.writeFileSync(configPath, content, 'utf8');
+            console.log(`  ✓ Updated: ${configFile} with latest aclMarkdownSaverPlugin`);
+            count++;
+          }
+        } catch (e) {
+          console.error(`  ⚠️ Could not update ${configFile}:`, e.message);
+        }
+      }
+    }
   }
 
   console.log(`\n✅ Replication Complete for ${path.basename(targetProject)}! (${count} files synchronized)\n`);
