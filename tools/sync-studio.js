@@ -104,12 +104,14 @@ function replicateToTarget(targetProject) {
     }
   }
 
-  // 4. Replicate tools/atlassian-service.mjs
-  const srcAtlassian = path.join(REPO_ROOT, 'tools', 'atlassian-service.mjs');
-  const targetAtlassian = path.join(targetProject, 'tools', 'atlassian-service.mjs');
-  if (fs.existsSync(srcAtlassian) && copyFileSafe(srcAtlassian, targetAtlassian)) {
-    console.log(`  ✓ Replicated: tools/atlassian-service.mjs`);
-    count++;
+  // 4. Replicate tools/atlassian-service.mjs and tools/git-details-service.mjs
+  for (const serviceFile of ['atlassian-service.mjs', 'git-details-service.mjs']) {
+    const srcService = path.join(REPO_ROOT, 'tools', serviceFile);
+    const targetService = path.join(targetProject, 'tools', serviceFile);
+    if (fs.existsSync(srcService) && copyFileSafe(srcService, targetService)) {
+      console.log(`  ✓ Replicated: tools/${serviceFile}`);
+      count++;
+    }
   }
 
   // 5. Update vite.config with latest vite-plugin-template if applicable

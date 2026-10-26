@@ -1413,6 +1413,16 @@ function renderDeveloperDashboard() {
 // ===================================================
 // User Control Centre (Git Identity & Permissions Dashboard)
 // ===================================================
+// Git names, emails and commit messages are user-controlled, so escape before inserting as HTML.
+function gitEsc(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function updateNavUserControlCentre(data) {
   const isConnected = Boolean(data && data.repoConnected === true && !data.repoDeleted);
   const hasUser = Boolean(isConnected && data.userDetails && (data.userDetails.fullName || data.userDetails.username));
@@ -1421,53 +1431,96 @@ function updateNavUserControlCentre(data) {
   const railIcon = document.getElementById('railGitIcon');
 
   const ownerName = hasUser ? data.userDetails.fullName || data.userDetails.username : isConnected ? 'Developer' : 'No Repo Connected';
-  const avatarUrl = hasUser ? data.userDetails.avatarUrl : null;
+  const avatarUrl = hasUser && data.userDetails.avatarUrl ? gitEsc(data.userDetails.avatarUrl) : null;
 
   if (navTitle) {
     navTitle.textContent = ownerName;
   }
   if (navIcon) {
     if (avatarUrl) {
-      navIcon.innerHTML = `<img src="${avatarUrl}" alt="${ownerName}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
+      navIcon.innerHTML = `<img src="${avatarUrl}" alt="${gitEsc(ownerName)}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
     } else {
       navIcon.innerHTML = `<span style="font-size: 1.15rem;">${isConnected ? '🐙' : '👤'}</span>`;
     }
   }
   if (railIcon) {
     if (avatarUrl) {
-      railIcon.innerHTML = `<img src="${avatarUrl}" alt="${ownerName}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
+      railIcon.innerHTML = `<img src="${avatarUrl}" alt="${gitEsc(ownerName)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
     } else {
       railIcon.innerHTML = `<span style="font-size: 1.15rem;">${isConnected ? '🐙' : '👤'}</span>`;
     }
   }
 }
 
-async function renderGitDashboard() {
+let gitDetailsSignature = '';
+let gitDetailsPollTimer = null;
+
+async function fetchGitDetails(refresh = false) {
+  try {
+    const res = await fetch('/api/git-details?t=' + Date.now() + (refresh ? '&refresh=1' : ''));
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    // Studio server not reachable
+  }
+  return null;
+}
+
+function gitDetailsKey(data) {
+  const { checkedAt, ...rest } = data || {};
+  return JSON.stringify(rest);
+}
+
+function disconnectedGitMessage(data) {
+  switch (data.repoState) {
+    case 'no-git': {
+      return 'Git is not installed or not available to the Studio server.';
+    }
+    case 'no-repo': {
+      return 'This project is not a Git repository yet. Run <code>git init</code>, add a remote and push. This page updates automatically.';
+    }
+    case 'no-remote': {
+      return (
+        'Local Git repository found' +
+        (data.branch ? ' (branch <code>' + gitEsc(data.branch) + '</code>)' : '') +
+        ', but no remote is configured. Run <code>git remote add origin &lt;url&gt;</code> and push. This page updates automatically.'
+      );
+    }
+    default: {
+      return gitEsc(data.message || 'No remote repository has been linked to this project.');
+    }
+  }
+}
+
+/**
+ * Renders the User Control Centre.
+ * @param {{ refresh?: boolean, data?: object }} [options] refresh bypasses the server's caches;
+ *   data renders an already-fetched payload without showing the loading state.
+ */
+async function renderGitDashboard(options = {}) {
   const container = document.getElementById('dashboardContainerRoot');
   if (!container) return;
 
-  container.innerHTML = `
+  if (!options.data) {
+    container.innerHTML = `
     <div style="text-align: center; padding: 3rem 0; color: #64748b;">
       <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">👤 Loading User Control Centre...</div>
-      <div style="font-size: 0.85rem;">Checking GitHub connection and repository records...</div>
+      <div style="font-size: 0.85rem;">Checking the Git repository and remote...</div>
     </div>
   `;
+  }
 
   try {
-    let data = null;
-    try {
-      const res = await fetch('/api/git-details?t=' + Date.now());
-      if (res.ok) {
-        data = await res.json();
-      }
-    } catch (e) {
-      data = null;
-    }
+    let data = options.data || (await fetchGitDetails(Boolean(options.refresh)));
     if (!data) {
       data = { isPushed: false, repoConnected: false, userDetails: {}, projectDetails: {}, gitDetails: {} };
     }
+    gitDetailsSignature = gitDetailsKey(data);
+    scheduleGitDetailsPoll(data);
     const isConnected = Boolean(data && data.repoConnected === true && !data.repoDeleted);
     const isPushed = Boolean(data && data.isPushed);
+    const providerName = (data.provider && data.provider.name) || 'Git';
 
     // Update navbar identity
     updateNavUserControlCentre(data);
@@ -1493,19 +1546,32 @@ async function renderGitDashboard() {
     const has2FA = isConnected && Boolean(git.twoFactorStatus);
     const hasLastActivity = isConnected && Boolean(git.lastActivity);
 
+    let syncText;
+    if (data.remoteStatus === 'auth-required') {
+      syncText = 'Remote found, but the Git credentials on this machine cannot read it. Showing local details.';
+    } else if (data.remoteStatus === 'unreachable') {
+      syncText = 'Remote could not be reached (offline?). Showing local details.';
+    } else if (isPushed) {
+      syncText = 'All commits pushed and in sync with the remote.';
+    } else if (data.unpushedCount > 0) {
+      syncText = gitEsc(data.unpushedCount) + ' local commit(s) pending push.';
+    } else {
+      syncText = 'Repository linked. Local commits pending push to remote.';
+    }
+
     const bannerHtml = isConnected
       ? `
         <div class="git-status-banner pushed" style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 1rem 1.25rem; border-radius: 8px;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
             <div>
-              <strong style="font-size: 0.95rem;">🟢 Connected to GitHub</strong> &nbsp;—&nbsp;
-              <span>Remote: <code style="font-size: 0.82rem; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${data.remoteOrigin || 'origin'}</code></span>
+              <strong style="font-size: 0.95rem;">🟢 Connected to ${gitEsc(providerName)}</strong> &nbsp;—&nbsp;
+              <span>Remote: <code style="font-size: 0.82rem; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${gitEsc(data.remoteOrigin || 'origin')}</code></span>
               <div style="font-size: 0.82rem; margin-top: 0.25rem; color: #15803d;">
-                ${isPushed ? 'All commits pushed and in sync with GitHub.' : 'Repository linked. Local commits pending push to remote.'}
+                ${syncText}
               </div>
             </div>
-            <button type="button" class="git-toggle-btn" onclick="renderGitDashboard()" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; cursor: pointer; border-radius: 4px; border: 1px solid #86efac; background: #fff; color: #166534;">
-              🔄 Refresh GitHub
+            <button type="button" class="git-toggle-btn" onclick="renderGitDashboard({ refresh: true })" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; cursor: pointer; border-radius: 4px; border: 1px solid #86efac; background: #fff; color: #166534;">
+              🔄 Refresh ${gitEsc(providerName)}
             </button>
           </div>
         </div>
@@ -1516,16 +1582,10 @@ async function renderGitDashboard() {
             <div>
               <strong style="font-size: 0.95rem;">⚠️ No Repository Connected to GitHub</strong>
               <div style="font-size: 0.82rem; margin-top: 0.25rem; color: #b91c1c;">
-                ${
-                  data.repoDeleted
-                    ? 'The remote repository (' + (data.remoteOrigin || 'origin') + ') was deleted or does not exist on GitHub.'
-                    : data.remoteOrigin
-                      ? 'Remote ' + data.remoteOrigin + ' not reachable on GitHub. Please verify repository or token.'
-                      : 'No remote repository has been linked to this project.'
-                }
+                ${disconnectedGitMessage(data)}
               </div>
             </div>
-            <button type="button" class="git-toggle-btn" onclick="renderGitDashboard()" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; cursor: pointer; border-radius: 4px; border: 1px solid #fca5a5; background: #fff; color: #991b1b;">
+            <button type="button" class="git-toggle-btn" onclick="renderGitDashboard({ refresh: true })" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; cursor: pointer; border-radius: 4px; border: 1px solid #fca5a5; background: #fff; color: #991b1b;">
               🔄 Refresh Status
             </button>
           </div>
@@ -1533,14 +1593,15 @@ async function renderGitDashboard() {
       `;
 
     const avatarHtml = hasAvatar
-      ? `<img src="${user.avatarUrl}" alt="${user.fullName || user.username || 'User Avatar'}" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'git-profile-avatar-placeholder\'>👤</span>';" />`
+      ? `<img src="${gitEsc(user.avatarUrl)}" alt="${gitEsc(user.fullName || user.username || 'User Avatar')}" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'git-profile-avatar-placeholder\'>👤</span>';" />`
       : `<span class="git-profile-avatar-placeholder">👤</span>`;
 
     const linkedReposHtml = hasLinkedRepos
       ? project.linkedRepositories
-          .map(
-            (r) =>
-              `<div style="margin-bottom: 0.25rem;"><a href="${r}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-family: monospace; font-size: 0.86rem;">${r}</a></div>`,
+          .map((r) =>
+            /^https?:\/\//i.test(r)
+              ? `<div style="margin-bottom: 0.25rem;"><a href="${gitEsc(r)}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-family: monospace; font-size: 0.86rem;">${gitEsc(r)}</a></div>`
+              : `<div style="margin-bottom: 0.25rem; font-family: monospace; font-size: 0.86rem;">${gitEsc(r)}</div>`,
           )
           .join('')
       : '<span class="empty">—</span>';
@@ -1552,11 +1613,11 @@ async function renderGitDashboard() {
           <div class="dashboard-header-top">
             <div class="dashboard-title-group">
               <h2><span>👤</span> User Control Centre</h2>
-              <p>Git identity, project assignment, and repository permissions imported from GitHub / GitLab.</p>
+              <p>Git identity, project assignment, and repository permissions read from this project's Git repository.</p>
             </div>
             <div>
               <span class="project-type-badge ${isConnected ? 'badge-greenfield' : 'badge-brownfield'}" style="${!isConnected ? 'background: #fef2f2; color: #991b1b; border-color: #fecaca;' : ''}">
-                ${isConnected ? '🟢 GitHub Linked' : '⚪ No Repo Connected'}
+                ${isConnected ? '🟢 ' + gitEsc(providerName) + ' Linked' : '⚪ No Repo Connected'}
               </span>
             </div>
           </div>
@@ -1570,13 +1631,13 @@ async function renderGitDashboard() {
           </div>
           <div class="git-profile-info">
             <div class="git-profile-info-top">
-              <span class="git-profile-name">${hasFullName ? user.fullName : '<span class="empty">—</span>'}</span>
-              <span class="git-profile-login">${hasUsername ? '@' + user.username : '<span class="empty">@—</span>'}</span>
-              ${hasOrgRole ? `<span class="git-role-badge">🛡️ Org Role: ${user.orgRole}</span>` : '<span class="git-role-badge" style="background:#f1f5f9; color:#94a3b8; border-color:#e2e8f0;">🛡️ Org Role: —</span>'}
+              <span class="git-profile-name">${hasFullName ? gitEsc(user.fullName) : '<span class="empty">—</span>'}</span>
+              <span class="git-profile-login">${hasUsername ? '@' + gitEsc(user.username) : '<span class="empty">@—</span>'}</span>
+              ${hasOrgRole ? `<span class="git-role-badge">🛡️ Org Role: ${gitEsc(user.orgRole)}</span>` : '<span class="git-role-badge" style="background:#f1f5f9; color:#94a3b8; border-color:#e2e8f0;">🛡️ Org Role: —</span>'}
             </div>
             <div class="git-profile-sub">
-              <span>📧 <strong>Email:</strong> ${hasEmail ? user.email : '<span class="empty">—</span>'}</span>
-              <span>🔒 <strong>Access Level:</strong> ${hasOrgRole ? user.orgRole : '<span class="empty">—</span>'}</span>
+              <span>📧 <strong>Email:</strong> ${hasEmail ? gitEsc(user.email) : '<span class="empty">—</span>'}</span>
+              <span>🔒 <strong>Access Level:</strong> ${hasPermission ? gitEsc(git.permissionLevel) : '<span class="empty">—</span>'}</span>
             </div>
             <div class="git-integrations-bar">
               <span>Linked Workspaces:</span>
@@ -1603,14 +1664,14 @@ async function renderGitDashboard() {
               <!-- Field: Project Name -->
               <div class="git-field-row">
                 <div class="git-field-label">Project Name</div>
-                <div class="git-field-value ${hasProjectName ? '' : 'empty'}">${hasProjectName ? project.projectName : '—'}</div>
+                <div class="git-field-value ${hasProjectName ? '' : 'empty'}">${hasProjectName ? gitEsc(project.projectName) : '—'}</div>
               </div>
 
               <!-- Field: User's Role in Project -->
               <div class="git-field-row">
                 <div class="git-field-label">User's Role in Project</div>
                 <div class="git-field-value ${hasUserRole ? '' : 'empty'}">
-                  ${hasUserRole ? `👤 ${project.userRole}` : '—'}
+                  ${hasUserRole ? `👤 ${gitEsc(project.userRole)}` : '—'}
                 </div>
               </div>
 
@@ -1618,7 +1679,7 @@ async function renderGitDashboard() {
               <div class="git-field-row">
                 <div class="git-field-label">Project Status</div>
                 <div class="git-field-value ${hasProjectStatus ? '' : 'empty'}">
-                  ${hasProjectStatus ? `${isConnected ? '🟢' : '⚪'} ${project.projectStatus}` : '—'}
+                  ${hasProjectStatus ? `${isConnected ? '🟢' : '⚪'} ${gitEsc(project.projectStatus)}` : '—'}
                 </div>
               </div>
 
@@ -1633,7 +1694,7 @@ async function renderGitDashboard() {
               <!-- Field: Assigned Date -->
               <div class="git-field-row">
                 <div class="git-field-label">Assigned Date</div>
-                <div class="git-field-value ${hasAssignedDate ? '' : 'empty'}">${hasAssignedDate ? project.assignedDate : '—'}</div>
+                <div class="git-field-value ${hasAssignedDate ? '' : 'empty'}">${hasAssignedDate ? gitEsc(project.assignedDate) : '—'}</div>
               </div>
             </div>
           </div>
@@ -1652,7 +1713,7 @@ async function renderGitDashboard() {
               <div class="git-field-row">
                 <div class="git-field-label">Permission Level</div>
                 <div class="git-field-value ${hasPermission ? '' : 'empty'}">
-                  ${hasPermission ? `👑 ${git.permissionLevel}` : '—'}
+                  ${hasPermission ? `👑 ${gitEsc(git.permissionLevel)}` : '—'}
                 </div>
               </div>
 
@@ -1660,7 +1721,7 @@ async function renderGitDashboard() {
               <div class="git-field-row">
                 <div class="git-field-label">Organization Teams / Department</div>
                 <div class="git-field-value ${hasTeams ? '' : 'empty'}">
-                  ${hasTeams ? git.teams.map((t) => `<span style="background: #e2e8f0; padding: 2px 7px; border-radius: 4px; font-size: 0.8rem; margin-right: 4px;">👥 ${t}</span>`).join(' ') : '—'}
+                  ${hasTeams ? git.teams.map((t) => `<span style="background: #e2e8f0; padding: 2px 7px; border-radius: 4px; font-size: 0.8rem; margin-right: 4px;">👥 ${gitEsc(t)}</span>`).join(' ') : '—'}
                 </div>
               </div>
 
@@ -1668,7 +1729,7 @@ async function renderGitDashboard() {
               <div class="git-field-row">
                 <div class="git-field-label">2FA Status (Security Compliance)</div>
                 <div class="git-field-value ${has2FA ? '' : 'empty'}">
-                  ${has2FA ? `🔒 ${git.twoFactorStatus}` : '—'}
+                  ${has2FA ? `🔒 ${gitEsc(git.twoFactorStatus)}` : '—'}
                 </div>
               </div>
 
@@ -1676,7 +1737,7 @@ async function renderGitDashboard() {
               <div class="git-field-row">
                 <div class="git-field-label">Last Activity (Recent Push / Commit / PR)</div>
                 <div class="git-field-value ${hasLastActivity ? '' : 'empty'}" style="font-family: monospace; font-size: 0.82rem;">
-                  ${hasLastActivity ? `🕒 ${git.lastActivity}` : '—'}
+                  ${hasLastActivity ? `🕒 ${gitEsc(git.lastActivity)}` : '—'}
                 </div>
               </div>
             </div>
@@ -1701,18 +1762,53 @@ async function renderGitDashboard() {
       <div style="padding: 2rem; background: #fee2e2; color: #991b1b; border-radius: 8px;">
         <h3>Error loading User Control Centre details</h3>
         <p>${err.message}</p>
-        <button class="git-toggle-btn" onclick="renderGitDashboard()">Retry</button>
+        <button class="git-toggle-btn" onclick="renderGitDashboard({ refresh: true })">Retry</button>
       </div>
     `;
   }
 }
 
-// Auto-check GitHub link on page load to update navbar
+// Auto-sync: poll quickly until the repo is connected and pushed, then slowly.
+// The page re-renders only when the details change, e.g. after `git init`, `git remote add` or `git push`.
+const GIT_POLL_PENDING_MS = 10000;
+const GIT_POLL_SYNCED_MS = 60000;
+
+function scheduleGitDetailsPoll(data) {
+  clearTimeout(gitDetailsPollTimer);
+  const synced = Boolean(data && data.repoConnected && data.isPushed);
+  const delay = document.hidden || synced ? GIT_POLL_SYNCED_MS : GIT_POLL_PENDING_MS;
+  gitDetailsPollTimer = setTimeout(pollGitDetails, delay);
+}
+
+let gitDetailsPollInFlight = false;
+
+async function pollGitDetails() {
+  if (gitDetailsPollInFlight) return;
+  gitDetailsPollInFlight = true;
+  try {
+    const data = await fetchGitDetails();
+    if (data) {
+      updateNavUserControlCentre(data);
+      const isGitViewOpen = typeof activeAppView !== 'undefined' && activeAppView === 'dashboard-git';
+      if (isGitViewOpen && gitDetailsKey(data) !== gitDetailsSignature) {
+        // renderGitDashboard records the new signature and reschedules the poll
+        renderGitDashboard({ data });
+        return;
+      }
+    }
+    scheduleGitDetailsPoll(data);
+  } finally {
+    gitDetailsPollInFlight = false;
+  }
+}
+
 if (typeof window !== 'undefined') {
-  fetch('/api/git-details')
-    .then((r) => r.json())
-    .then((d) => updateNavUserControlCentre(d))
-    .catch(() => updateNavUserControlCentre(null));
+  pollGitDetails();
+  // Check right away when the user comes back from the terminal or Git client.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) pollGitDetails();
+  });
+  window.addEventListener('focus', () => pollGitDetails());
 }
 
 // Safe JSON Fetch Helper (Resilient against HTML error pages or empty response bodies)

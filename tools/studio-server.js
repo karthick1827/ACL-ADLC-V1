@@ -1355,159 +1355,15 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/api/git-details' && req.method === 'GET') {
     try {
-      const { execFileSync } = require('node:child_process');
-      const simulateUnpushed = url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true';
-
-      const localAppData =
-        process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : '');
-      const gitUserPath = localAppData ? path.join(localAppData, 'Programs', 'Git', 'cmd') : '';
-      const env = {
-        ...process.env,
-        PATH: [process.env.PATH || '', gitUserPath, 'C:\\Program Files\\Git\\cmd'].filter(Boolean).join(';'),
-      };
-
-      if (simulateUnpushed) {
+      if (url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
-            isPushed: false,
-            simulated: true,
-            message: 'Repository simulated as not pushed to GitHub',
-            userDetails: null,
-            projectDetails: null,
-            gitDetails: null,
-          }),
-        );
-        return;
-      }
-
-      let remoteOrigin = '';
-      try {
-        remoteOrigin = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim();
-      } catch {
-        remoteOrigin = '';
-      }
-
-      const isGitHub = /github\.com/i.test(remoteOrigin) || /gitlab\.com/i.test(remoteOrigin);
-
-      let repoOwner = '';
-      let repoName = '';
-      const match = remoteOrigin.match(/[:/]([^/:]+)\/([^/:]+?)(?:\.git)?$/);
-      if (match) {
-        repoOwner = match[1];
-        repoName = match[2];
-      }
-
-      let isPushed = false;
-      let liveRemoteExists = false;
-      let repoDeleted = false;
-      if (remoteOrigin) {
-        try {
-          const lsOut = execFileSync('git', ['ls-remote', '--exit-code', 'origin', 'HEAD'], {
-            cwd: PROJECT_ROOT,
-            env,
-            encoding: 'utf8',
-            timeout: 6000,
-            stdio: ['ignore', 'pipe', 'pipe'],
-          }).trim();
-          if (lsOut && lsOut.length > 0) {
-            liveRemoteExists = true;
-          }
-        } catch (err) {
-          const errText = (
-            (err.stderr ? err.stderr.toString() : '') +
-            ' ' +
-            (err.stdout ? err.stdout.toString() : '') +
-            ' ' +
-            (err.message || '')
-          ).toLowerCase();
-          if (errText.includes('not found') || errText.includes('does not exist') || errText.includes('fatal: repository')) {
-            repoDeleted = true;
-          }
-        }
-
-        try {
-          const unpushedCommits = execFileSync('git', ['log', '@{u}..HEAD', '--oneline'], {
-            cwd: PROJECT_ROOT,
-            env,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'ignore'],
-          }).trim();
-          isPushed = unpushedCommits.length === 0;
-        } catch {
-          try {
-            const localCommits = execFileSync('git', ['log', '-1', '--oneline'], {
-              cwd: PROJECT_ROOT,
-              env,
-              encoding: 'utf8',
-              stdio: ['ignore', 'pipe', 'ignore'],
-            }).trim();
-            isPushed = Boolean(localCommits);
-          } catch {
-            isPushed = true;
-          }
-        }
-      }
-
-      let gitUserName = '';
-      let gitUserEmail = '';
-      let lastActivityDate = new Date().toISOString();
-      let lastCommitMsg = 'Latest commit';
-      try {
-        gitUserName =
-          execFileSync('git', ['log', '-1', '--format=%an'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim() || gitUserName;
-        gitUserEmail =
-          execFileSync('git', ['log', '-1', '--format=%ae'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim() || gitUserEmail;
-        lastActivityDate =
-          execFileSync('git', ['log', '-1', '--format=%cd'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim() || lastActivityDate;
-        lastCommitMsg =
-          execFileSync('git', ['log', '-1', '--format=%s'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim() || lastCommitMsg;
-      } catch {
-        /* ignore */
-      }
-
-      let ghUserData = null;
-      let ghRepoData = null;
-      if (repoOwner && !repoDeleted) {
-        try {
-          const repoRes = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}`, {
-            headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
-          });
-          if (repoRes.status === 404) {
-            repoDeleted = true;
-          } else if (repoRes.ok) {
-            ghRepoData = await repoRes.json();
-            liveRemoteExists = true;
-          }
-        } catch {
-          /* ignore */
-        }
-
-        if (!repoDeleted) {
-          try {
-            const userRes = await fetch(`https://api.github.com/users/${repoOwner}`, {
-              headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
-            });
-            if (userRes.ok) {
-              ghUserData = await userRes.json();
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-
-      if (!remoteOrigin || repoDeleted) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
+            repoState: 'no-remote',
             isPushed: false,
             repoConnected: false,
-            repoDeleted: Boolean(repoDeleted),
-            remoteOrigin: remoteOrigin || null,
-            message: repoDeleted
-              ? `The remote repository (${remoteOrigin || 'origin'}) was deleted or does not exist on GitHub.`
-              : 'No remote repository has been linked to this project.',
+            simulated: true,
+            message: 'Repository simulated as not pushed',
             userDetails: null,
             projectDetails: null,
             gitDetails: null,
@@ -1516,38 +1372,23 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const responsePayload = {
-        isPushed: Boolean(isPushed),
-        repoConnected: true,
-        repoDeleted: false,
-        remoteOrigin,
-        userDetails: {
-          username: (ghUserData && ghUserData.login) || repoOwner || gitUserName,
-          fullName: (ghUserData && ghUserData.name) || gitUserName,
-          email: gitUserEmail || (ghUserData && ghUserData.email) || '',
-          avatarUrl: (ghUserData && ghUserData.avatar_url) || null,
-          orgRole: 'Admin',
-        },
-        projectDetails: {
-          projectName: repoName || path.basename(PROJECT_ROOT),
-          userRole: 'Lead Developer',
-          projectStatus: 'Active',
-          linkedRepositories: [remoteOrigin],
-          assignedDate: '2026-03-24',
-        },
-        gitDetails: {
-          permissionLevel: 'Admin / Maintainer',
-          teams: ['Core Engineering', 'Product Delivery'],
-          twoFactorStatus: 'Enabled',
-          lastActivity: `${lastActivityDate} (${lastCommitMsg})`,
-        },
-      };
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(responsePayload));
+      const { pathToFileURL } = require('node:url');
+      const candidatePaths = [
+        path.resolve(__dirname, 'git-details-service.mjs'),
+        path.resolve(PROJECT_ROOT, 'tools', 'git-details-service.mjs'),
+      ];
+      const servicePath = candidatePaths.find((p) => fs.existsSync(p));
+      if (!servicePath) {
+        throw new Error('Git details service module not found in project or studio tools.');
+      }
+      // Imported without a cache-buster so the service's network caches survive between requests.
+      const { getGitDetails } = await import(pathToFileURL(servicePath).href);
+      const payload = await getGitDetails(PROJECT_ROOT, { forceRefresh: url.searchParams.get('refresh') === '1' });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(payload));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
+      res.end(JSON.stringify({ error: err.message, repoConnected: false, isPushed: false }));
     }
     return;
   }

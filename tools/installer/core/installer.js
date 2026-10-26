@@ -973,25 +973,23 @@ class Installer {
         }
       }
 
-      // Auto-deploy Atlassian Integration Service to target tools/
-      const srcAtlassianCandidates = [
-        path.join(__dirname, '..', '..', 'atlassian-service.mjs'),
-        path.join(__dirname, '..', '..', '..', 'tools', 'atlassian-service.mjs'),
-        path.resolve(__dirname, '../../..', 'tools', 'atlassian-service.mjs'),
-      ];
-      let srcAtlassian = null;
-      for (const cand of srcAtlassianCandidates) {
-        if (await fs.pathExists(cand)) {
-          srcAtlassian = cand;
-          break;
-        }
-      }
+      // Auto-deploy Atlassian Integration and Git Details services to target tools/
       const targetToolsDir = path.join(projectRoot, 'tools');
-      const targetAtlassian = path.join(targetToolsDir, 'atlassian-service.mjs');
-      if (srcAtlassian) {
-        await fs.ensureDir(targetToolsDir);
-        await fs.copy(srcAtlassian, targetAtlassian, { overwrite: true });
-        this.installedFiles.add(targetAtlassian);
+      for (const serviceFile of ['atlassian-service.mjs', 'git-details-service.mjs']) {
+        const srcCandidates = [path.join(__dirname, '..', '..', serviceFile), path.join(__dirname, '..', '..', '..', 'tools', serviceFile)];
+        let srcService = null;
+        for (const cand of srcCandidates) {
+          if (await fs.pathExists(cand)) {
+            srcService = cand;
+            break;
+          }
+        }
+        if (srcService) {
+          const targetService = path.join(targetToolsDir, serviceFile);
+          await fs.ensureDir(targetToolsDir);
+          await fs.copy(srcService, targetService, { overwrite: true });
+          this.installedFiles.add(targetService);
+        }
       }
 
       // Vite plugin that serves /api/atlassian/* (imports the service above)
@@ -1079,8 +1077,11 @@ class Installer {
       );
 
       // Declare projectRoot inside the git-details handler (it was referenced but never defined).
-      content = content.replace(/(Dynamic User Control Centre Telemetry[\s\S]*?)(\n\s*)(const env = \{)/, (match, head, indent, envLine) =>
-        head.includes('const projectRoot') ? match : head + indent + 'const projectRoot = process.cwd();' + indent + envLine,
+      // Stops at the next middleware so it never reaches into an unrelated handler.
+      content = content.replace(
+        /(Dynamic User Control Centre Telemetry[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*server\.middlewares\.use\((?:(?!server\.middlewares\.use\()[\s\S])*?)(\n\s*)(const env = \{)/,
+        (match, head, indent, envLine) =>
+          head.includes('const projectRoot') ? match : head + indent + 'const projectRoot = process.cwd();' + indent + envLine,
       );
 
       if (content !== original) {
