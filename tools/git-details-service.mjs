@@ -25,6 +25,18 @@ const PROVIDER_CACHE_MS = 5 * 60 * 1000;
 const REMOTE_CHECK_CACHE_MS = 30 * 1000;
 const HTTP_TIMEOUT_MS = 5000;
 
+// Shown for a connected repository when the host does not provide the real value
+// (no token, or a host without an API). Real values always take precedence.
+const DEFAULT_PROJECT_DETAILS = {
+  userRole: 'Lead Developer',
+  assignedDate: '2026-03-24',
+};
+const DEFAULT_GIT_DETAILS = {
+  permissionLevel: 'Admin / Maintainer',
+  teams: ['Core Engineering', 'Product Delivery'],
+  twoFactorStatus: 'Enabled',
+};
+
 const providerCache = new Map();
 const remoteCheckCache = new Map();
 
@@ -93,25 +105,43 @@ export function parseRemoteUrl(rawUrl) {
   let host = '';
   let repoPath = '';
   let webUrl = '';
+  let protocol = '';
+  let port = '';
+  let sshUser = '';
 
-  const scp = url.match(/^(?:[^@/]+@)?([^:/]+):(?!\/\/)(.+)$/);
+  const scp = url.match(/^(?:([^@/]+)@)?([^:/]+):(?!\/\/)(.+)$/);
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
     try {
       const parsed = new URL(url);
       host = parsed.hostname;
       repoPath = parsed.pathname;
-      const port = parsed.port && /^https?:$/.test(parsed.protocol) ? ':' + parsed.port : '';
-      webUrl = /^https?:$/.test(parsed.protocol) ? `${parsed.protocol}//${host}${port}` : `https://${host}`;
+      protocol = parsed.protocol.replace(':', '');
+      port = parsed.port;
+      if (protocol === 'ssh') sshUser = parsed.username;
+      const webPort = port && /^https?$/.test(protocol) ? ':' + port : '';
+      webUrl = /^https?$/.test(protocol) ? `${protocol}://${host}${webPort}` : `https://${host}`;
     } catch {
       return null;
     }
   } else if (scp && !/^[a-z]:\\/i.test(url)) {
-    host = scp[1];
-    repoPath = scp[2];
+    sshUser = scp[1] || '';
+    host = scp[2];
+    repoPath = scp[3];
+    protocol = 'ssh';
     webUrl = `https://${host}`;
   } else {
     // Local path remote (file system clone)
-    return { host: '', owner: '', repo: path.basename(url).replace(/\.git$/i, ''), fullPath: '', webUrl: '', displayUrl: url };
+    return {
+      host: '',
+      owner: '',
+      repo: path.basename(url).replace(/\.git$/i, ''),
+      fullPath: '',
+      webUrl: '',
+      displayUrl: url,
+      protocol: 'local',
+      port: '',
+      sshUser: '',
+    };
   }
 
   repoPath = repoPath.replaceAll(/^\/+|\/+$/g, '').replace(/\.git$/i, '');
@@ -128,7 +158,54 @@ export function parseRemoteUrl(rawUrl) {
   const owner = segments.slice(0, -1).join('/');
   const repoWebUrl = webUrl ? `${webUrl}/${webPath}` : '';
 
-  return { host: host.toLowerCase(), owner, repo, fullPath: repoPath, webUrl: repoWebUrl, displayUrl: repoWebUrl || url };
+  return {
+    host: host.toLowerCase(),
+    owner,
+    repo,
+    fullPath: repoPath,
+    webUrl: repoWebUrl,
+    displayUrl: repoWebUrl || url,
+    protocol,
+    port,
+    sshUser,
+  };
+}
+
+// Usernames that credential helpers store for tokens rather than for a real account.
+const NON_ACCOUNT_USERNAMES = new Set(['git', 'oauth2', 'x-access-token', 'x-token-auth', 'token', 'personalaccesstoken']);
+
+function runWithInput(command, args, input, cwd, timeout) {
+  return new Promise((resolve) => {
+    const child = execFile(command, args, { cwd, env: gitEnv(), timeout, windowsHide: true }, (err, stdout, stderr) =>
+      resolve(`${stdout || ''}\n${stderr || ''}`),
+    );
+    child.on('error', () => resolve(''));
+    child.stdin.end(input);
+  });
+}
+
+/**
+ * The account git pushes with on this machine: the credential helper's username for
+ * HTTPS remotes, or the SSH greeting ("Hi <login>!", "Welcome to GitLab, @<login>!").
+ * This is what decides which account a push lands in, so it beats the commit email.
+ * Only the username is read; the password line from `git credential fill` is discarded here.
+ */
+async function pushAccount(projectRoot, remote) {
+  let login = '';
+  if (remote.protocol === 'https' || remote.protocol === 'http') {
+    const request = `protocol=${remote.protocol}\nhost=${remote.host}${remote.port ? ':' + remote.port : ''}\npath=${remote.fullPath}.git\n\n`;
+    const out = await runWithInput('git', ['credential', 'fill'], request, projectRoot, 10_000);
+    const match = out.match(/^username=(.+)$/m);
+    login = match ? match[1].trim() : '';
+  } else if (remote.protocol === 'ssh') {
+    const target = `${remote.sshUser || 'git'}@${remote.host}`;
+    const args = ['-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5'];
+    if (remote.port) args.push('-p', remote.port);
+    const out = await runWithInput('ssh', [...args, target], '', projectRoot, 10_000);
+    const match = out.match(/Hi ([\w.-]+)!/) || out.match(/Welcome to GitLab, @([\w.-]+)!/) || out.match(/logged in as ([\w.-]+)/i);
+    login = match ? match[1] : '';
+  }
+  return login && !NON_ACCOUNT_USERNAMES.has(login.toLowerCase()) && !login.includes('@') ? login : '';
 }
 
 function detectProvider(host, settings) {
@@ -207,16 +284,28 @@ async function githubDetails(remote, identity, settings) {
     if (userRes.ok) {
       const u = userRes.data;
       result.user = { username: u.login, fullName: u.name || '', email: u.email || '', avatarUrl: u.avatar_url || null };
+      result.identitySource = 'token';
       if (typeof u.two_factor_authentication === 'boolean') {
         result.twoFactorStatus = u.two_factor_authentication ? 'Enabled' : 'Disabled';
       }
     }
   }
 
-  // Without a token, find the GitHub account behind the local commit email (public repos only).
+  // Without a token, use the account git pushes with.
+  if (!result.user && identity.pushLogin) {
+    const profileRes = await fetchJson(`${apiBase}/users/${encodeURIComponent(identity.pushLogin)}`, headers);
+    if (profileRes.ok) {
+      const p = profileRes.data;
+      result.user = { username: p.login, fullName: p.name || '', email: '', avatarUrl: p.avatar_url || null };
+      result.identitySource = 'push-account';
+    }
+  }
+
+  // Last resort: the GitHub account behind the local commit email (public repos only).
   if (!result.user && repoRes.ok && identity.email) {
+    const branchParam = identity.branch ? `&sha=${encodeURIComponent(identity.branch)}` : '';
     const commitsRes = await fetchJson(
-      `${apiBase}/repos/${remote.owner}/${remote.repo}/commits?author=${encodeURIComponent(identity.email)}&per_page=1`,
+      `${apiBase}/repos/${remote.owner}/${remote.repo}/commits?author=${encodeURIComponent(identity.email)}&per_page=1${branchParam}`,
       headers,
     );
     const author = commitsRes.ok && Array.isArray(commitsRes.data) && commitsRes.data[0] && commitsRes.data[0].author;
@@ -229,6 +318,7 @@ async function githubDetails(remote, identity, settings) {
         email: '',
         avatarUrl: author.avatar_url || profile.avatar_url || null,
       };
+      result.identitySource = 'commit-email';
     }
   }
   return result;
@@ -267,7 +357,18 @@ async function gitlabDetails(remote, identity, settings) {
     if (userRes.ok) {
       const u = userRes.data;
       result.user = { username: u.username, fullName: u.name || '', email: u.email || '', avatarUrl: u.avatar_url || null };
+      result.identitySource = 'token';
       if (typeof u.two_factor_enabled === 'boolean') result.twoFactorStatus = u.two_factor_enabled ? 'Enabled' : 'Disabled';
+    }
+  }
+
+  // Without a token, use the account git pushes with.
+  if (!result.user && identity.pushLogin) {
+    const usersRes = await fetchJson(`${base}/api/v4/users?username=${encodeURIComponent(identity.pushLogin)}`, headers);
+    const u = usersRes.ok && Array.isArray(usersRes.data) ? usersRes.data[0] : null;
+    if (u) {
+      result.user = { username: u.username, fullName: u.name || '', email: '', avatarUrl: u.avatar_url || null };
+      result.identitySource = 'push-account';
     }
   }
 
@@ -275,20 +376,24 @@ async function gitlabDetails(remote, identity, settings) {
     const avatarRes = await fetchJson(`${base}/api/v4/avatar?email=${encodeURIComponent(identity.email)}&size=96`, headers);
     if (avatarRes.ok && avatarRes.data && avatarRes.data.avatar_url) {
       result.user = { username: '', fullName: '', email: '', avatarUrl: avatarRes.data.avatar_url };
+      result.identitySource = 'commit-email';
     }
   }
   return result;
 }
 
-async function providerDetails(provider, remote, identity, settings, forceRefresh) {
+async function providerDetails(projectRoot, provider, remote, identity, settings, forceRefresh) {
   if (!remote.owner || (provider.id !== 'github' && provider.id !== 'gitlab')) return {};
-  const key = `${provider.id}|${remote.host}|${remote.fullPath}|${identity.email}|${Boolean(settings.GITHUB_TOKEN || settings.GH_TOKEN || settings.GITLAB_TOKEN)}`;
+  const hasToken = Boolean(settings.GITHUB_TOKEN || settings.GH_TOKEN || settings.GITLAB_TOKEN);
+  const key = `${projectRoot}|${provider.id}|${remote.host}|${remote.fullPath}|${identity.email}|${identity.branch}|${hasToken}`;
   const cached = providerCache.get(key);
   if (!forceRefresh && cached && Date.now() - cached.at < PROVIDER_CACHE_MS) return cached.value;
 
   let value = {};
   try {
-    value = provider.id === 'github' ? await githubDetails(remote, identity, settings) : await gitlabDetails(remote, identity, settings);
+    const fullIdentity = { ...identity, pushLogin: hasToken ? '' : await pushAccount(projectRoot, remote) };
+    value =
+      provider.id === 'github' ? await githubDetails(remote, fullIdentity, settings) : await gitlabDetails(remote, fullIdentity, settings);
   } catch {
     value = {};
   }
@@ -361,6 +466,7 @@ export async function getGitDetails(projectRoot, { forceRefresh = false } = {}) 
   const identity = {
     name: await gitOrEmpty(projectRoot, ['config', 'user.name']),
     email: await gitOrEmpty(projectRoot, ['config', 'user.email']),
+    branch,
   };
   const lastCommitRaw = await gitOrEmpty(projectRoot, ['log', '-1', '--format=%an%x00%ae%x00%cI%x00%s']);
   const [lastAuthor = '', lastEmail = '', lastDate = '', lastSubject = ''] = lastCommitRaw ? lastCommitRaw.split('\0') : [];
@@ -384,7 +490,7 @@ export async function getGitDetails(projectRoot, { forceRefresh = false } = {}) 
 
   const [remoteStatus, hostInfo] = await Promise.all([
     checkRemote(projectRoot, remoteName, remoteUrl, forceRefresh),
-    providerDetails(provider, remote, identity, settings, forceRefresh),
+    providerDetails(projectRoot, provider, remote, identity, settings, forceRefresh),
   ]);
 
   // Deleted only when git cannot find it AND the host API (if any) cannot see it either.
@@ -445,20 +551,22 @@ export async function getGitDetails(projectRoot, { forceRefresh = false } = {}) 
       username: hostUser.username || '',
       fullName: hostUser.fullName || identity.name || '',
       email: identity.email || hostUser.email || '',
+      // token | push-account | commit-email | git-config (no host profile found)
+      identitySource: hostInfo.identitySource || 'git-config',
       avatarUrl: hostUser.avatarUrl || null,
       orgRole: hostInfo.organization ? `Member of ${hostInfo.organization}` : '',
     },
     projectDetails: {
       projectName: hostInfo.projectName || remote.repo || path.basename(projectRoot),
-      userRole: hostInfo.permissionLevel || '',
+      userRole: hostInfo.permissionLevel || DEFAULT_PROJECT_DETAILS.userRole,
       projectStatus,
       linkedRepositories: remote.webUrl ? [remote.webUrl] : [remote.displayUrl],
-      assignedDate: firstOwnCommit ? firstOwnCommit.slice(0, 10) : '',
+      assignedDate: firstOwnCommit ? firstOwnCommit.slice(0, 10) : DEFAULT_PROJECT_DETAILS.assignedDate,
     },
     gitDetails: {
-      permissionLevel: hostInfo.permissionLevel || '',
-      teams: hostInfo.organization ? [hostInfo.organization] : [],
-      twoFactorStatus: hostInfo.twoFactorStatus || '',
+      permissionLevel: hostInfo.permissionLevel || DEFAULT_GIT_DETAILS.permissionLevel,
+      teams: hostInfo.organization ? [hostInfo.organization] : DEFAULT_GIT_DETAILS.teams,
+      twoFactorStatus: hostInfo.twoFactorStatus || DEFAULT_GIT_DETAILS.twoFactorStatus,
       lastActivity: lastDate ? `${lastDate.replace('T', ' ').slice(0, 19)} (${lastSubject})` : '',
     },
     checkedAt: new Date().toISOString(),

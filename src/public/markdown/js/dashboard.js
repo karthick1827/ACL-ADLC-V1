@@ -1455,6 +1455,13 @@ function updateNavUserControlCentre(data) {
 let gitDetailsSignature = '';
 let gitDetailsPollTimer = null;
 
+const GIT_IDENTITY_SOURCE_LABELS = {
+  token: 'Access token in .env',
+  'push-account': 'Account Git pushes with',
+  'commit-email': 'Commit email match',
+  'git-config': 'Local Git config only',
+};
+
 async function fetchGitDetails(refresh = false) {
   try {
     const res = await fetch('/api/git-details?t=' + Date.now() + (refresh ? '&refresh=1' : ''));
@@ -1636,7 +1643,8 @@ async function renderGitDashboard(options = {}) {
               ${hasOrgRole ? `<span class="git-role-badge">🛡️ Org Role: ${gitEsc(user.orgRole)}</span>` : '<span class="git-role-badge" style="background:#f1f5f9; color:#94a3b8; border-color:#e2e8f0;">🛡️ Org Role: —</span>'}
             </div>
             <div class="git-profile-sub">
-              <span>📧 <strong>Email:</strong> ${hasEmail ? gitEsc(user.email) : '<span class="empty">—</span>'}</span>
+              <span>📧 <strong>Commit Email:</strong> ${hasEmail ? gitEsc(user.email) : '<span class="empty">—</span>'}</span>
+              ${isConnected ? `<span title="Where the profile above was matched from">🔎 <strong>Profile From:</strong> ${gitEsc(GIT_IDENTITY_SOURCE_LABELS[user.identitySource] || GIT_IDENTITY_SOURCE_LABELS['git-config'])}</span>` : ''}
               <span>🔒 <strong>Access Level:</strong> ${hasPermission ? gitEsc(git.permissionLevel) : '<span class="empty">—</span>'}</span>
             </div>
             <div class="git-integrations-bar">
