@@ -60,7 +60,11 @@ if (document.readyState === 'loading') {
 }
 
 function switchAppView(view) {
-  activeAppView = view;
+  const normalizedView = view === 'dashboard' ? 'dashboard-summarized' : view;
+  activeAppView = normalizedView;
+  try {
+    sessionStorage.setItem('acl_last_active_view', normalizedView);
+  } catch (e) {}
   closeNavDrawer();
 
   openAccordionEpicIndex = null;

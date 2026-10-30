@@ -1,4 +1,32 @@
+function isPageReload() {
+  try {
+    const navEntries = performance.getEntriesByType('navigation');
+    if (navEntries && navEntries.length > 0) {
+      return navEntries[0].type === 'reload';
+    }
+    if (typeof performance.navigation !== 'undefined') {
+      return performance.navigation.type === 1;
+    }
+  } catch (e) {}
+  return false;
+}
+
 async function init() {
+  const isReload = isPageReload();
+  if (!isReload) {
+    try {
+      sessionStorage.removeItem('acl_last_active_view');
+      sessionStorage.removeItem('acl_last_active_file_id');
+    } catch (e) {}
+  } else {
+    try {
+      const savedActive = sessionStorage.getItem('acl_last_active_file_id');
+      if (savedActive && !savedActive.toLowerCase().includes('memlog') && !savedActive.startsWith('.')) {
+        activeFileId = savedActive;
+      }
+    } catch (e) {}
+  }
+
   try {
     const cached = localStorage.getItem('acl_adlc_project_markdown_files');
     if (cached) {
@@ -64,7 +92,14 @@ async function init() {
 
     if (files.length > 0) {
       if (!activeFileId || !files.some((f) => f.id === activeFileId && !isChildFile(f.filename, f.folderPath))) {
-        activeFileId = getInitialActiveFileId(files);
+        let restored = null;
+        try {
+          const savedFileId = sessionStorage.getItem('acl_last_active_file_id');
+          if (savedFileId && files.some((f) => f.id === savedFileId && !isChildFile(f.filename, f.folderPath))) {
+            restored = savedFileId;
+          }
+        } catch (e) {}
+        activeFileId = restored || getInitialActiveFileId(files);
       }
       renderFileTree();
       if (activeFileId) {
@@ -76,10 +111,24 @@ async function init() {
     }
   }
 
-  // Open Summarized Dashboard by default when visiting /markdown.html; #working-tree etc. deep-link to a view
+  // View resolution: Hash deep-links take top priority; on reload, restore last seen view;
+  // on fresh launch from IDE without hash, default cleanly to Summarized Dashboard.
   const hashView = (window.location.hash || '').slice(1);
-  const deepLinkViews = ['working-tree', 'dashboard-scrum', 'dashboard-developer', 'studio'];
-  switchAppView(deepLinkViews.includes(hashView) ? hashView : 'dashboard-summarized');
+  const deepLinkViews = ['working-tree', 'dashboard-scrum', 'dashboard-developer', 'studio', 'agents', 'dashboard-git'];
+
+  let targetView = 'dashboard-summarized';
+  if (deepLinkViews.includes(hashView)) {
+    targetView = hashView;
+  } else if (isReload) {
+    try {
+      const savedView = sessionStorage.getItem('acl_last_active_view');
+      if (savedView && (deepLinkViews.includes(savedView) || savedView === 'dashboard-summarized' || savedView === 'dashboard')) {
+        targetView = savedView === 'dashboard' ? 'dashboard-summarized' : savedView;
+      }
+    } catch (e) {}
+  }
+
+  switchAppView(targetView);
 
   // Universal live auto-sync: automatically syncs when any agent (Claude Code, AGY, Gemini, Copilot, Cursor, etc.)
   // generates or updates markdown files in _acl-output/ without needing manual browser refresh

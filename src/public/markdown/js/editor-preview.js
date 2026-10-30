@@ -19,6 +19,9 @@ function loadFile(id, openFolder = false) {
     }
   }
   activeFileId = file.id;
+  try {
+    sessionStorage.setItem('acl_last_active_file_id', file.id);
+  } catch (e) {}
   if (openFolder) {
     openFolders.clear();
     openFolders.add(getFileFolderGroup(file));

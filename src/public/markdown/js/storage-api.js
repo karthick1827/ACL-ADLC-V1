@@ -108,7 +108,14 @@ async function syncFromLiveDisk(quiet = false) {
             localStorage.setItem('acl_adlc_project_markdown_files', JSON.stringify(files));
           } catch (e) {}
           if (!activeFileId || !files.some((f) => f.id === activeFileId && !isChildFile(f.filename, f.folderPath))) {
-            activeFileId = getInitialActiveFileId(files);
+            let restored = null;
+            try {
+              const savedFileId = sessionStorage.getItem('acl_last_active_file_id');
+              if (savedFileId && files.some((f) => f.id === savedFileId && !isChildFile(f.filename, f.folderPath))) {
+                restored = savedFileId;
+              }
+            } catch (e) {}
+            activeFileId = restored || getInitialActiveFileId(files);
           }
           renderFileTree();
           const currentActiveFile = files.find((f) => f.id === activeFileId);
