@@ -1,5 +1,17 @@
 # Changelog
 
+## v6.11.54 - 2026-11-02
+
+### Markdown Studio enterprise integrations (install bundle)
+
+- Shared Git telemetry via `tools/git-details-service.mjs` and `api/git-details.js` (Vercel-aware repo resolution, deleted-repo detection, `Cache-Control: no-store`).
+- GitHub `_acl-output` helpers: `acl-output-github.mjs`, `github-api.mjs`, `github-token.mjs`, list cache and tarball utilities.
+- Vercel flat Atlassian handlers (`api/atlassian-*.js`, `api/_atlassian-handlers.js`) with `/api/atlassian/*` rewrites; live-only Atlassian (sandbox/demo removed).
+- Studio server delegates to universal `api/*` handlers; fixes local save path bug (`baseDir` → shared save handler).
+- Installer ships full `tools/` studio stack, expanded `api/` endpoints, and `vercel.json` `includeFiles` for `tools/**`.
+- Configurable team email: `api/send-email.js`, `api/team-notifications-config.js`, client `gmail.js`; see `DEPLOYMENT.md`.
+- User Control Centre: `refreshGitHubUserControl`, `applyGitDetailsToStudio`, GitHub localStorage hygiene on disconnect/deleted repo.
+
 ## v6.10.0 - 2026-07-03
 
 ### ✨ Headline

@@ -1291,52 +1291,25 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
-  if (url.pathname === '/api/list-markdown-files') {
-    const files = getDiskMarkdownFiles();
-    let frameworkVersion = '6.11.15';
+  if (url.pathname === '/api/health') {
     try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
-      if (pkg && pkg.version) frameworkVersion = pkg.version;
-    } catch {
-      // Use fallback version
+      const health = require('../api/health.js');
+      return health(req, res);
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: error.message }));
     }
+    return;
+  }
 
-    let activeTier = null;
-    for (const cand of ['_acl-output/.tier', '_acl-output/tier.json', '.tier']) {
-      const tp = path.join(PROJECT_ROOT, cand);
-      if (fs.existsSync(tp)) {
-        try {
-          const raw = fs.readFileSync(tp, 'utf8').trim().toLowerCase();
-          if (raw.includes('2')) activeTier = '2';
-          else if (raw.includes('1')) activeTier = '1';
-          break;
-        } catch {
-          // Ignore read error
-        }
-      }
+  if (url.pathname === '/api/list-markdown-files') {
+    try {
+      const listHandler = require('../api/list-markdown-files.js');
+      return listHandler(req, res);
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, files: [], error: error.message }));
     }
-    if (!activeTier) {
-      if (files.some((f) => (f.filename || '').toLowerCase().includes('epics.md') || (f.filename || '').toLowerCase().includes('spine'))) {
-        activeTier = '2';
-      } else {
-        const fileWithTier = files.find((f) => f.tier);
-        if (fileWithTier) activeTier = fileWithTier.tier;
-      }
-    }
-
-    res.writeHead(200, {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-    });
-    res.end(
-      JSON.stringify({
-        success: true,
-        files: files,
-        activeTier: activeTier,
-        frameworkVersion: frameworkVersion,
-        version: frameworkVersion,
-      }),
-    );
     return;
   }
 
@@ -1355,199 +1328,33 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/api/git-details' && req.method === 'GET') {
     try {
-      const { execFileSync } = require('node:child_process');
-      const simulateUnpushed = url.searchParams.get('simulate') === 'unpushed' || url.searchParams.get('unpushed') === 'true';
-
-      const localAppData =
-        process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : '');
-      const gitUserPath = localAppData ? path.join(localAppData, 'Programs', 'Git', 'cmd') : '';
-      const env = {
-        ...process.env,
-        PATH: [process.env.PATH || '', gitUserPath, 'C:\\Program Files\\Git\\cmd'].filter(Boolean).join(';'),
-      };
-
-      if (simulateUnpushed) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            isPushed: false,
-            simulated: true,
-            message: 'Repository simulated as not pushed to GitHub',
-            userDetails: null,
-            projectDetails: null,
-            gitDetails: null,
-          }),
-        );
-        return;
-      }
-
-      let remoteOrigin = '';
-      try {
-        remoteOrigin = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim();
-      } catch {
-        remoteOrigin = '';
-      }
-
-      const isGitHub = /github\.com/i.test(remoteOrigin) || /gitlab\.com/i.test(remoteOrigin);
-
-      let repoOwner = '';
-      let repoName = '';
-      const match = remoteOrigin.match(/[:/]([^/:]+)\/([^/:]+?)(?:\.git)?$/);
-      if (match) {
-        repoOwner = match[1];
-        repoName = match[2];
-      }
-
-      let isPushed = false;
-      let liveRemoteExists = false;
-      let repoDeleted = false;
-      if (remoteOrigin) {
-        try {
-          const lsOut = execFileSync('git', ['ls-remote', '--exit-code', 'origin', 'HEAD'], {
-            cwd: PROJECT_ROOT,
-            env,
-            encoding: 'utf8',
-            timeout: 6000,
-            stdio: ['ignore', 'pipe', 'pipe'],
-          }).trim();
-          if (lsOut && lsOut.length > 0) {
-            liveRemoteExists = true;
-          }
-        } catch (err) {
-          const errText = (
-            (err.stderr ? err.stderr.toString() : '') +
-            ' ' +
-            (err.stdout ? err.stdout.toString() : '') +
-            ' ' +
-            (err.message || '')
-          ).toLowerCase();
-          if (errText.includes('not found') || errText.includes('does not exist') || errText.includes('fatal: repository')) {
-            repoDeleted = true;
-          }
-        }
-
-        try {
-          const unpushedCommits = execFileSync('git', ['log', '@{u}..HEAD', '--oneline'], {
-            cwd: PROJECT_ROOT,
-            env,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'ignore'],
-          }).trim();
-          isPushed = unpushedCommits.length === 0;
-        } catch {
-          try {
-            const localCommits = execFileSync('git', ['log', '-1', '--oneline'], {
-              cwd: PROJECT_ROOT,
-              env,
-              encoding: 'utf8',
-              stdio: ['ignore', 'pipe', 'ignore'],
-            }).trim();
-            isPushed = Boolean(localCommits);
-          } catch {
-            isPushed = true;
-          }
-        }
-      }
-
-      let gitUserName = '';
-      let gitUserEmail = '';
-      let lastActivityDate = new Date().toISOString();
-      let lastCommitMsg = 'Latest commit';
-      try {
-        gitUserName =
-          execFileSync('git', ['log', '-1', '--format=%an'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim() || gitUserName;
-        gitUserEmail =
-          execFileSync('git', ['log', '-1', '--format=%ae'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim() || gitUserEmail;
-        lastActivityDate =
-          execFileSync('git', ['log', '-1', '--format=%cd'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim() || lastActivityDate;
-        lastCommitMsg =
-          execFileSync('git', ['log', '-1', '--format=%s'], { cwd: PROJECT_ROOT, env, encoding: 'utf8' }).trim() || lastCommitMsg;
-      } catch {
-        /* ignore */
-      }
-
-      let ghUserData = null;
-      let ghRepoData = null;
-      if (repoOwner && !repoDeleted) {
-        try {
-          const repoRes = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}`, {
-            headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
-          });
-          if (repoRes.status === 404) {
-            repoDeleted = true;
-          } else if (repoRes.ok) {
-            ghRepoData = await repoRes.json();
-            liveRemoteExists = true;
-          }
-        } catch {
-          /* ignore */
-        }
-
-        if (!repoDeleted) {
-          try {
-            const userRes = await fetch(`https://api.github.com/users/${repoOwner}`, {
-              headers: { 'User-Agent': 'Node-ACL-ADLC-Studio' },
-            });
-            if (userRes.ok) {
-              ghUserData = await userRes.json();
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-
-      if (!remoteOrigin || repoDeleted) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            isPushed: false,
-            repoConnected: false,
-            repoDeleted: Boolean(repoDeleted),
-            remoteOrigin: remoteOrigin || null,
-            message: repoDeleted
-              ? `The remote repository (${remoteOrigin || 'origin'}) was deleted or does not exist on GitHub.`
-              : 'No remote repository has been linked to this project.',
-            userDetails: null,
-            projectDetails: null,
-            gitDetails: null,
-          }),
-        );
-        return;
-      }
-
-      const responsePayload = {
-        isPushed: Boolean(isPushed),
-        repoConnected: true,
-        repoDeleted: false,
-        remoteOrigin,
-        userDetails: {
-          username: (ghUserData && ghUserData.login) || repoOwner || gitUserName,
-          fullName: (ghUserData && ghUserData.name) || gitUserName,
-          email: gitUserEmail || (ghUserData && ghUserData.email) || '',
-          avatarUrl: (ghUserData && ghUserData.avatar_url) || null,
-          orgRole: 'Admin',
-        },
-        projectDetails: {
-          projectName: repoName || path.basename(PROJECT_ROOT),
-          userRole: 'Lead Developer',
-          projectStatus: 'Active',
-          linkedRepositories: [remoteOrigin],
-          assignedDate: '2026-03-24',
-        },
-        gitDetails: {
-          permissionLevel: 'Admin / Maintainer',
-          teams: ['Core Engineering', 'Product Delivery'],
-          twoFactorStatus: 'Enabled',
-          lastActivity: `${lastActivityDate} (${lastCommitMsg})`,
-        },
-      };
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(responsePayload));
+      const gitDetails = require('../api/git-details.js');
+      return gitDetails(req, res);
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
+      res.end(JSON.stringify({ error: err.message, repoConnected: false }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/team-notifications-config' && req.method === 'GET') {
+    try {
+      const cfgHandler = require('../api/team-notifications-config.js');
+      return cfgHandler(req, res);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/send-email' && req.method === 'POST') {
+    try {
+      const mailHandler = require('../api/send-email.js');
+      return mailHandler(req, res);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
     }
     return;
   }
@@ -1620,248 +1427,37 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // =========================================================================
   // ATLASSIAN JIRA & CONFLUENCE INTEGRATION ENDPOINTS
-  // =========================================================================
   if (url.pathname.startsWith('/api/atlassian/')) {
-    try {
-      const { pathToFileURL } = require('node:url');
-      const candidatePaths = [
-        path.resolve(__dirname, 'atlassian-service.mjs'),
-        path.resolve(PROJECT_ROOT, 'tools', 'atlassian-service.mjs'),
-      ];
-      const servicePath = candidatePaths.find((p) => fs.existsSync(p));
-      if (!servicePath) {
-        throw new Error('Atlassian service module not found in project or studio tools.');
+    const routeMap = {
+      '/api/atlassian/config': 'config',
+      '/api/atlassian/discover': 'discover',
+      '/api/atlassian/sync-jira': 'sync-jira',
+      '/api/atlassian/pull-jira': 'pull-jira',
+      '/api/atlassian/sync-confluence': 'sync-confluence',
+      '/api/atlassian/pull-confluence': 'pull-confluence',
+      '/api/atlassian/sync-history': 'sync-history',
+    };
+    const route = routeMap[url.pathname];
+    if (route) {
+      try {
+        const { handleAtlassianRoute } = require('../api/_atlassian-handlers.js');
+        return handleAtlassianRoute(route, req, res);
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: err.message }));
       }
-      const atlassianMod = await import(pathToFileURL(servicePath).href + '?t=' + Date.now());
-      const projectRoot = PROJECT_ROOT;
-
-      if (url.pathname === '/api/atlassian/config') {
-        if (req.method === 'GET') {
-          const cfg = atlassianMod.getAtlassianConfig(projectRoot);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify(cfg));
-        }
-        if (req.method === 'POST') {
-          let body = '';
-          req.on('data', (chunk) => {
-            body += chunk;
-          });
-          req.on('end', async () => {
-            try {
-              const payload = JSON.parse(body || '{}');
-              const saved = await atlassianMod.saveAtlassianConfig(projectRoot, payload);
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: true, config: saved }));
-            } catch (e) {
-              res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: false, error: e.message }));
-            }
-          });
-          return;
-        }
-      }
-
-      if (url.pathname === '/api/atlassian/discover' && req.method === 'GET') {
-        const stories = atlassianMod.discoverStoriesAndEpics(projectRoot);
-        const deliverables = atlassianMod.discoverDeliverables(projectRoot);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(
-          JSON.stringify({
-            epics: stories.epics,
-            stories: stories.stories,
-            deliverables: deliverables.map((d) => ({
-              filename: d.filename,
-              relPath: d.relPath,
-              type: d.type,
-              title: d.title,
-              status: d.status,
-            })),
-          }),
-        );
-      }
-
-      if (url.pathname === '/api/atlassian/sync-jira' && req.method === 'POST') {
-        let body = '';
-        req.on('data', (chunk) => {
-          body += chunk;
-        });
-        req.on('end', async () => {
-          try {
-            const payload = JSON.parse(body || '{}');
-            const result = await atlassianMod.syncToJira(projectRoot, payload);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, ...result }));
-          } catch (e) {
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: e.message }));
-          }
-        });
-        return;
-      }
-
-      if (url.pathname === '/api/atlassian/pull-jira' && req.method === 'POST') {
-        let body = '';
-        req.on('data', (chunk) => {
-          body += chunk;
-        });
-        req.on('end', async () => {
-          try {
-            const payload = JSON.parse(body || '{}');
-            const result = await atlassianMod.pullFromJira(projectRoot, payload);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, ...result }));
-          } catch (e) {
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: e.message }));
-          }
-        });
-        return;
-      }
-
-      if (url.pathname === '/api/atlassian/sync-confluence' && req.method === 'POST') {
-        let body = '';
-        req.on('data', (chunk) => {
-          body += chunk;
-        });
-        req.on('end', async () => {
-          try {
-            const payload = JSON.parse(body || '{}');
-            const result = await atlassianMod.syncToConfluence(projectRoot, payload);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, ...result }));
-          } catch (e) {
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: e.message }));
-          }
-        });
-        return;
-      }
-
-      if (url.pathname === '/api/atlassian/pull-confluence' && req.method === 'POST') {
-        let body = '';
-        req.on('data', (chunk) => {
-          body += chunk;
-        });
-        req.on('end', async () => {
-          try {
-            const payload = JSON.parse(body || '{}');
-            const result = await atlassianMod.pullFromConfluence(projectRoot, payload);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, ...result }));
-          } catch (e) {
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: e.message }));
-          }
-        });
-        return;
-      }
-
-      if (url.pathname === '/api/atlassian/sync-history' && req.method === 'GET') {
-        const history = atlassianMod.getSyncHistory(projectRoot);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify(history));
-      }
-    } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: err.message }));
     }
   }
 
   if (url.pathname === '/api/save-markdown' && req.method === 'POST') {
-    let body = '';
-    req.on('data', (chunk) => {
-      body += chunk;
-    });
-    req.on('end', () => {
-      try {
-        const payload = JSON.parse(body);
-        const { folderPath, filename, content, autoPush } = payload;
-
-        if (!fs.existsSync(ACL_OUTPUT_DIR)) {
-          fs.mkdirSync(ACL_OUTPUT_DIR, { recursive: true });
-        }
-        let cleanFolder = (folderPath || '').replaceAll('\\', '/').trim();
-        cleanFolder = cleanFolder.replace(/^(_acl-output|_acl_output|acl-output)\/?/i, '');
-
-        // Normalize project-context.md always to root of _acl-output
-        const lowerName = (filename || '').toLowerCase();
-        if (lowerName === 'project-context.md') {
-          cleanFolder = '';
-        } else if (!cleanFolder || cleanFolder === 'root' || cleanFolder === '.') {
-          // Route standard artifacts to their canonical phase folders if saved from root
-          switch (lowerName) {
-            case 'brief.md': {
-              cleanFolder = '1-analysis/acl-product-brief';
-              break;
-            }
-            case 'prd.md': {
-              cleanFolder = '2-plan-workflows/acl-prd';
-              break;
-            }
-            case 'architecture-spine.md':
-            case 'architecture.md': {
-              cleanFolder = '3-solutioning/acl-architecture';
-              break;
-            }
-            case 'epics.md': {
-              cleanFolder = '3-solutioning/acl-create-epics-and-stories';
-              break;
-            }
-            default: {
-              cleanFolder = '';
-              break;
-            }
-          }
-        }
-
-        const targetDir = cleanFolder ? path.join(baseDir, cleanFolder) : baseDir;
-        fs.mkdirSync(targetDir, { recursive: true });
-
-        const targetFile = path.join(targetDir, filename);
-        fs.writeFileSync(targetFile, content, 'utf8');
-        console.log(`[Studio Server] Saved live to disk: ${targetFile}`);
-
-        // If saving project-context.md at root, clean up any legacy nested duplicate
-        if (lowerName === 'project-context.md') {
-          const legacyNestedFile = path.join(baseDir, '0-context', 'acl-generate-project-context', 'project-context.md');
-          if (fs.existsSync(legacyNestedFile)) {
-            try {
-              fs.unlinkSync(legacyNestedFile);
-              const legacyDir = path.dirname(legacyNestedFile);
-              if (fs.readdirSync(legacyDir).length === 0) fs.rmdirSync(legacyDir);
-              const parentLegacyDir = path.dirname(legacyDir);
-              if (fs.readdirSync(parentLegacyDir).length === 0) fs.rmdirSync(parentLegacyDir);
-            } catch {
-              // Ignore cleanup error
-            }
-          }
-        }
-
-        let gitPushed = false;
-        if (autoPush) {
-          try {
-            execSync(
-              `git add "${targetFile}" && git commit -m "docs(${filename}): update status and content via Markdown Studio" && git push`,
-              {
-                cwd: PROJECT_ROOT,
-                stdio: 'pipe',
-              },
-            );
-            gitPushed = true;
-          } catch {
-            console.warn('[Studio Server] Git auto-push skipped (no remote or git unconfigured).');
-          }
-        }
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, gitPushed: gitPushed }));
-      } catch (error) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: error.message }));
-      }
-    });
+    try {
+      const saveHandler = require('../api/save-markdown.js');
+      return saveHandler(req, res);
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error.message }));
+    }
     return;
   }
 

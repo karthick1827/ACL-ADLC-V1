@@ -18,7 +18,35 @@ const { ExistingInstall } = require('./existing-install');
 const { warnPreNativeSkillsLegacy } = require('./legacy-warnings');
 
 // Markdown Studio serverless endpoints shipped from the framework's api/ folder
-const API_ENDPOINT_FILES = ['save-markdown.js', 'list-markdown-files.js', 'list-agents.js'];
+const API_ENDPOINT_FILES = [
+  'save-markdown.js',
+  'list-markdown-files.js',
+  'list-agents.js',
+  'git-details.js',
+  'health.js',
+  'send-email.js',
+  'team-notifications-config.js',
+  '_atlassian-handlers.js',
+  'atlassian-config.js',
+  'atlassian-discover.js',
+  'atlassian-sync-jira.js',
+  'atlassian-pull-jira.js',
+  'atlassian-sync-confluence.js',
+  'atlassian-pull-confluence.js',
+  'atlassian-sync-history.js',
+];
+
+const STUDIO_TOOL_FILES = [
+  'git-details-service.mjs',
+  'acl-output-github.mjs',
+  'github-api.mjs',
+  'github-tarball-acl.mjs',
+  'github-list-cache.mjs',
+  'github-token.mjs',
+  'atlassian-service.mjs',
+  'atlassian-workspace.mjs',
+  'studio-server.js',
+];
 
 /**
  * The api/*.js endpoints are authored as CommonJS. In a `"type": "module"` project
@@ -973,25 +1001,46 @@ class Installer {
         }
       }
 
-      // Auto-deploy Atlassian Integration Service to target tools/
-      const srcAtlassianCandidates = [
-        path.join(__dirname, '..', '..', 'atlassian-service.mjs'),
-        path.join(__dirname, '..', '..', '..', 'tools', 'atlassian-service.mjs'),
-        path.resolve(__dirname, '../../..', 'tools', 'atlassian-service.mjs'),
+      // Auto-deploy Atlassian Integration Service and Markdown Studio tools to target tools/
+      const srcToolsCandidates = [
+        path.join(__dirname, '..', '..'),
+        path.join(__dirname, '..', '..', '..', 'tools'),
+        path.resolve(__dirname, '../../..', 'tools'),
       ];
-      let srcAtlassian = null;
-      for (const cand of srcAtlassianCandidates) {
-        if (await fs.pathExists(cand)) {
-          srcAtlassian = cand;
+      let srcToolsDir = null;
+      for (const cand of srcToolsCandidates) {
+        if (await fs.pathExists(path.join(cand, 'git-details-service.mjs'))) {
+          srcToolsDir = cand;
+          break;
+        }
+        if (await fs.pathExists(path.join(cand, 'atlassian-service.mjs'))) {
+          srcToolsDir = cand;
           break;
         }
       }
       const targetToolsDir = path.join(projectRoot, 'tools');
-      const targetAtlassian = path.join(targetToolsDir, 'atlassian-service.mjs');
-      if (srcAtlassian) {
-        await fs.ensureDir(targetToolsDir);
-        await fs.copy(srcAtlassian, targetAtlassian, { overwrite: true });
-        this.installedFiles.add(targetAtlassian);
+      await fs.ensureDir(targetToolsDir);
+      if (srcToolsDir) {
+        for (const toolFile of STUDIO_TOOL_FILES) {
+          const srcFile = path.join(srcToolsDir, toolFile);
+          if (await fs.pathExists(srcFile)) {
+            await fs.copy(srcFile, path.join(targetToolsDir, toolFile), { overwrite: true });
+            this.installedFiles.add(path.join(targetToolsDir, toolFile));
+          }
+        }
+      } else {
+        const srcAtlassianCandidates = [
+          path.join(__dirname, '..', '..', 'atlassian-service.mjs'),
+          path.join(__dirname, '..', '..', '..', 'tools', 'atlassian-service.mjs'),
+          path.resolve(__dirname, '../../..', 'tools', 'atlassian-service.mjs'),
+        ];
+        for (const cand of srcAtlassianCandidates) {
+          if (await fs.pathExists(cand)) {
+            await fs.copy(cand, path.join(targetToolsDir, 'atlassian-service.mjs'), { overwrite: true });
+            this.installedFiles.add(path.join(targetToolsDir, 'atlassian-service.mjs'));
+            break;
+          }
+        }
       }
 
       // Auto-configure Vite middleware if Vite config exists in project
@@ -1457,19 +1506,60 @@ export default async function handler(req, res) {
         const vercelConfig = {
           $schema: 'https://openapi.vercel.sh/vercel.json',
           cleanUrls: true,
+          functions: {
+            'api/**/*.js': {
+              includeFiles: 'tools/**',
+            },
+          },
           rewrites: [
-            {
-              source: '/api/(.*)',
-              destination: '/api/$1',
-            },
-            {
-              source: '/markdown.html',
-              destination: '/markdown.html',
-            },
+            { source: '/api/atlassian/config', destination: '/api/atlassian-config' },
+            { source: '/api/atlassian/discover', destination: '/api/atlassian-discover' },
+            { source: '/api/atlassian/sync-jira', destination: '/api/atlassian-sync-jira' },
+            { source: '/api/atlassian/pull-jira', destination: '/api/atlassian-pull-jira' },
+            { source: '/api/atlassian/sync-confluence', destination: '/api/atlassian-sync-confluence' },
+            { source: '/api/atlassian/pull-confluence', destination: '/api/atlassian-pull-confluence' },
+            { source: '/api/atlassian/sync-history', destination: '/api/atlassian-sync-history' },
+            { source: '/api/(.*)', destination: '/api/$1' },
+            { source: '/markdown.html', destination: '/markdown.html' },
           ],
         };
         await fs.writeFile(targetVercelJson, JSON.stringify(vercelConfig, null, 2) + '\n', 'utf8');
         this.installedFiles.add(targetVercelJson);
+      }
+
+      const deploymentDocCandidates = [
+        path.join(__dirname, '..', '..', '..', 'DEPLOYMENT.md'),
+        path.join(getProjectRoot(), 'DEPLOYMENT.md'),
+      ];
+      const targetDeployment = path.join(projectRoot, 'DEPLOYMENT.md');
+      if (!(await fs.pathExists(targetDeployment))) {
+        for (const cand of deploymentDocCandidates) {
+          if (await fs.pathExists(cand)) {
+            await fs.copy(cand, targetDeployment);
+            this.installedFiles.add(targetDeployment);
+            break;
+          }
+        }
+      }
+
+      const customDir = path.join(projectRoot, '_acl', 'custom');
+      await fs.ensureDir(customDir);
+      const teamNotifyExample = path.join(customDir, 'team-notifications.toml.example');
+      if (!(await fs.pathExists(teamNotifyExample))) {
+        await fs.writeFile(
+          teamNotifyExample,
+          [
+            '# Copy to team-notifications.toml and set real addresses (do not commit secrets).',
+            '# Used by Markdown Studio POST /api/send-email',
+            '',
+            '[[team]]',
+            'name = "Product Owner"',
+            'email = "po@example.com"',
+            '',
+          ].join('\n'),
+          'utf8',
+        );
+        this.installedFiles.add(teamNotifyExample);
       }
 
       // Deploy netlify.toml and netlify/functions if not present

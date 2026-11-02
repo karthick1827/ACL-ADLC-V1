@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "tools/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/atlassian/config", "destination": "/api/atlassian-config" },
+    { "source": "/api/atlassian/discover", "destination": "/api/atlassian-discover" },
+    { "source": "/api/atlassian/sync-jira", "destination": "/api/atlassian-sync-jira" },
+    { "source": "/api/atlassian/pull-jira", "destination": "/api/atlassian-pull-jira" },
+    { "source": "/api/atlassian/sync-confluence", "destination": "/api/atlassian-sync-confluence" },
+    { "source": "/api/atlassian/pull-confluence", "destination": "/api/atlassian-pull-confluence" },
+    { "source": "/api/atlassian/sync-history", "destination": "/api/atlassian-sync-history" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/markdown.html", "destination": "/markdown.html" }
+  ]
+}

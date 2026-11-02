@@ -166,21 +166,27 @@ async function universalHandler(arg1, arg2) {
       ''
     ).trim();
 
+    const vercelOwner = (process.env.VERCEL_GIT_REPO_OWNER || '').trim();
+    const vercelRepo = (process.env.VERCEL_GIT_REPO_SLUG || '').trim();
+
     let owner = (
       (payload && payload.githubOwner) ||
-      qParams.owner ||
+      (vercelOwner && vercelRepo ? vercelOwner : qParams.owner) ||
       process.env.GITHUB_OWNER ||
-      process.env.VERCEL_GIT_REPO_OWNER ||
       ''
     ).trim();
 
     let repo = (
       (payload && payload.githubRepo) ||
-      qParams.repo ||
+      (vercelOwner && vercelRepo ? vercelRepo : qParams.repo) ||
       process.env.GITHUB_REPO ||
-      process.env.VERCEL_GIT_REPO_SLUG ||
       ''
     ).trim();
+
+    if (vercelOwner && vercelRepo) {
+      if (!payload || !payload.githubOwner) owner = vercelOwner;
+      if (!payload || !payload.githubRepo) repo = vercelRepo;
+    }
 
     const branch = (
       (payload && payload.githubBranch) ||
@@ -310,6 +316,8 @@ async function universalHandler(arg1, arg2) {
       return reply(200, {
         success: true,
         mode: 'github',
+        repoConnected: true,
+        gitPushed: true,
         repo: `${owner}/${repo}`,
         branch: branch,
         path: repoFilePath,
@@ -328,6 +336,8 @@ async function universalHandler(arg1, arg2) {
       return reply(200, {
         success: true,
         mode: 'local-disk',
+        repoConnected: false,
+        gitPushed: false,
         path: repoFilePath,
         status: status,
         warning:

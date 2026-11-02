@@ -2,6 +2,9 @@ async function syncFromLiveDisk(quiet = false) {
   if (isSyncing || isSaving || Date.now() - lastSaveTime < 3500) return false;
   isSyncing = true;
   try {
+    if (typeof refreshGitHubUserControl === 'function') {
+      await refreshGitHubUserControl();
+    }
     const cloudToken = (localStorage.getItem('acl_github_token') || '').trim();
     const cloudOwner = (localStorage.getItem('acl_github_owner') || '').trim();
     const cloudRepo = (localStorage.getItem('acl_github_repo') || '').trim();
@@ -176,6 +179,7 @@ async function saveCurrentFile() {
 
   // Save to disk locally or commit to GitHub if hosted on Vercel
   isSaving = true;
+  let resData = {};
   try {
     const cloudToken = (localStorage.getItem('acl_github_token') || '').trim();
     const cloudOwner = (localStorage.getItem('acl_github_owner') || '').trim();
@@ -206,7 +210,7 @@ async function saveCurrentFile() {
       headers: headers,
       body: JSON.stringify(bodyPayload),
     });
-    const resData = await resp.json().catch(() => ({}));
+    resData = await resp.json().catch(() => ({}));
     if (resp.ok && resData.success !== false) {
       lastSaveTime = Date.now();
       if (resData && resData.gitPushed) {
@@ -314,6 +318,11 @@ async function onStatusChange(newStatus) {
   file.content = updatedContent;
 
   const ok = await saveCurrentFile();
+  if (ok !== false && typeof notifyTeamOnStatusChange === 'function') {
+    if (newStatus === 'In Review' || newStatus === 'Approved' || newStatus === 'Rejected') {
+      notifyTeamOnStatusChange(file, newStatus);
+    }
+  }
   if (ok === false) {
     file.status = prevStatus;
     const sel = document.getElementById('statusSelect');
@@ -342,6 +351,10 @@ async function onStatusChange(newStatus) {
 if (typeof window !== 'undefined') {
   window.saveCurrentFile = saveCurrentFile;
   window.syncFromLiveDisk = syncFromLiveDisk;
+  window.ensureLinkedGitHubRepo = async function () {
+    if (typeof refreshGitHubUserControl === 'function') return refreshGitHubUserControl();
+    return null;
+  };
   window.refreshTree = async function (quiet = false) {
     return await syncFromLiveDisk(quiet);
   };

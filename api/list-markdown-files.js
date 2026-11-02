@@ -179,8 +179,10 @@ async function universalHandler(arg1, arg2) {
       ''
     ).trim();
 
-    let owner = (qOwner || process.env.GITHUB_OWNER || process.env.VERCEL_GIT_REPO_OWNER || '').trim();
-    let repo = (qRepo || process.env.GITHUB_REPO || process.env.VERCEL_GIT_REPO_SLUG || '').trim();
+    let owner = (process.env.VERCEL_GIT_REPO_OWNER || '').trim();
+    let repo = (process.env.VERCEL_GIT_REPO_SLUG || '').trim();
+    if (!owner) owner = (qOwner || process.env.GITHUB_OWNER || '').trim();
+    if (!repo) repo = (qRepo || process.env.GITHUB_REPO || '').trim();
     const branch = (
       qBranch ||
       process.env.GITHUB_BRANCH ||

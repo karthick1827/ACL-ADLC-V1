@@ -21,17 +21,16 @@ export function getAtlassianConfig(projectRoot) {
   if (fs.existsSync(configPath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      const hasRealCredentials = Boolean(parsed.domain && parsed.email);
-      const isDemo = Boolean(parsed.isDemoMode);
-      const isConnected = Boolean(parsed.connected && (hasRealCredentials || isDemo));
+      const hasRealCredentials = Boolean(parsed.domain && parsed.email && parsed.apiToken);
+      const isConnected = Boolean(parsed.connected && hasRealCredentials);
       return {
         domain: parsed.domain || '',
         email: parsed.email || '',
-        apiToken: parsed.apiToken || '',
+        apiToken: '',
         jiraProjectKey: parsed.jiraProjectKey || defaultProjectKey,
         confluenceSpaceKey: parsed.confluenceSpaceKey || defaultProjectKey,
         connected: isConnected,
-        isDemoMode: isDemo,
+        verifiedAt: parsed.verifiedAt || null,
         lastSynced: parsed.lastSynced || null,
       };
     } catch {
@@ -46,15 +45,14 @@ export function getAtlassianConfig(projectRoot) {
     jiraProjectKey: defaultProjectKey,
     confluenceSpaceKey: defaultProjectKey,
     connected: false,
-    isDemoMode: false,
+    verifiedAt: null,
     lastSynced: null,
   };
 }
 
 export async function validateAtlassianConfig(config) {
-  const isDemoOnly = Boolean(config.isDemoMode && !config.domain && !config.email);
-  if (isDemoOnly) {
-    return { valid: true, message: 'Sandbox Simulation Mode active' };
+  if (config.isDemoMode) {
+    return { valid: false, error: 'Sandbox/demo mode is not supported. Provide live Atlassian Cloud credentials.' };
   }
   let domain = (config.domain || '').trim();
   if (!domain) {
@@ -63,7 +61,7 @@ export async function validateAtlassianConfig(config) {
   if (!domain.startsWith('http://') && !domain.startsWith('https://')) {
     domain = 'https://' + domain;
   }
-  domain = domain.replace(/\/+$/, '');
+  domain = domain.replace(/\/wiki\/?$/i, '').replace(/\/+$/, '');
   const email = (config.email || '').trim();
   const token = (config.apiToken || '').trim();
   const jiraKey = (config.jiraProjectKey || '').trim().toUpperCase();
@@ -181,7 +179,17 @@ export async function saveAtlassianConfig(projectRoot, config) {
     return cleared;
   }
 
-  const validation = await validateAtlassianConfig(config);
+  const configForValidation = { ...config };
+  if (!configForValidation.apiToken && fs.existsSync(configPath)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (existing.apiToken) configForValidation.apiToken = existing.apiToken;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const validation = await validateAtlassianConfig(configForValidation);
   if (!validation.valid) {
     // Write disconnected status so subsequent requests don't show old connected state
     try {
@@ -198,8 +206,10 @@ export async function saveAtlassianConfig(projectRoot, config) {
   }
 
   const payloadToSave = {
-    ...config,
+    ...configForValidation,
     connected: true,
+    verifiedAt: new Date().toISOString(),
+    isDemoMode: false,
     lastError: null,
   };
   fs.writeFileSync(configPath, JSON.stringify(payloadToSave, null, 2), 'utf8');

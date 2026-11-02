@@ -104,15 +104,54 @@ function replicateToTarget(targetProject) {
     }
   }
 
-  // 4. Replicate tools/atlassian-service.mjs
-  const srcAtlassian = path.join(REPO_ROOT, 'tools', 'atlassian-service.mjs');
-  const targetAtlassian = path.join(targetProject, 'tools', 'atlassian-service.mjs');
-  if (fs.existsSync(srcAtlassian) && copyFileSafe(srcAtlassian, targetAtlassian)) {
-    console.log(`  ✓ Replicated: tools/atlassian-service.mjs`);
+  // 4. Replicate Markdown Studio tools/*.mjs and studio-server.js
+  const studioToolFiles = [
+    'git-details-service.mjs',
+    'acl-output-github.mjs',
+    'github-api.mjs',
+    'github-tarball-acl.mjs',
+    'github-list-cache.mjs',
+    'github-token.mjs',
+    'atlassian-service.mjs',
+    'atlassian-workspace.mjs',
+    'studio-server.js',
+  ];
+  const targetToolsDir = path.join(targetProject, 'tools');
+  if (!fs.existsSync(targetToolsDir)) fs.mkdirSync(targetToolsDir, { recursive: true });
+  for (const toolFile of studioToolFiles) {
+    const srcTool = path.join(REPO_ROOT, 'tools', toolFile);
+    const targetTool = path.join(targetToolsDir, toolFile);
+    if (fs.existsSync(srcTool) && copyFileSafe(srcTool, targetTool)) {
+      console.log(`  ✓ Replicated: tools/${toolFile}`);
+      count++;
+    }
+  }
+
+  // 5. Replicate api/* serverless handlers
+  const apiDir = path.join(REPO_ROOT, 'api');
+  if (fs.existsSync(apiDir)) {
+    const apiFiles = fs.readdirSync(apiDir).filter((f) => f.endsWith('.js'));
+    const targetApiDir = path.join(targetProject, 'api');
+    if (!fs.existsSync(targetApiDir)) fs.mkdirSync(targetApiDir, { recursive: true });
+    for (const apiFile of apiFiles) {
+      const srcApi = path.join(apiDir, apiFile);
+      const targetApi = path.join(targetApiDir, apiFile);
+      if (copyFileSafe(srcApi, targetApi)) {
+        console.log(`  ✓ Replicated: api/${apiFile}`);
+        count++;
+      }
+    }
+  }
+
+  // 6. Replicate DEPLOYMENT.md to target project root if missing
+  const srcDeployment = path.join(REPO_ROOT, 'DEPLOYMENT.md');
+  const targetDeployment = path.join(targetProject, 'DEPLOYMENT.md');
+  if (fs.existsSync(srcDeployment) && !fs.existsSync(targetDeployment) && copyFileSafe(srcDeployment, targetDeployment)) {
+    console.log(`  ✓ Replicated: DEPLOYMENT.md`);
     count++;
   }
 
-  // 5. Update vite.config with latest vite-plugin-template if applicable
+  // 7. Update vite.config with latest vite-plugin-template if applicable
   const viteConfigFiles = ['vite.config.js', 'vite.config.ts', 'vite.config.mjs', 'vite.config.cjs'];
   for (const configFile of viteConfigFiles) {
     const configPath = path.join(targetProject, configFile);

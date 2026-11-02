@@ -20,6 +20,66 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function realPathSafe(value) {
+  try {
+    return fs.realpathSync(value);
+  } catch {
+    return path.resolve(value);
+  }
+}
+
+function canonicalProjectPath(value) {
+  const resolved = path.resolve(value);
+  if (process.platform === 'win32' && typeof fs.realpathSync.native === 'function') {
+    try {
+      return fs.realpathSync.native(resolved);
+    } catch {
+      return resolved;
+    }
+  }
+  return realPathSafe(resolved);
+}
+
+function projectRootHash(projectPath) {
+  return hash(Buffer.from(String(canonicalProjectPath(projectPath)), 'utf8')).slice(0, 12);
+}
+
+function pathsEqual(left, right) {
+  const a = canonicalProjectPath(left);
+  const b = canonicalProjectPath(right);
+  if (process.platform === 'win32') {
+    return a.replaceAll('\\', '/').toLowerCase() === b.replaceAll('\\', '/').toLowerCase();
+  }
+  return a === b;
+}
+
+function pathPresentInText(text, projectPath) {
+  const candidates = new Set([projectPath, path.resolve(projectPath), canonicalProjectPath(projectPath)]);
+  for (const value of candidates) {
+    candidates.add(String(value).replaceAll('\\', '/'));
+  }
+  if (process.platform === 'win32') {
+    for (const value of candidates) {
+      candidates.add(String(value).toLowerCase());
+    }
+  }
+  for (const candidate of candidates) {
+    if (candidate && text.includes(candidate)) return true;
+  }
+  return false;
+}
+
+function renderedPathStartsWithProject(renderedPath, projectPath) {
+  const rendered = path.resolve(renderedPath);
+  const normalize = (value) => (process.platform === 'win32' ? value.replaceAll('\\', '/').toLowerCase() : value);
+  const renderedNorm = normalize(rendered);
+  const projectCandidates = new Set([path.resolve(projectPath), canonicalProjectPath(projectPath)]);
+  for (const candidate of projectCandidates) {
+    if (renderedNorm.startsWith(normalize(String(candidate)))) return true;
+  }
+  return false;
+}
+
 function test(name, fn) {
   total++;
   try {
@@ -167,7 +227,7 @@ async function main() {
     const expectedNames = [...Object.keys(manifest.outputs), 'manifest.json'].sort();
     assert(JSON.stringify(actualNames) === JSON.stringify(expectedNames), 'snapshot file set differs from manifest');
     assert(!fs.existsSync(path.join(dir, 'SKILL.md')), 'SKILL.md was published');
-    assert(manifest.project_root === fs.realpathSync(fix.project), 'manifest root is wrong');
+    assert(pathsEqual(manifest.project_root, fix.project), 'manifest root is wrong');
     for (const [name, expected] of Object.entries(manifest.outputs)) {
       assert(hash(fs.readFileSync(path.join(dir, name))) === expected, `bad output hash for ${name}`);
     }
@@ -234,8 +294,8 @@ async function main() {
     const one = entry(run(fix));
     const two = entry(run(other));
     assert(one !== two, 'shared roots collided');
-    assert(fs.readFileSync(two, 'utf8').includes(other.project), 'second root was not baked');
-    assert(fs.readFileSync(one, 'utf8').includes(fix.project), 'first root lost its binding');
+    assert(pathPresentInText(fs.readFileSync(two, 'utf8'), other.project), 'second root was not baked');
+    assert(pathPresentInText(fs.readFileSync(one, 'utf8'), fix.project), 'first root lost its binding');
   });
 
   await asyncTest('concurrent identical renderers both reuse one complete generation', async () => {
@@ -390,7 +450,7 @@ async function main() {
     const workflow = fs.readFileSync(output, 'utf8');
     const match = workflow.match(/`([^`]*step-01-clarify-and-route\.md)`/);
     assert(match, 'rendered workflow has no first-step reference');
-    assert(match[1].startsWith(fs.realpathSync(special.project)), 'project root was rewritten as a source token');
+    assert(renderedPathStartsWithProject(match[1], special.project), 'project root was rewritten as a source token');
     assert(fs.existsSync(match[1]), 'rendered first-step reference does not exist');
   });
 
@@ -403,8 +463,9 @@ async function main() {
       .basename(broken.project)
       .toLowerCase()
       .replaceAll(/[^a-z0-9]+/g, '-');
-    const rootHash = hash(Buffer.from(fs.realpathSync(broken.project))).slice(0, 12);
+    const rootHash = projectRootHash(broken.project);
     const namespace = path.join(stable.acl, 'render', 'acl-dev-auto', `${slug}-${rootHash}`);
+    fs.mkdirSync(path.dirname(namespace), { recursive: true });
     fs.writeFileSync(namespace, 'not a directory', 'utf8');
     const result = run(broken);
     assert(result.status !== 0 && result.stdout.startsWith('HALT:'), 'publication failure did not HALT');

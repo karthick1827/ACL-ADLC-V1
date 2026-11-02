@@ -1442,6 +1442,45 @@ function updateNavUserControlCentre(data) {
   }
 }
 
+function clearGithubLocalStorageKeys() {
+  try {
+    ['acl_github_owner', 'acl_github_repo', 'acl_github_branch', 'acl_github_token'].forEach((key) => localStorage.removeItem(key));
+  } catch (e) {}
+}
+
+function hydrateGithubRepoFromGitDetails(data) {
+  if (!data || !data.repoConnected || data.repoDeleted) {
+    clearGithubLocalStorageKeys();
+    return;
+  }
+  try {
+    if (data.githubOwner) localStorage.setItem('acl_github_owner', data.githubOwner);
+    if (data.githubRepo) localStorage.setItem('acl_github_repo', data.githubRepo);
+    if (data.githubBranch) localStorage.setItem('acl_github_branch', data.githubBranch);
+  } catch (e) {}
+}
+
+function applyGitDetailsToStudio(data) {
+  const payload = data || { repoConnected: false };
+  const isConnected = Boolean(payload.repoConnected === true && !payload.repoDeleted);
+  window.__ACL_GIT_CONNECTED__ = isConnected;
+  if (!isConnected || payload.repoDeleted) clearGithubLocalStorageKeys();
+  else hydrateGithubRepoFromGitDetails(payload);
+  if (typeof updateNavUserControlCentre === 'function') updateNavUserControlCentre(payload);
+}
+
+async function refreshGitHubUserControl() {
+  try {
+    const res = await fetch('/api/git-details?t=' + Date.now(), { cache: 'no-store' });
+    const data = res.ok ? await res.json() : { repoConnected: false };
+    applyGitDetailsToStudio(data);
+    return data;
+  } catch (e) {
+    applyGitDetailsToStudio({ repoConnected: false });
+    return null;
+  }
+}
+
 async function renderGitDashboard() {
   const container = document.getElementById('dashboardContainerRoot');
   if (!container) return;
@@ -1466,12 +1505,9 @@ async function renderGitDashboard() {
     if (!data) {
       data = { isPushed: false, repoConnected: false, userDetails: {}, projectDetails: {}, gitDetails: {} };
     }
+    applyGitDetailsToStudio(data);
     const isConnected = Boolean(data && data.repoConnected === true && !data.repoDeleted);
-    window.__ACL_GIT_CONNECTED__ = isConnected;
     const isPushed = Boolean(data && data.isPushed);
-
-    // Update navbar identity
-    updateNavUserControlCentre(data);
 
     const user = data.userDetails || {};
     const project = data.projectDetails || {};
@@ -1770,14 +1806,11 @@ async function renderAtlassianSuite(isPushed) {
     const epicsCount = (discRes.epics || []).length;
     const storiesCount = (discRes.stories || []).length;
     const deliverablesCount = (discRes.deliverables || []).length;
-    const isConnected = Boolean(cfgRes.connected && cfgRes.domain && cfgRes.email);
-    const isDemo = Boolean(cfgRes.isDemoMode);
+    const isConnected = Boolean(cfgRes.connected);
 
     let statusBadgeHtml = '';
-    if (isConnected && !isDemo) {
+    if (isConnected) {
       statusBadgeHtml = `<span class="atlassian-status-badge connected">🟢 Connected: ${cfgRes.domain || 'Cloud'}</span>`;
-    } else if (isDemo) {
-      statusBadgeHtml = `<span class="atlassian-status-badge demo">🟡 Interactive Sandbox Mode</span>`;
     } else {
       statusBadgeHtml = `<span class="atlassian-status-badge standby">⚪ Not Configured</span>`;
     }
@@ -1833,12 +1866,8 @@ async function renderAtlassianSuite(isPushed) {
             </div>
 
             <div class="atlassian-config-actions">
-              <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: #475569;">
-                <input type="checkbox" id="atlDemoMode" name="isDemoMode" ${isDemo ? 'checked' : ''} style="cursor: pointer;" />
-                <label for="atlDemoMode" style="cursor: pointer; font-size: 0.82rem; text-transform: none; color: #475569;">Use Sandbox Simulation Mode (generates live-preview keys without requiring active API token)</label>
-              </div>
-              <div style="display: flex; gap: 0.5rem;">
-                ${isConnected || isDemo ? '<button type="button" class="atlassian-toggle-btn" onclick="disconnectAtlassian()" style="color: #ef4444; border-color: #fca5a5;">Disconnect</button>' : ''}
+              <div style="display: flex; gap: 0.5rem; margin-left: auto;">
+                ${isConnected ? '<button type="button" class="atlassian-toggle-btn" onclick="disconnectAtlassian()" style="color: #ef4444; border-color: #fca5a5;">Disconnect</button>' : ''}
                 <button type="button" class="atlassian-toggle-btn" onclick="toggleAtlassianConfigPanel()">Cancel</button>
                 <button type="button" class="atlassian-btn-sync jira" onclick="saveAtlassianConfig(event)" style="width: auto; padding: 0.45rem 1rem;">Save & Connect</button>
               </div>
@@ -1859,8 +1888,8 @@ async function renderAtlassianSuite(isPushed) {
                   <span>Sprint & Issue Management</span>
                 </div>
               </div>
-              <span class="atlassian-status-badge ${isConnected ? 'connected' : isDemo ? 'demo' : 'standby'}">
-                ${isConnected ? 'Ready to Sync' : isDemo ? 'Sandbox Ready' : '⚪ Not Configured'}
+              <span class="atlassian-status-badge ${isConnected ? 'connected' : 'standby'}">
+                ${isConnected ? 'Ready to Sync' : '⚪ Not Configured'}
               </span>
             </div>
 
@@ -1891,8 +1920,8 @@ async function renderAtlassianSuite(isPushed) {
                   <span>Living Product & Architecture Pages</span>
                 </div>
               </div>
-              <span class="atlassian-status-badge ${isConnected ? 'connected' : isDemo ? 'demo' : 'standby'}">
-                ${isConnected ? 'Ready to Sync' : isDemo ? 'Sandbox Ready' : '⚪ Not Configured'}
+              <span class="atlassian-status-badge ${isConnected ? 'connected' : 'standby'}">
+                ${isConnected ? 'Ready to Sync' : '⚪ Not Configured'}
               </span>
             </div>
 
@@ -1972,7 +2001,6 @@ window.disconnectAtlassian = async function () {
       apiToken: '',
       jiraProjectKey: '',
       confluenceSpaceKey: '',
-      isDemoMode: false,
       connected: false,
     };
     await safeFetchJson('/api/atlassian/config', {
@@ -1997,24 +2025,19 @@ window.saveAtlassianConfig = async function (e) {
   const apiToken = document.getElementById('atlToken')?.value?.trim();
   const jiraProjectKey = document.getElementById('atlJiraKey')?.value?.trim()?.toUpperCase();
   const confluenceSpaceKey = document.getElementById('atlConfSpace')?.value?.trim()?.toUpperCase();
-  const isDemoMode = Boolean(document.getElementById('atlDemoMode')?.checked);
-
-  if (!isDemoMode && (!domain || !email || !apiToken || !jiraProjectKey || !confluenceSpaceKey)) {
-    alert(
-      '⚠️ Please fill in all required fields (Domain, Email, API Token, JIRA Key, Confluence Space Key) or enable Sandbox Simulation Mode.',
-    );
-    return;
-  }
-
   const payload = {
     domain: domain || '',
     email: email || '',
     apiToken: apiToken || '',
     jiraProjectKey: jiraProjectKey || '',
     confluenceSpaceKey: confluenceSpaceKey || '',
-    isDemoMode,
     connected: true,
   };
+
+  if (!domain || !email || !apiToken || !jiraProjectKey || !confluenceSpaceKey) {
+    alert('⚠️ Please fill in all required fields (Domain, Email, API Token, JIRA Key, Confluence Space Key).');
+    return;
+  }
 
   const saveBtn = document.querySelector('#atlassianConfigForm button[type="submit"]') || (e && e.target);
   const origBtnText = saveBtn ? saveBtn.textContent : '';
@@ -2311,3 +2334,7 @@ function renderSyncHistoryItems(history) {
     )
     .join('');
 }
+
+window.refreshGitHubUserControl = refreshGitHubUserControl;
+window.applyGitDetailsToStudio = applyGitDetailsToStudio;
+window.hydrateGithubRepoFromGitDetails = hydrateGithubRepoFromGitDetails;

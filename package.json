@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "acl-adlc",
-  "version": "6.11.53",
+  "version": "6.11.54",
   "description": "AI-driven agile development framework for the ACL Method Module Ecosystem",
   "keywords": [
     "agile",
@@ -30,6 +30,7 @@
     "api",
     "netlify.toml",
     "vercel.json",
+    "DEPLOYMENT.md",
     "ACL-ADLC-Figma-Precision-Engine-Guide.pdf",
     "AGENTS.md",
     ".cursorrules",
