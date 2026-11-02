@@ -12,7 +12,7 @@
   <text x="248.4" y="346.3" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#4a1d6a">acl-agent-ux-designer</text>
 
   <!-- Phase 3: Solutioning (Architect Winston, PM Epics skill) -->
-  <text x="385.2" y="159.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#7c2d12">acl-agent-architect</text>
+  <text x="385.2" y="159.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#7c2d12">acl-architecture</text>
   <text x="385.2" y="216.7" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="4.8" font-weight="600" fill="#14532d">acl-create-epics-and-stories</text>
   <!-- Test Design: Agent name removed as requested -->
   <text x="385.2" y="334.2" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#7c2d12">acl-architecture</text>
