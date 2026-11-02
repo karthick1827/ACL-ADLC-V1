@@ -4,35 +4,35 @@
   <!-- Phase 1: Discovery (Analyst - Mary) -->
   <text x="111.6" y="229.8" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#0f5147">acl-agent-analyst</text>
   <text x="111.6" y="283.8" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#0f5147">acl-agent-analyst</text>
-  <text x="111.6" y="337.8" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#0f5147">acl-product-brief</text>
+  <text x="111.6" y="337.8" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#0f5147">acl-agent-analyst</text>
 
   <!-- Phase 2: Planning (PM John & UX Sally) -->
-  <text x="248.4" y="159.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#14532d">acl-agent-pm</text>
-  <text x="248.4" y="219.0" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#14532d">acl-agent-pm</text>
+  <text x="248.4" y="159.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#14532d">acl-prd</text>
+  <text x="248.4" y="219.0" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#14532d">acl-prd</text>
   <text x="248.4" y="346.3" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#4a1d6a">acl-agent-ux-designer</text>
 
   <!-- Phase 3: Solutioning (Architect Winston, PM Epics skill) -->
   <text x="385.2" y="159.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#7c2d12">acl-agent-architect</text>
   <text x="385.2" y="216.7" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="4.8" font-weight="600" fill="#14532d">acl-create-epics-and-stories</text>
-  <text x="385.2" y="276.6" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.0" font-weight="600" fill="#831843">acl-qa-generate-e2e-tests</text>
-  <text x="385.2" y="334.2" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#7c2d12">acl-agent-architect</text>
-  <text x="385.2" y="389.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#7c2d12">acl-agent-architect</text>
+  <!-- Test Design: Agent name removed as requested -->
+  <text x="385.2" y="334.2" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#7c2d12">acl-architecture</text>
+  <text x="385.2" y="389.2" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="4.4" font-weight="600" fill="#7c2d12">acl-check-implementation-readiness</text>
 
   <!-- Phase 4: Sprints & Epics (Sprint skills) -->
   <text x="529.2" y="159.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#1e3a8a">acl-sprint-planning</text>
-  <text x="529.2" y="220.3" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#1e3a8a">acl-sprint-planning</text>
-  <text x="529.2" y="276.6" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#1e3a8a">acl-sprint-status</text>
+  <!-- Epic Context: Agent name removed as requested -->
+  <!-- Validate Epic: Agent name removed as requested -->
 
   <!-- Phase 4: Story Context & Retro -->
-  <text x="673.2" y="231.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#1e3a8a">acl-agent-dev</text>
-  <text x="673.2" y="291.0" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#1e3a8a">acl-agent-dev</text>
+  <text x="673.2" y="231.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#1e3a8a">acl-quick-dev</text>
+  <text x="673.2" y="291.0" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#1e3a8a">acl-quick-dev</text>
   <text x="673.2" y="511.9" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#1e3a8a">acl-retrospective</text>
 
   <!-- Phase 4: Story Cycle -->
-  <text x="817.2" y="123.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="4.8" font-weight="600" fill="#1e3a8a">acl-create-epics-and-stories</text>
-  <text x="817.2" y="175.8" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.3" font-weight="600" fill="#1e3a8a">acl-sprint-status</text>
-  <text x="817.2" y="288.7" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#1e3a8a">acl-agent-dev</text>
-  <text x="817.2" y="339.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#2e1065">acl-agent-dev</text>
+  <text x="817.2" y="123.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#1e3a8a">acl-quick-dev</text>
+  <text x="817.2" y="175.8" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#1e3a8a">acl-quick-dev</text>
+  <text x="817.2" y="288.7" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#1e3a8a">acl-quick-dev</text>
+  <text x="817.2" y="339.1" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="600" fill="#2e1065">acl-quick-dev</text>
   <text x="817.2" y="454.3" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#2e1065">acl-agent-dev</text>
 </g>
 </svg>

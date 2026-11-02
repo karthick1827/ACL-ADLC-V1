@@ -2,13 +2,12 @@
 
 <g id="acl-agent-workflow-labels">
   <!-- Brownfield Steps (Left Column) -->
-  <text x="446.4" y="139.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#14532d">acl-agent-pm</text>
-  <text x="446.4" y="196.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#7c2d12">acl-agent-architect</text>
-  <text x="446.4" y="249.0" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="4.6" font-weight="600" fill="#1e3a8a">acl-sprint-planning</text>
-  <text x="446.4" y="304.8" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#1e293b">acl-agent-dev</text>
-  <text x="446.4" y="362.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.2" font-weight="600" fill="#831843">acl-qa-generate-e2e-tests</text>
-  <text x="446.4" y="420.0" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#0f5147">acl-agent-tech-writer</text>
-  
+  <text x="446.4" y="139.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.2" font-weight="600" fill="#0f5147">acl-generate-project-context</text>
+  <text x="446.4" y="196.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.0" font-weight="600" fill="#7c2d12">acl-prd, acl-agent-architect</text>
+  <text x="446.4" y="249.0" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="5.2" font-weight="600" fill="#1e3a8a">acl-quick-dev</text>
+  <text x="446.4" y="304.8" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#1e293b">acl-quick-dev</text>
+  <text x="446.4" y="362.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="4.8" font-weight="600" fill="#831843">acl-code-review, acl-qa-generate-e2e-tests</text>
+
   <!-- Reviewers (Right Column) -->
   <text x="777.6" y="157.0" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#334155">acl-review-adversarial-general</text>
   <text x="777.6" y="207.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6.0" font-weight="600" fill="#334155">acl-review-edge-case-hunter</text>
