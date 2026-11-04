@@ -18,6 +18,31 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const SRC_PUBLIC_DIR = path.join(REPO_ROOT, 'src', 'public');
 const SRC_MARKDOWN_DIR = path.join(SRC_PUBLIC_DIR, 'markdown');
 
+// Auto-load .env from REPO_ROOT if present
+const envPath = path.join(REPO_ROOT, '.env');
+if (fs.existsSync(envPath)) {
+  try {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    for (const line of envContent.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const match = trimmed.match(/^([^=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        let val = match[2].trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[SYNC-WARN] Failed to read .env file:`, err.message);
+  }
+}
+
 // Parse CLI arguments
 const args = process.argv.slice(2);
 const isWatch = args.includes('--watch') || args.includes('-w');
@@ -26,14 +51,23 @@ const customTarget = args.find((arg) => !arg.startsWith('-'));
 
 const DEFAULT_TARGETS = [];
 
-const targetProjects = customTarget
+function resolveTarget(p) {
+  if (!p) return null;
+  return path.isAbsolute(p) ? path.resolve(p) : path.resolve(REPO_ROOT, p);
+}
+
+const rawTargets = customTarget
   ? [customTarget]
   : process.env.ACL_TARGET_PROJECT
-    ? [process.env.ACL_TARGET_PROJECT]
-    : DEFAULT_TARGETS.filter((p) => fs.existsSync(p));
+    ? process.env.ACL_TARGET_PROJECT.split(',').map((t) => t.trim()).filter(Boolean)
+    : DEFAULT_TARGETS;
+
+const targetProjects = rawTargets
+  .map(resolveTarget)
+  .filter((p) => p && fs.existsSync(p));
 
 if (targetProjects.length === 0) {
-  console.error(`[SYNC-ERROR] No valid target projects found.`);
+  console.error(`[SYNC-ERROR] No valid target projects found. Make sure ACL_TARGET_PROJECT is set in .env or pass as argument.`);
   process.exit(1);
 }
 
