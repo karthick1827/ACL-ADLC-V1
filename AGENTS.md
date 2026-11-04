@@ -280,7 +280,7 @@ Please choose which Tier you want to proceed with:
 
 1. **Phase 1 — Product Brief Update (Gate 1/4)**:
    - The AI Agent **MUST NOT** immediately write or modify application code.
-   - The AI Agent **ONLY** appends the new feature description, problem statement, and scope in `_acl-output/1-analysis/acl-product-brief/brief.md`; sets frontmatter `status: In Review` and `project_type: greenfield`.
+   - The AI Agent **ONLY** appends the new feature description, problem statement, and scope at the **bottom** of the **existing** `_acl-output/1-analysis/acl-product-brief/brief.md` (never create a second `brief.md` under `{planning_artifacts}/briefs/` or another run folder); sets frontmatter `status: In Review` and `project_type: brownfield` (Tier 2 feature addition). Agents **may** change `Approved` → `In Review` on that canonical file only.
    - **NO OTHER DOCUMENT** (`prd.md`, `architecture-spine.md`, `epics.md`) is created or modified at this step.
    - **Immediate Gate Lock 1**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 
@@ -306,7 +306,7 @@ Please choose which Tier you want to proceed with:
 
 2. **Phase 2 — PRD Update (Gate 2/4)**:
    - **Prerequisite Check**: The AI Agent MUST verify `brief.md` has `status: Approved`. If it does not, the AI Agent MUST output Gate Lock 1 and halt immediately.
-   - The AI Agent **ONLY** appends functional requirements (FRs), user stories, and acceptance criteria in `_acl-output/2-plan-workflows/acl-prd/prd.md`; sets frontmatter `status: In Review`.
+   - The AI Agent **ONLY** appends functional requirements (FRs), user stories, and acceptance criteria at the **bottom** of the **existing** `_acl-output/2-plan-workflows/acl-prd/prd.md` (never a second `prd.md` under `{planning_artifacts}/prds/`); sets frontmatter `status: In Review`.
    - **NO OTHER DOCUMENT** (`architecture-spine.md`, `epics.md`) is created or modified at this step.
    - **Immediate Gate Lock 2**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 
@@ -331,7 +331,7 @@ Please choose which Tier you want to proceed with:
 
 3. **Phase 3A — Architecture Update (Gate 3/4)**:
    - **Prerequisite Check**: The AI Agent MUST verify BOTH `brief.md` AND `prd.md` have `status: Approved`. If either does not, the AI Agent MUST output the relevant Gate Lock and halt immediately.
-   - The AI Agent **ONLY** appends component interfaces, data models, and API contracts in `_acl-output/3-solutioning/acl-architecture/architecture-spine.md`; sets frontmatter `status: In Review`.
+   - The AI Agent **ONLY** appends component interfaces, data models, and API contracts at the **bottom** of the **existing** canonical spine under `_acl-output/3-solutioning/acl-architecture/` (never a second spine file in a new run folder); sets frontmatter `status: In Review`.
    - **NO OTHER DOCUMENT** (`epics.md`) is created or modified at this step.
    - **Immediate Gate Lock 3**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 
@@ -356,7 +356,7 @@ Please choose which Tier you want to proceed with:
 
 4. **Phase 3B — Epics & Stories Update (Gate 4/4)**:
    - **Prerequisite Check**: The AI Agent MUST verify `brief.md`, `prd.md`, AND `architecture-spine.md` ALL have `status: Approved`. If any does not, the AI Agent MUST output the relevant Gate Lock and halt immediately.
-   - The AI Agent **ONLY** appends the new Epic or Story with an unchecked acceptance criteria checklist (`- [ ]`) in `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`, strictly preserving all existing completed stories (`- [x]`); sets frontmatter `status: In Review`.
+   - The AI Agent **ONLY** appends the new Epic or Story at the **bottom** of the **existing** `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md` (never a second `epics.md` elsewhere), with an unchecked acceptance criteria checklist (`- [ ]`), strictly preserving all existing completed stories (`- [x]`); sets frontmatter `status: In Review`.
    - **NO APPLICATION CODE** is generated at this step.
    - **Immediate Gate Lock 4**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 

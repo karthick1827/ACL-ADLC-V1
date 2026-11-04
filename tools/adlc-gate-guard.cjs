@@ -22,8 +22,9 @@ const GATES = {
   phase3_arch: {
     key: 'phase3_arch',
     name: 'Phase 3A: Solutioning (Architecture Spine)',
-    artifact: '3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md',
-    altArtifact: '3-solutioning/acl-architecture/architecture.md',
+    artifact: '3-solutioning/acl-architecture/architecture-spine.md',
+    altArtifact: '3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md',
+    altArtifact2: '3-solutioning/acl-architecture/architecture.md',
     prerequisites: ['phase1', 'phase2'],
   },
   phase3_stories: {
@@ -41,43 +42,7 @@ const GATES = {
   },
 };
 
-function findArtifactFile(baseName) {
-  if (!fs.existsSync(ACL_OUTPUT_DIR)) return null;
-  const targetName = path.basename(baseName).toLowerCase();
-  let found = null;
-  function walk(dir) {
-    if (found || !fs.existsSync(dir)) return;
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name.toLowerCase().includes('memlog')) continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (entry.isFile() && entry.name.toLowerCase() === targetName) {
-        found = full;
-        return;
-      }
-    }
-  }
-  walk(ACL_OUTPUT_DIR);
-  return found;
-}
-
-function getArtifactStatus(relativePath, altPath) {
-  let fullPath = path.join(ACL_OUTPUT_DIR, relativePath);
-  if (!fs.existsSync(fullPath) && altPath) {
-    const altFull = path.join(ACL_OUTPUT_DIR, altPath);
-    if (fs.existsSync(altFull)) fullPath = altFull;
-  }
-  if (!fs.existsSync(fullPath)) {
-    const dynamicFind = findArtifactFile(relativePath) || (altPath ? findArtifactFile(altPath) : null);
-    if (dynamicFind) fullPath = dynamicFind;
-  }
-
-  if (!fs.existsSync(fullPath)) {
-    return { exists: false, status: 'Missing', path: fullPath };
-  }
-
+function readStatusFromFile(fullPath, relativePath, canonical) {
   const content = fs.readFileSync(fullPath, 'utf8');
   let status = 'In Review';
   const match = content.match(/status:\s*([^\n\r]+)/i);
@@ -92,13 +57,102 @@ function getArtifactStatus(relativePath, altPath) {
     }
   }
 
-  return { exists: true, status: status, path: fullPath, content: content };
+  return { exists: true, status, path: fullPath, relativePath, canonical: Boolean(canonical), content };
+}
+
+function getArtifactStatus(relativePath, altPath, altPath2) {
+  const candidates = [relativePath, altPath, altPath2].filter(Boolean);
+  for (const rel of candidates) {
+    const fullPath = path.join(ACL_OUTPUT_DIR, rel);
+    if (fs.existsSync(fullPath)) {
+      return readStatusFromFile(fullPath, rel, true);
+    }
+  }
+
+  const missingPath = path.join(ACL_OUTPUT_DIR, relativePath);
+  return { exists: false, status: 'Missing', path: missingPath, relativePath, canonical: false };
+}
+
+function findAllFilesNamed(baseName) {
+  if (!fs.existsSync(ACL_OUTPUT_DIR)) return [];
+  const targetName = path.basename(baseName).toLowerCase();
+  const found = [];
+  function walk(dir) {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name.toLowerCase().includes('memlog')) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile() && entry.name.toLowerCase() === targetName) {
+        found.push(full);
+      }
+    }
+  }
+  walk(ACL_OUTPUT_DIR);
+  return found;
+}
+
+function normalizeAclRelativePath(value) {
+  return value.replaceAll('\\', '/').toLowerCase();
+}
+
+function validateDuplicateDeliverables() {
+  const rules = [
+    { base: 'brief.md', allowed: ['1-analysis/acl-product-brief/brief.md'] },
+    { base: 'prd.md', allowed: ['2-plan-workflows/acl-prd/prd.md'] },
+    { base: 'epics.md', allowed: ['3-solutioning/acl-create-epics-and-stories/epics.md'] },
+  ];
+  const spineAllowed = [
+    '3-solutioning/acl-architecture/architecture-spine.md',
+    '3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md',
+    '3-solutioning/acl-architecture/architecture.md',
+  ];
+
+  let hasDuplicate = false;
+
+  for (const rule of rules) {
+    for (const full of findAllFilesNamed(rule.base)) {
+      const rel = normalizeAclRelativePath(path.relative(ACL_OUTPUT_DIR, full));
+      if (rule.allowed.some((allowed) => normalizeAclRelativePath(allowed) === rel)) continue;
+      hasDuplicate = true;
+      console.error(`❌ [DUPLICATE GATE DELIVERABLE]: Extra '${rule.base}' at _acl-output/${rel}`);
+      console.error(`   Canonical: _acl-output/${rule.allowed[0]}`);
+    }
+  }
+
+  for (const spineName of ['architecture-spine.md', 'architecture.md']) {
+    for (const full of findAllFilesNamed(spineName)) {
+      const rel = normalizeAclRelativePath(path.relative(ACL_OUTPUT_DIR, full));
+      if (spineAllowed.some((allowed) => normalizeAclRelativePath(allowed) === rel)) continue;
+      if (spineName === 'architecture-spine.md' && rel === normalizeAclRelativePath('3-solutioning/acl-architecture/ARCHITECTURE-SPINE.md'))
+        continue;
+      hasDuplicate = true;
+      console.error(`❌ [DUPLICATE GATE DELIVERABLE]: Extra spine file at _acl-output/${rel}`);
+      console.error(`   Use a single spine under _acl-output/3-solutioning/acl-architecture/`);
+    }
+  }
+  // ARCHITECTURE-SPINE.md (case)
+  for (const full of findAllFilesNamed('ARCHITECTURE-SPINE.md')) {
+    const rel = normalizeAclRelativePath(path.relative(ACL_OUTPUT_DIR, full));
+    if (spineAllowed.some((allowed) => normalizeAclRelativePath(allowed) === rel)) continue;
+    hasDuplicate = true;
+    console.error(`❌ [DUPLICATE GATE DELIVERABLE]: Extra spine file at _acl-output/${rel}`);
+  }
+
+  if (hasDuplicate) {
+    console.error(
+      '   Fix: Append feature content to the canonical file and remove extras. See src/acl-skills/_shared/references/brownfield-tier2-feature-addition.md',
+    );
+  }
+  return hasDuplicate;
 }
 
 function evaluateAllGates() {
   const results = {};
   for (const [gateKey, gate] of Object.entries(GATES)) {
-    const fileInfo = getArtifactStatus(gate.artifact, gate.altArtifact);
+    const fileInfo = getArtifactStatus(gate.artifact, gate.altArtifact, gate.altArtifact2);
     let isAccepted = fileInfo.status === 'Accepted';
     let isRejected = fileInfo.status === 'Rejected';
     let isInReview = fileInfo.status === 'In Review' || fileInfo.status === 'Missing';
@@ -237,11 +291,18 @@ function validateAllIntegrity() {
     console.error('\n🛑 Gate integrity check failed: Downstream deliverables were generated before upstream manager approval.');
     console.error('========================================================================\n');
     process.exit(1);
-  } else {
-    console.log('✅ [GATE INTEGRITY PASSED]: All pipeline artifacts conform to manager approval invariants.\n');
-    console.log('========================================================================\n');
-    return { ok: true };
   }
+
+  const hasDuplicates = validateDuplicateDeliverables();
+  if (hasDuplicates) {
+    console.error('\n🛑 Duplicate deliverable check failed: Use canonical _acl-output paths only (Brownfield Tier 2 feature addition).');
+    console.error('========================================================================\n');
+    process.exit(1);
+  }
+
+  console.log('✅ [GATE INTEGRITY PASSED]: All pipeline artifacts conform to manager approval invariants.\n');
+  console.log('========================================================================\n');
+  return { ok: true };
 }
 function waitForGate(targetName) {
   const normalized = (targetName || 'phase2').toLowerCase().replaceAll(/[^a-z0-9_]/g, '');
@@ -334,4 +395,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { checkGate, evaluateAllGates, validateAllIntegrity, waitForGate, GATES };
+module.exports = { checkGate, evaluateAllGates, validateAllIntegrity, validateDuplicateDeliverables, waitForGate, GATES };

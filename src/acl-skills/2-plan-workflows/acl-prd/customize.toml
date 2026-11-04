@@ -31,6 +31,7 @@ activation_steps_append = []
 #   "Investor PRDs must include a market sizing section."                    # generic agent instruction
 persistent_facts = [
   "file:{project-root}/**/project-context.md",
+  "file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md",
 ]
 
 # Executed when the workflow completes (after the user has been told the

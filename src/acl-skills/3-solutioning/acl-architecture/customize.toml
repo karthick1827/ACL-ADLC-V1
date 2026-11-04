@@ -31,6 +31,7 @@ activation_steps_append = []
 #   "file:{project-root}/docs/engineering-standards.md"
 persistent_facts = [
   "file:{project-root}/**/project-context.md",
+  "file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md",
 ]
 
 # Executed when the workflow completes (after the spine is final and the user has been told).

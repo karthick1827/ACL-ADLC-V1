@@ -32,6 +32,7 @@ activation_steps_append = []
 
 persistent_facts = [
   "file:{project-root}/**/project-context.md",
+  "file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md",
 ]
 
 # Scalar: executed when the workflow reaches Step 4 (Final Validation) and the

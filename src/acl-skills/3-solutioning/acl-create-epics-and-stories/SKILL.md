@@ -37,6 +37,11 @@ Before executing any actions, adopting any persona, greeting the user, or produc
 - ONLY THE MANAGER is authorized and permitted to change the status via Markdown Studio (`markdown.html`).
 - The AI agent is **STRICTLY PROHIBITED** from prompting the developer to self-approve or change review statuses.
 - The AI agent MUST ONLY instruct the developer to wait for the manager's review.
+- **Brownfield Tier 2 feature addition:** agents **may** set `status: Approved` → `status: In Review` when appending to canonical `epics.md` (shared reference in `{workflow.persistent_facts}`). Never set `status: Approved`.
+
+## Brownfield Tier 2 feature addition
+
+Obey `file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md`. **Canonical epics file:** `{project-root}/_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`. If it exists, **append** new epics/stories at the bottom (preserve `- [x]` on completed stories); set frontmatter `status: In Review`. Do **not** initialize a second `epics.md` under `{planning_artifacts}/` when the canonical file exists.
 
 
 # Create Epics and Stories

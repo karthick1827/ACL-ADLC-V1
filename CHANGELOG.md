@@ -1,5 +1,14 @@
 # Changelog
 
+## v6.11.55 - 2026-11-04
+
+### Brownfield Tier 2 feature addition (single canonical deliverables)
+
+- Shared reference `src/acl-skills/_shared/references/brownfield-tier2-feature-addition.md` loaded by phase skills and agents.
+- Product brief, PRD, architecture, and epics skills: append to canonical `_acl-output/` paths, set `status: In Review` on update (agents may revert `Approved` → `In Review` for that case only).
+- Epics step-01 and `AGENTS.md` cascade aligned; gate guard uses canonical paths only and `--validate-all` flags duplicate gate deliverables.
+- Primary architecture gate artifact: `architecture-spine.md` (legacy filename fallbacks retained).
+
 ## v6.11.54 - 2026-11-02
 
 ### Markdown Studio enterprise integrations (install bundle)

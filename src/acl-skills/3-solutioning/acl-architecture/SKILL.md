@@ -37,6 +37,11 @@ Before executing any actions, adopting any persona, greeting the user, or produc
 - ONLY THE MANAGER is authorized and permitted to change the status via Markdown Studio (`markdown.html`).
 - The AI agent is **STRICTLY PROHIBITED** from prompting the developer to self-approve or change review statuses.
 - The AI agent MUST ONLY instruct the developer to wait for the manager's review.
+- **Brownfield Tier 2 feature addition:** agents **may** set `status: Approved` → `status: In Review` when appending to an existing canonical spine (shared reference in `{workflow.persistent_facts}`). Never set `status: Approved`.
+
+## Brownfield Tier 2 feature addition
+
+Obey `file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md`. Use the **existing** spine under `_acl-output/3-solutioning/acl-architecture/` (one file only). **Update** in place: append feature invariants at the bottom; set spine frontmatter `status: In Review`. Do **not** bind a new `{workflow.spine_output_path}/{run_folder_pattern}/` for gate deliverables when a canonical spine already exists.
 
 
 # ACL Architecture
@@ -106,7 +111,7 @@ Before proceeding with architecture creation or invoking subagents:
 5. Interactive create: offer the working mode in `{communication_language}` — **Coaching path** (default) or **Fast path** (see *How you work*) — before any drafting; default to Coaching unless the user asks for speed.
 6. **Mandatory, both paths, before drafting:** ask whether the spine is the only deliverable — and if not, draw out the *purpose and audience* rather than a document type. "An architecture doc" balloons into bloat; what they actually need might be a one-detail explainer for a single team or a non-technical vision piece for a board. Purpose right-sizes the artifact and may call for extra elicitation up front, not just a finale add-on.
 
-For a new spine, bind `{doc_workspace}` to `{workflow.spine_output_path}/{workflow.run_folder_pattern}/`, seed `ARCHITECTURE-SPINE.md` from `{workflow.spine_template}`, run `memlog.py init`, and tell the user the path. **At epic altitude, scope the folder to the epic** (set `run_folder_pattern` per `customize.toml`) so per-epic runs don't collide.
+For a new spine, bind `{doc_workspace}` to `{workflow.spine_output_path}/{workflow.run_folder_pattern}/`, seed `ARCHITECTURE-SPINE.md` from `{workflow.spine_template}`, run `memlog.py init`, and tell the user the path. **Pre-check:** If any canonical spine already exists under `_acl-output/3-solutioning/acl-architecture/` (`architecture-spine.md`, `ARCHITECTURE-SPINE.md`, or `architecture.md`), do **not** create a new run folder — **Update** that file (Tier 2 feature addition). **At epic altitude, scope the folder to the epic** (set `run_folder_pattern` per `customize.toml`) so per-epic runs don't collide.
 
 ## Reviewer Gate
 

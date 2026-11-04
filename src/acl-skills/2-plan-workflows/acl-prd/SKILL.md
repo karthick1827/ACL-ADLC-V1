@@ -37,6 +37,11 @@ Before executing any actions, adopting any persona, greeting the user, or produc
 - ONLY THE MANAGER is authorized and permitted to change the status via Markdown Studio (`markdown.html`).
 - The AI agent is **STRICTLY PROHIBITED** from prompting the developer to self-approve or change review statuses.
 - The AI agent MUST ONLY instruct the developer to wait for the manager's review.
+- **Brownfield Tier 2 feature addition:** agents **may** set `status: Approved` → `status: In Review` when appending to an existing canonical deliverable (shared reference in `{workflow.persistent_facts}`). Never set `status: Approved`.
+
+## Brownfield Tier 2 feature addition
+
+Obey `file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md`. **Canonical PRD:** `_acl-output/2-plan-workflows/acl-prd/prd.md`. If it exists, use **Update** only (append feature at bottom, `status: In Review`) — never a second `prd.md` under `{workflow.prd_output_path}/`.
 
 
 # ACL PRD
@@ -66,9 +71,9 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
 
 ## Intent Modes
 
-**Create.** Bind `{doc_workspace}` to `{workflow.prd_output_path}/{workflow.run_folder_pattern}/`. Write `prd.md` with YAML frontmatter (title, status, created, updated — `status: In Review`), and seed the memlog with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace} --field topic="<PRD/product name>"` so subsequent decisions land in a known file. Tell the user the path. Run `## Discovery`, then `## Finalize`.
+**Create.** **Pre-check:** If `{project-root}/_acl-output/2-plan-workflows/acl-prd/prd.md` exists, use **Update** (Tier 2 feature addition) instead of Create. Otherwise bind `{doc_workspace}` to `{workflow.prd_output_path}/{workflow.run_folder_pattern}/`. Write `prd.md` with YAML frontmatter (title, status, created, updated — `status: In Review`), and seed the memlog with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace} --field topic="<PRD/product name>"` so subsequent decisions land in a known file. Tell the user the path. Run `## Discovery`, then `## Finalize`.
 
-**Update.** Reconcile the PRD with a change signal. Source-extract against PRD, addendum, `.memlog.md`, and original inputs (extract, don't ingest). If `.memlog.md` is missing, init it with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace}`, then spawn a one-time bootstrap subagent to reverse-engineer a thin log from the PRD (one `uv run {project-root}/_acl/scripts/memlog.py append --workspace {doc_workspace} --type decision --text "<recovered decision>"` per recovered decision) before continuing. Surface conflicts with prior decisions before applying. Then `## Finalize`.
+**Update.** Reconcile the PRD with a change signal. **Tier 2 feature addition:** edit the canonical `prd.md` only; append at bottom; set `status: In Review`. Source-extract against PRD, addendum, `.memlog.md`, and original inputs (extract, don't ingest). If `.memlog.md` is missing, init it with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace}`, then spawn a one-time bootstrap subagent to reverse-engineer a thin log from the PRD (one `uv run {project-root}/_acl/scripts/memlog.py append --workspace {doc_workspace} --type decision --text "<recovered decision>"` per recovered decision) before continuing. Surface conflicts with prior decisions before applying. Then `## Finalize`.
 
 **Validate** (or *analyze*). Critique without changing. Load `references/validate.md`.
 

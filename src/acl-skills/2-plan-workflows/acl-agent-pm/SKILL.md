@@ -52,6 +52,10 @@ You are John, the Product Manager. You drive PRD creation through user interview
 - `{project-root}`-prefixed paths resolve from the project working directory.
 - `{skill-name}` resolves to the skill directory's basename.
 
+### Brownfield Tier 2 feature addition
+
+For Tier 2 feature work on an approved pipeline, invoke `acl-prd` in **Update** mode on `_acl-output/2-plan-workflows/acl-prd/prd.md` only (append at bottom, `status: In Review`). Never create a second PRD under `{planning_artifacts}/prds/`.
+
 ## On Activation
 
 ### Step 1: Resolve the Agent Block

@@ -6,6 +6,18 @@ Before extracting requirements or editing epics.md:
 2. If ANY prerequisite is 'status: In Review' or 'status: Rejected' (or missing):
    - **HALT IMMEDIATELY. DO NOT PROCEED. DO NOT WRITE EPICS.MD.**
 
+## Canonical output (Brownfield Tier 2 feature addition)
+
+**canonical_epics** = `{project-root}/_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`.
+
+If **canonical_epics** already exists (typical when adding a feature after an approved pipeline):
+
+- Use **canonical_epics** as the only gate `epics.md` for this run — do **not** create a second copy under `{planning_artifacts}/` or elsewhere.
+- **Append** new FR/NFR/epic/story content at the **bottom**; preserve existing `- [x]` completed stories.
+- When updating a previously `Approved` file, set frontmatter `status: In Review` (Manager re-approves before implementation).
+
+If **canonical_epics** does not exist, initialize `{planning_artifacts}/epics.md` (prefer aligning `{planning_artifacts}` with `_acl-output/3-solutioning/acl-create-epics-and-stories`).
+
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 ### Universal Rules:
@@ -79,7 +91,10 @@ For each matching acl-ux run folder, treat `DESIGN.md` and `EXPERIENCE.md` as on
 - If only one spine exists, report the incomplete pair and ask whether the user wants to include the partial UX handoff.
 - If multiple run folders match, show each run folder with the spine frontmatter `status` and `updated` values when available, then ask the user which UX design contract to include.
 
-Before proceeding, Ask the user if there are any other documents to include for analysis, and if anything found should be excluded. Wait for user confirmation. Once confirmed, create the {planning_artifacts}/epics.md from the ../templates/epics-template.md and in the front matter list the files in the array of `inputDocuments: []`.
+Before proceeding, Ask the user if there are any other documents to include for analysis, and if anything found should be excluded. Wait for user confirmation. Then initialize the epics output file:
+
+- If **canonical_epics** exists: open it for update (append feature addition); do **not** replace from template wholesale.
+- Else: create `{planning_artifacts}/epics.md` from `../templates/epics-template.md` and in the front matter list the files in the array of `inputDocuments: []`.
 
 ### 3. Extract Functional Requirements (FRs)
 
@@ -170,7 +185,9 @@ UX-DR2: [Actionable UX design requirement with clear implementation scope]
 
 ### 7. Load and Initialize Template
 
-Load ../templates/epics-template.md and initialize {planning_artifacts}/epics.md:
+**If canonical_epics exists:** Load **canonical_epics**, append a `## Feature addition: …` section at the bottom for new requirements (do not delete prior epics/stories). Set `status: In Review` in frontmatter when the file was previously Approved.
+
+**Otherwise:** Load ../templates/epics-template.md and initialize {planning_artifacts}/epics.md:
 
 1. Copy the entire template to {planning_artifacts}/epics.md
 2. Replace {{project_name}} with the actual project name
