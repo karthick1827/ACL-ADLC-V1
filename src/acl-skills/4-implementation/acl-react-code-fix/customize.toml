@@ -1,0 +1,15 @@
+# Workflow customization surface for acl-react-code-fix (Report & Fix)
+[workflow]
+
+activation_steps_prepend = []
+activation_steps_append = []
+
+persistent_facts = [
+  "file:{project-root}/**/project-context.md",
+  "file:{project-root}/package.json",
+]
+
+output_folder = "{project-root}/_acl-output/acl-react-code-review"
+report_template = "{skill-root}/templates/review-report-template.md"
+rules_reference = "{skill-root}/rules/react-best-practices.md"
+on_complete = ""

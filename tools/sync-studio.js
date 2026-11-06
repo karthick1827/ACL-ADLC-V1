@@ -24,7 +24,9 @@ const isWatch = args.includes('--watch') || args.includes('-w');
 const isServe = args.includes('--serve') || args.includes('-s');
 const customTarget = args.find((arg) => !arg.startsWith('-'));
 
-const DEFAULT_TARGETS = [];
+const DEFAULT_TARGETS = [
+  path.resolve(process.env.USERPROFILE || process.env.HOME || '', 'Desktop', 'React', 'react-acl-adlc', 'vite-project'),
+];
 
 const targetProjects = customTarget
   ? [customTarget]
