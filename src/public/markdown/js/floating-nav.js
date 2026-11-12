@@ -968,7 +968,7 @@
               </button>
               <button type="button" class="acl-quick-btn" id="aclBrowseAgentsBtn">
                 <span>🤖</span>
-                <span>All 20+ Agents</span>
+                <span>Agents</span>
               </button>
               <button type="button" class="acl-quick-btn" id="aclWorkingTreeBtn">
                 <span>🌳</span>
