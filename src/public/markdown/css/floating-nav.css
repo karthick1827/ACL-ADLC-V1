@@ -163,7 +163,7 @@ body.view-studio #toastNotification {
 }
 
 /* ==========================================================================
-   Right Group: Command Box, Timer Pill & Close Action
+   Right Group: Command Box & Close Action
    ========================================================================== */
 
 .acl-notif-bar-right {
@@ -171,19 +171,6 @@ body.view-studio #toastNotification {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
-}
-
-.acl-notif-timer-pill {
-  font-size: 0.72rem;
-  color: #cbd5e1;
-  background: rgba(15, 23, 42, 0.6);
-  padding: 3px 9px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  white-space: nowrap;
-  user-select: none;
-  font-weight: 500;
-  letter-spacing: -0.1px;
 }
 
 .acl-notif-cmd-box {

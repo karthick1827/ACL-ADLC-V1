@@ -696,7 +696,6 @@
         </div>
 
         <div class="acl-notif-bar-right">
-          <span class="acl-notif-timer-pill" title="This notice will disappear in 10 seconds">⏱️ Closes in 10s</span>
           <button type="button" class="acl-notif-close-btn" id="aclNotifCloseBtn" title="Dismiss notification bar" aria-label="Close notification bar">
             ✕
           </button>
@@ -737,7 +736,6 @@
         </div>
 
         <div class="acl-notif-bar-right">
-          <span class="acl-notif-timer-pill" title="This notice will disappear in 10 seconds">⏱️ Closes in 10s</span>
           <button type="button" class="acl-notif-close-btn" id="aclNotifCloseBtn" title="Dismiss notification bar" aria-label="Close notification bar">
             ✕
           </button>
