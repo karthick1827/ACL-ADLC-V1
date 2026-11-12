@@ -1,4 +1,8 @@
 let files = [];
+window.files = files;
+window.getAclFiles = function () {
+  return files;
+};
 let activeFileId = null;
 let isDirty = false;
 let currentMode = 'preview';

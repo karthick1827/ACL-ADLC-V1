@@ -68,12 +68,16 @@ async function syncFromLiveDisk(quiet = false) {
 
         if (filteredFiles.length === 0) {
           files = [];
+          window.files = files;
           try {
             localStorage.setItem('acl_adlc_project_markdown_files', JSON.stringify([]));
           } catch (e) {}
           renderFileTree();
           loadEmptyState();
           setSyncStatus('Synced with VS code and Github (0 files in _acl-output)', 'green');
+          if (typeof updateFloatingNavWidget === 'function') {
+            updateFloatingNavWidget();
+          }
           return true;
         }
 
@@ -107,6 +111,7 @@ async function syncFromLiveDisk(quiet = false) {
         if (hasChanged || files.length === 0) {
           const prevActiveFile = files.find((f) => f.id === activeFileId);
           files = normIncoming;
+          window.files = files;
           try {
             localStorage.setItem('acl_adlc_project_markdown_files', JSON.stringify(files));
           } catch (e) {}
@@ -149,7 +154,11 @@ async function syncFromLiveDisk(quiet = false) {
             setSyncStatus('Synced with IDE (Not synced with GitHub)', 'yellow');
           }
         }
+        window.files = files;
         evaluateProceedButton();
+        if (typeof updateFloatingNavWidget === 'function') {
+          updateFloatingNavWidget();
+        }
         return true;
       }
     }
@@ -248,8 +257,12 @@ async function saveCurrentFile() {
   } else {
     showToast(`Saved '${file.filename}' [${status}]${syncSuffix}`, 'info');
   }
+  window.files = files;
   renderFileTree();
   evaluateProceedButton();
+  if (typeof updateFloatingNavWidget === 'function') {
+    updateFloatingNavWidget();
+  }
   if (activeAppView === 'dashboard') {
     renderDeliveryDashboard();
   }
