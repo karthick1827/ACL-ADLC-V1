@@ -68,6 +68,7 @@ const SKILL_MODULE_MAP = {
   'acl-advanced-elicitation': core('Elicitation'),
   'acl-brainstorming': core('Brainstorming'),
   'acl-customize': core('Customize'),
+  'acl-custom-agent-creator': core('Custom Agent Creator'),
   'acl-deep-recon': core('Recon'),
   'acl-figma-bridge': core('Figma Bridge'),
   'acl-forge-idea': core('Ideation'),
