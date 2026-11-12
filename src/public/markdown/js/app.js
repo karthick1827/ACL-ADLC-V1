@@ -132,6 +132,9 @@ async function init() {
   }
 
   switchAppView(targetView);
+  if (typeof updateFloatingNavWidget === 'function') {
+    updateFloatingNavWidget();
+  }
 
   // Universal live auto-sync: automatically syncs when any agent (Claude Code, AGY, Gemini, Copilot, Cursor, etc.)
   // generates or updates markdown files in _acl-output/ without needing manual browser refresh

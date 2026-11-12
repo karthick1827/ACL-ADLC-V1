@@ -221,6 +221,10 @@ function switchAppView(view) {
     if (syncStatus) syncStatus.style.display = 'flex';
     if (activeFileId) loadFile(activeFileId);
   }
+
+  if (typeof updateFloatingNavVisibility === 'function') {
+    updateFloatingNavVisibility(activeAppView);
+  }
 }
 
 // ==========================================

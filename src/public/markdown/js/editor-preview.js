@@ -125,7 +125,11 @@ function handleContentInput() {
   setSyncStatus('Unsaved changes...', 'yellow');
 }
 
-function evaluateProceedButton() {}
+function evaluateProceedButton() {
+  if (typeof updateFloatingNavWidget === 'function') {
+    updateFloatingNavWidget();
+  }
+}
 
 window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {

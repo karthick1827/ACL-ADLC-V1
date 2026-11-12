@@ -135,6 +135,9 @@ async function syncFromLiveDisk(quiet = false) {
           } else if (activeAppView === 'working-tree') {
             renderWorkingTree();
           }
+          if (typeof updateFloatingNavWidget === 'function') {
+            updateFloatingNavWidget();
+          }
         }
         if (data && data.source === 'github') {
           setSyncStatus(`Synced live with GitHub (${data.repo || 'origin'})`, 'green');

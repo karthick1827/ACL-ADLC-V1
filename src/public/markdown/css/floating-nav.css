@@ -1,0 +1,747 @@
+/**
+ * ACL-ADLC Markdown Studio: Floating Help & Agent Navigation Widget
+ *
+ * Provides real-time working directory analysis, stage awareness,
+ * agent recommendations, IDE command triggers, and VelocityONE guidance.
+ *
+ * Note: Displays strictly when inside Markdown Studio (body.view-studio).
+ */
+
+/* ==========================================================================
+   Widget Container & Visibility Guard
+   ========================================================================== */
+
+#aclFloatingNavWidget {
+  display: none; /* Hidden by default across dashboards, agents-info, and git views */
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  z-index: 9999;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #0f172a;
+}
+
+/* Strictly visible ONLY when in Markdown Studio view */
+body.view-studio #aclFloatingNavWidget {
+  display: block;
+}
+
+/* ==========================================================================
+   Floating Action Button (Trigger)
+   ========================================================================== */
+
+.acl-floating-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 16px 0 12px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  cursor: pointer;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.35), 0 6px 12px -3px rgba(15, 23, 42, 0.2);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.acl-floating-btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #091e42 0%, #1e3a8a 100%);
+  box-shadow: 0 14px 30px -4px rgba(2, 71, 186, 0.4), 0 8px 16px -2px rgba(15, 23, 42, 0.25);
+  border-color: rgba(96, 165, 250, 0.5);
+}
+
+.acl-floating-btn:active {
+  transform: translateY(0);
+}
+
+.acl-floating-btn-icon-wrap {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.acl-floating-btn-pulse-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  border: 2px solid #0f172a;
+}
+
+.acl-floating-btn-pulse-dot.pulse-amber {
+  background-color: #f59e0b;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  animation: aclPulseRing 1.8s infinite;
+}
+
+.acl-floating-btn-pulse-dot.pulse-green {
+  background-color: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  animation: aclPulseRing 2s infinite;
+}
+
+.acl-floating-btn-pulse-dot.pulse-blue {
+  background-color: #3b82f6;
+  box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  animation: aclPulseRing 2s infinite;
+}
+
+.acl-floating-btn-label-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+
+.acl-floating-btn-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.acl-floating-btn-subtitle {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.acl-floating-btn-chevron {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.acl-floating-btn.active .acl-floating-btn-chevron {
+  transform: rotate(180deg);
+}
+
+@keyframes aclPulseRing {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+/* ==========================================================================
+   Floating Help & Navigation Panel (Card)
+   ========================================================================== */
+
+.acl-floating-panel {
+  display: none;
+  position: fixed;
+  bottom: 82px;
+  right: 28px;
+  width: 480px;
+  max-width: calc(100vw - 36px);
+  max-height: calc(100vh - 110px);
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 14px;
+  box-shadow: 0 20px 45px -8px rgba(15, 23, 42, 0.26), 0 8px 16px -4px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: aclSlideUpFade 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10001;
+}
+
+.acl-floating-panel.hidden {
+  display: none !important;
+}
+
+@keyframes aclSlideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Panel Header */
+.acl-floating-header {
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #0a2540 0%, #1e293b 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.acl-floating-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.acl-floating-header-brand-icon {
+  width: 28px;
+  height: 28px;
+  background: #ffffff;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  padding: 2px;
+}
+
+.acl-floating-header-brand-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.acl-floating-header-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #ffffff;
+}
+
+.acl-floating-header-live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.acl-live-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: aclDotBlink 1.5s infinite ease-in-out;
+}
+
+@keyframes aclDotBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.acl-floating-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.acl-floating-btn-icon {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #ffffff;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.15s ease;
+}
+
+.acl-floating-btn-icon:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Panel Body */
+.acl-floating-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  max-height: calc(100vh - 190px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #f8fafc;
+}
+
+.acl-floating-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.acl-floating-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.acl-floating-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* Section Box */
+.acl-nav-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.acl-nav-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+/* Mode Switcher Toggle */
+.acl-mode-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.acl-mode-toggle-btn {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.acl-mode-toggle-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.acl-mode-toggle-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.acl-mode-toggle-btn.active.mode-greenfield {
+  background: #15803d;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.acl-mode-toggle-btn.active.mode-brownfield {
+  background: #d97706;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Current Position Card */
+.acl-position-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.acl-position-headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.acl-phase-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #dbeafe;
+}
+
+.acl-doc-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.acl-doc-name {
+  font-family: 'Fira Code', monospace;
+  font-weight: 600;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.acl-status-pill {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.acl-status-pill.status-in-review {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.acl-status-pill.status-approved {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.acl-status-pill.status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.acl-gate-message {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #475569;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #faf5ff;
+  border-left: 3px solid #a855f7;
+}
+
+.acl-gate-message.alert-amber {
+  background: #fffbeb;
+  border-left-color: #f59e0b;
+  color: #92400e;
+}
+
+.acl-gate-message.alert-green {
+  background: #f0fdf4;
+  border-left-color: #22c55e;
+  color: #166534;
+}
+
+/* ACL-ADLC Gated Lock Banner */
+.acl-gated-lock-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.acl-gated-lock-box.locked-red {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.acl-gated-lock-box.locked-green {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.acl-gated-lock-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+}
+
+.acl-gated-lock-body {
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+/* Agent Hero Card */
+.acl-agent-hero-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid #bfdbfe;
+  background: linear-gradient(180deg, #f8faff 0%, #ffffff 100%);
+}
+
+.acl-agent-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.acl-agent-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.acl-agent-identity {
+  display: flex;
+  flex-direction: column;
+}
+
+.acl-agent-name {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.acl-agent-role {
+  font-size: 0.76rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.acl-agent-description {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+/* Command Box */
+.acl-command-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #0f172a;
+  border-radius: 8px;
+  color: #f8fafc;
+}
+
+.acl-command-text {
+  font-family: 'Fira Code', Consolas, Monaco, monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #38bdf8;
+  word-break: break-all;
+}
+
+.acl-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.acl-copy-btn:hover {
+  background: #1d4ed8;
+}
+
+.acl-copy-btn.copied {
+  background: #16a34a;
+}
+
+.acl-ide-hint {
+  font-size: 0.72rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Next Steps Sequence */
+.acl-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.acl-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.acl-step-number {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.acl-step-item.step-active .acl-step-number {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.acl-step-item.step-done .acl-step-number {
+  background: #22c55e;
+  color: #ffffff;
+}
+
+/* Next Agent Callout */
+.acl-next-agent-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.acl-next-agent-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.acl-next-agent-cmd {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.74rem;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #0f172a;
+}
+
+/* VelocityONE Quick Actions */
+.acl-quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.acl-quick-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.acl-quick-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.acl-quick-btn.btn-primary-action {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+.acl-quick-btn.btn-primary-action:hover {
+  background: #0369a1;
+}
+
+/* Panel Footer */
+.acl-floating-footer {
+  padding: 10px 18px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.acl-refresh-link {
+  color: #2563eb;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.acl-refresh-link:hover {
+  text-decoration: underline;
+}

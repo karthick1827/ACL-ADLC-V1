@@ -24,7 +24,41 @@ const isWatch = args.includes('--watch') || args.includes('-w');
 const isServe = args.includes('--serve') || args.includes('-s');
 const customTarget = args.find((arg) => !arg.startsWith('-'));
 
-const DEFAULT_TARGETS = [];
+// Dynamically discover sibling projects (e.g. ../vite-project or any sibling ACL/Vite app) without explicit machine paths
+function discoverTargetProjects() {
+  const discovered = [];
+  const parentDir = path.resolve(REPO_ROOT, '..');
+  const siblingTargets = [
+    path.resolve(parentDir, 'vite-project'),
+    path.resolve(parentDir, 'sample-project'),
+  ];
+  for (const t of siblingTargets) {
+    if (fs.existsSync(t) && !discovered.includes(t)) {
+      discovered.push(t);
+    }
+  }
+  try {
+    const entries = fs.readdirSync(parentDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name !== path.basename(REPO_ROOT)) {
+        const fullCandidate = path.join(parentDir, entry.name);
+        const hasPublic = fs.existsSync(path.join(fullCandidate, 'public'));
+        const hasVite =
+          fs.existsSync(path.join(fullCandidate, 'vite.config.js')) ||
+          fs.existsSync(path.join(fullCandidate, 'vite.config.ts'));
+        const hasAcl =
+          fs.existsSync(path.join(fullCandidate, '_acl')) ||
+          fs.existsSync(path.join(fullCandidate, '_acl-output'));
+        if (hasPublic && (hasVite || hasAcl) && !discovered.includes(fullCandidate)) {
+          discovered.push(fullCandidate);
+        }
+      }
+    }
+  } catch {}
+  return discovered;
+}
+
+const DEFAULT_TARGETS = discoverTargetProjects();
 
 const targetProjects = customTarget
   ? [customTarget]
