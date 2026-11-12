@@ -16,7 +16,7 @@
   position: fixed;
   bottom: 24px;
   right: 28px;
-  z-index: 9999;
+  z-index: 10005; /* Ensures the floating navigator icon is never hidden under popups or toasts */
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: #0f172a;
 }
@@ -24,6 +24,18 @@
 /* Strictly visible ONLY when in Markdown Studio view */
 body.view-studio #aclFloatingNavWidget {
   display: block;
+}
+
+/* Responsive toast positioning: never cover the floating navigator trigger or panel */
+body.view-studio #toastNotification {
+  bottom: 84px;
+  right: 28px;
+}
+
+body.view-studio.acl-panel-open #toastNotification,
+body.view-studio:has(#aclFloatingNavPanel:not(.hidden)) #toastNotification {
+  bottom: 24px;
+  right: 460px;
 }
 
 /* ==========================================================================

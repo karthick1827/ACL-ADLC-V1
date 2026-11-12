@@ -1237,6 +1237,7 @@
 
   function toggleFloatingNavPanel() {
     isPanelOpen = !isPanelOpen;
+    document.body.classList.toggle('acl-panel-open', isPanelOpen);
     const panel = document.getElementById('aclFloatingNavPanel');
     const btn = document.getElementById('aclFloatingNavBtn');
     if (panel) {
@@ -1253,6 +1254,7 @@
 
   function closeFloatingNavPanel() {
     isPanelOpen = false;
+    document.body.classList.remove('acl-panel-open');
     const panel = document.getElementById('aclFloatingNavPanel');
     const btn = document.getElementById('aclFloatingNavBtn');
     if (panel) panel.classList.add('hidden');
