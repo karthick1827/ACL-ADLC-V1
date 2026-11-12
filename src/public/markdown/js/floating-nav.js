@@ -1,16 +1,14 @@
 /**
- * ACL-ADLC Markdown Studio: Approval & Next Agent Notification Bar
+ * ACL-ADLC Markdown Studio: Status & Next Agent Notification Bar
  *
- * Automatically monitors the currently active markdown deliverable in Markdown Studio.
- * When the document is marked status: Approved by the Manager, displays a prominent,
- * persistent notification bar across the top of Studio with:
- *   - Current approved document confirmation badge
- *   - Recommended next agent name & title
- *   - Exact IDE command to execute next
- *   - One-click copy button
- *   - Close (dismiss) button
+ * Monitors the currently active markdown deliverable in Markdown Studio:
+ *   - Status: Approved: Shows Approved badge, next agent, IDE command with Copy button.
+ *     Persistence: Persists on screen UNLESS AND UNTIL the user closes it.
+ *   - Status: In Review: Shows In Review badge and Gate Locked guidance.
+ *     Duration: Disappears automatically after 10 seconds.
+ *   - Status: Rejected: Shows Rejected badge and Revisions Required warning.
+ *     Duration: Disappears automatically after 10 seconds.
  *
- * Persistence rule: The notification bar persists on screen UNLESS AND UNTIL the user closes it.
  * Exclusively active inside Markdown Studio (view-studio).
  */
 
@@ -147,29 +145,41 @@
     },
   };
 
-  // State: persistent dismissals set
-  const dismissedApprovals = new Set();
+  // State: persistent dismissals set and active 10s auto-dismiss timer
+  const dismissedNotifications = new Set();
+  let autoDismissTimer = null;
   let lastRenderedFingerprint = '';
 
   /**
-   * Clear dismissal record for a document when freshly approved or modified
+   * Clear any active auto-dismiss timer
+   */
+  function clearAutoDismissTimer() {
+    if (autoDismissTimer) {
+      clearTimeout(autoDismissTimer);
+      autoDismissTimer = null;
+    }
+  }
+
+  /**
+   * Clear dismissal record for a document when freshly saved or modified
    */
   function clearDismissalForDoc(docId) {
     if (!docId) return;
     const strId = String(docId).toLowerCase();
-    for (const key of dismissedApprovals) {
+    for (const key of dismissedNotifications) {
       if (key.toLowerCase().startsWith(strId + ':')) {
-        dismissedApprovals.delete(key);
+        dismissedNotifications.delete(key);
       }
     }
   }
 
   /**
-   * Dismiss approval notification bar for current document
+   * Dismiss notification bar for current document and status
    */
   function dismissApprovalNotification(docId, status) {
+    clearAutoDismissTimer();
     const key = `${String(docId || '').toLowerCase()}:${String(status || 'Approved').toLowerCase()}`;
-    dismissedApprovals.add(key);
+    dismissedNotifications.add(key);
     const bar = document.getElementById('aclApprovalNotificationBar');
     if (bar) {
       bar.classList.add('hidden');
@@ -230,7 +240,7 @@
    * Extract status from file object or frontmatter
    */
   function getEffectiveStatus(file) {
-    if (!file) return 'Not Started';
+    if (!file) return 'In Review';
     if (file.status) {
       return normalizeStatus(file.status);
     }
@@ -395,23 +405,20 @@
       }
     } catch (_) {}
 
-    // Fallback to first primary deliverable
     const primFiles = getWorkspaceFiles().filter(isPrimaryDeliverable);
     return primFiles.length > 0 ? primFiles[0] : null;
   }
 
   /**
-   * Determine if the document currently being viewed in the editor is approved
+   * Determine the current document status (checking active editor dropdown or file object)
    */
-  function isDocumentApproved(doc) {
-    if (!doc) return false;
+  function getCurrentDocumentStatus(doc) {
+    if (!doc) return 'In Review';
     const statusSelect = document.getElementById('statusSelect');
     if (statusSelect && statusSelect.value) {
-      const domStatus = normalizeStatus(statusSelect.value);
-      if (domStatus === 'Approved') return true;
-      if (domStatus === 'In Review' || domStatus === 'Rejected') return false;
+      return normalizeStatus(statusSelect.value);
     }
-    return getEffectiveStatus(doc) === 'Approved';
+    return getEffectiveStatus(doc);
   }
 
   /**
@@ -542,14 +549,15 @@
       document.body.removeChild(textarea);
       onSuccess();
     } catch (e) {
-      console.warn('[ApprovalNotificationBar] Clipboard copy failed:', e);
+      console.warn('[StatusNotificationBar] Clipboard copy failed:', e);
     }
   }
 
   /**
    * Main Notification Bar Controller:
-   * Displays when current markdown file is approved.
-   * Persists unless and until user closes it.
+   * Displays status for In Review, Approved, and Rejected.
+   * If Approved: Shows next agent, IDE command with copy button. Persists until closed.
+   * If In Review or Rejected: Shows status & guidance, and automatically disappears after 10 seconds.
    */
   function updateApprovalNotificationBar() {
     // Clean up any old floating icons
@@ -574,93 +582,183 @@
 
     const currentDoc = getCurrentActiveDocument();
     if (!currentDoc) {
+      clearAutoDismissTimer();
       bar.classList.add('hidden');
       return;
     }
 
     const docKey = String(currentDoc.id || currentDoc.filename || currentDoc.name || '').toLowerCase();
-    const isApproved = isDocumentApproved(currentDoc);
-    const dismissalKey = `${docKey}:approved`;
+    const docName = currentDoc.filename || currentDoc.name || 'Document';
+    const status = getCurrentDocumentStatus(currentDoc);
+    const dismissalKey = `${docKey}:${status.toLowerCase()}`;
 
-    // ONLY display if current markdown file is approved AND has not been closed by the user
-    if (!isApproved || dismissedApprovals.has(dismissalKey)) {
+    // If this specific notification was dismissed or timed out, keep it hidden
+    if (dismissedNotifications.has(dismissalKey)) {
       bar.classList.add('hidden');
       return;
     }
 
-    const allFiles = getWorkspaceFiles();
-    const projectType = detectProjectLifecycle(allFiles.filter(isPrimaryDeliverable), allFiles);
-    const recommendation = getNextAgentForApprovedDoc(currentDoc, allFiles, projectType);
+    const fingerprint = `${docKey}:${status}`;
+    const isNewState = fingerprint !== lastRenderedFingerprint || bar.classList.contains('hidden');
 
-    if (!recommendation || !recommendation.nextAgent) {
-      bar.classList.add('hidden');
-      return;
-    }
-
-    const agent = recommendation.nextAgent;
-    const docName = recommendation.docName || currentDoc.filename || currentDoc.name;
-
-    const fingerprint = `${docKey}:approved:${agent.key}:${recommendation.command}`;
-    if (fingerprint === lastRenderedFingerprint && !bar.classList.contains('hidden')) {
+    if (!isNewState) {
       return;
     }
     lastRenderedFingerprint = fingerprint;
 
-    bar.innerHTML = `
-      <div class="acl-notif-bar-left">
-        <span class="acl-notif-badge">
-          <span class="acl-notif-badge-icon">✅</span>
-          <span id="aclNotifDocName">${docName} Approved</span>
-        </span>
-        <div class="acl-notif-agent-group">
-          <span class="acl-notif-arrow">👉</span>
-          <span class="acl-notif-label">Next Agent:</span>
-          <span class="acl-notif-agent-name" id="aclNotifAgentName">${agent.icon} ${agent.name} (${agent.title})</span>
-          <span class="acl-notif-divider">|</span>
-          <span class="acl-notif-phase" id="aclNotifPhaseName">${recommendation.phase}</span>
-        </div>
-      </div>
+    // Reset container classes
+    bar.className = 'acl-notification-bar';
 
-      <div class="acl-notif-bar-right">
-        <div class="acl-notif-cmd-box" id="aclNotifCmdBox" title="Click to copy IDE command">
-          <span class="acl-notif-cmd-label">IDE Command:</span>
-          <code class="acl-notif-cmd-code" id="aclNotifCmdText">${recommendation.command}</code>
-          <button type="button" class="acl-notif-copy-btn" id="aclNotifCopyBtn" title="Copy command for IDE chat">
-            <span class="acl-notif-copy-icon">📋</span>
-            <span id="aclNotifCopyLabel">Copy</span>
+    // =========================================================================
+    // CASE 1: STATUS APPROVED -> Show Next Agent + Command. Persist until closed!
+    // =========================================================================
+    if (status === 'Approved') {
+      clearAutoDismissTimer();
+      bar.classList.add('status-approved');
+
+      const allFiles = getWorkspaceFiles();
+      const projectType = detectProjectLifecycle(allFiles.filter(isPrimaryDeliverable), allFiles);
+      const recommendation = getNextAgentForApprovedDoc(currentDoc, allFiles, projectType);
+      const agent = recommendation ? recommendation.nextAgent : ACL_AGENTS_DIRECTORY.pm;
+      const cmd = recommendation ? recommendation.command : '@acl-prd';
+      const phase = recommendation ? recommendation.phase : 'Phase 2 · PRD Planning';
+
+      bar.innerHTML = `
+        <div class="acl-notif-bar-left">
+          <span class="acl-notif-badge badge-approved">
+            <span class="acl-notif-badge-icon">✅</span>
+            <span id="aclNotifDocName">${docName} Approved</span>
+          </span>
+          <div class="acl-notif-agent-group">
+            <span class="acl-notif-arrow">👉</span>
+            <span class="acl-notif-label">Next Agent:</span>
+            <span class="acl-notif-agent-name" id="aclNotifAgentName">${agent.icon} ${agent.name} (${agent.title})</span>
+            <span class="acl-notif-divider">|</span>
+            <span class="acl-notif-phase" id="aclNotifPhaseName">${phase}</span>
+          </div>
+        </div>
+
+        <div class="acl-notif-bar-right">
+          <div class="acl-notif-cmd-box" id="aclNotifCmdBox" title="Click to copy IDE command">
+            <span class="acl-notif-cmd-label">IDE Command:</span>
+            <code class="acl-notif-cmd-code" id="aclNotifCmdText">${cmd}</code>
+            <button type="button" class="acl-notif-copy-btn" id="aclNotifCopyBtn" title="Copy command for IDE chat">
+              <span class="acl-notif-copy-icon">📋</span>
+              <span id="aclNotifCopyLabel">Copy</span>
+            </button>
+          </div>
+          <button type="button" class="acl-notif-close-btn" id="aclNotifCloseBtn" title="Dismiss notification bar (persists until closed)" aria-label="Close notification bar">
+            ✕
           </button>
         </div>
-        <button type="button" class="acl-notif-close-btn" id="aclNotifCloseBtn" title="Dismiss notification bar (persists until closed)" aria-label="Close notification bar">
-          ✕
-        </button>
-      </div>
-    `;
+      `;
 
-    bar.classList.remove('hidden');
+      bar.classList.remove('hidden');
 
-    const copyBtn = document.getElementById('aclNotifCopyBtn');
-    const cmdBox = document.getElementById('aclNotifCmdBox');
-    const closeBtn = document.getElementById('aclNotifCloseBtn');
+      const copyBtn = document.getElementById('aclNotifCopyBtn');
+      const cmdBox = document.getElementById('aclNotifCmdBox');
+      const closeBtn = document.getElementById('aclNotifCloseBtn');
 
-    if (copyBtn) {
-      copyBtn.onclick = function (e) {
-        e.stopPropagation();
-        copyCommandToClipboard(recommendation.command);
-      };
+      if (copyBtn) {
+        copyBtn.onclick = function (e) {
+          e.stopPropagation();
+          copyCommandToClipboard(cmd);
+        };
+      }
+      if (cmdBox) {
+        cmdBox.onclick = function (e) {
+          e.stopPropagation();
+          copyCommandToClipboard(cmd);
+        };
+      }
+      if (closeBtn) {
+        closeBtn.onclick = function (e) {
+          e.stopPropagation();
+          dismissApprovalNotification(docKey, 'approved');
+        };
+      }
     }
+    // =========================================================================
+    // CASE 2: STATUS IN REVIEW -> Show Status & Gate Lock. Disappear after 10s!
+    // =========================================================================
+    else if (status === 'In Review') {
+      bar.classList.add('status-in-review');
 
-    if (cmdBox) {
-      cmdBox.onclick = function (e) {
-        e.stopPropagation();
-        copyCommandToClipboard(recommendation.command);
-      };
+      bar.innerHTML = `
+        <div class="acl-notif-bar-left">
+          <span class="acl-notif-badge badge-in-review">
+            <span class="acl-notif-badge-icon">⏳</span>
+            <span id="aclNotifDocName">${docName} · In Review</span>
+          </span>
+          <div class="acl-notif-status-message">
+            <span>🔒 Gate Locked: Awaiting Manager Review & Sign-Off in Markdown Studio before downstream tasks can proceed</span>
+          </div>
+        </div>
+
+        <div class="acl-notif-bar-right">
+          <span class="acl-notif-timer-pill" title="This notice will disappear in 10 seconds">⏱️ Closes in 10s</span>
+          <button type="button" class="acl-notif-close-btn" id="aclNotifCloseBtn" title="Dismiss notification bar" aria-label="Close notification bar">
+            ✕
+          </button>
+        </div>
+      `;
+
+      bar.classList.remove('hidden');
+
+      const closeBtn = document.getElementById('aclNotifCloseBtn');
+      if (closeBtn) {
+        closeBtn.onclick = function (e) {
+          e.stopPropagation();
+          dismissApprovalNotification(docKey, 'in review');
+        };
+      }
+
+      // Auto-dismiss after 10 seconds
+      clearAutoDismissTimer();
+      autoDismissTimer = setTimeout(() => {
+        dismissApprovalNotification(docKey, 'in review');
+      }, 10000);
     }
+    // =========================================================================
+    // CASE 3: STATUS REJECTED -> Show Status & Revision Required. Disappear after 10s!
+    // =========================================================================
+    else if (status === 'Rejected') {
+      bar.classList.add('status-rejected');
 
-    if (closeBtn) {
-      closeBtn.onclick = function (e) {
-        e.stopPropagation();
-        dismissApprovalNotification(docKey, 'approved');
-      };
+      bar.innerHTML = `
+        <div class="acl-notif-bar-left">
+          <span class="acl-notif-badge badge-rejected">
+            <span class="acl-notif-badge-icon">🛑</span>
+            <span id="aclNotifDocName">${docName} · Rejected</span>
+          </span>
+          <div class="acl-notif-status-message">
+            <span>⚠️ Revisions Required: Manager rejected this document · Revisions required before gate sign-off</span>
+          </div>
+        </div>
+
+        <div class="acl-notif-bar-right">
+          <span class="acl-notif-timer-pill" title="This notice will disappear in 10 seconds">⏱️ Closes in 10s</span>
+          <button type="button" class="acl-notif-close-btn" id="aclNotifCloseBtn" title="Dismiss notification bar" aria-label="Close notification bar">
+            ✕
+          </button>
+        </div>
+      `;
+
+      bar.classList.remove('hidden');
+
+      const closeBtn = document.getElementById('aclNotifCloseBtn');
+      if (closeBtn) {
+        closeBtn.onclick = function (e) {
+          e.stopPropagation();
+          dismissApprovalNotification(docKey, 'rejected');
+        };
+      }
+
+      // Auto-dismiss after 10 seconds
+      clearAutoDismissTimer();
+      autoDismissTimer = setTimeout(() => {
+        dismissApprovalNotification(docKey, 'rejected');
+      }, 10000);
     }
   }
 
