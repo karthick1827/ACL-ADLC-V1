@@ -6,6 +6,9 @@
  * the exact IDE command to execute, and guides users sequentially through
  * the VelocityONE framework.
  *
+ * Invariant: An agent advances to the next agent ONLY when ALL markdown files
+ * created for the current stage/agent have received manager status: Approved.
+ *
  * Exclusively active and visible inside Markdown Studio (view-studio).
  */
 
@@ -258,51 +261,98 @@
   }
 
   /**
+   * Categorize deliverable file into its respective phase
+   */
+  function getFilePhaseCategory(f) {
+    if (!f) return null;
+    const fn = String(f.filename || f.name || '').toLowerCase();
+    const fp = String(f.folderPath || f.path || '').toLowerCase();
+
+    // Context / Brownfield Phase 0
+    if (fn === 'project-context.md' || fp.includes('0-context') || fn.includes('project-context')) {
+      return 'phase0';
+    }
+
+    // Phase 1 (Product Brief)
+    if (fp.includes('1-analysis') || fp.includes('acl-product-brief') || fn === 'brief.md' || fn.startsWith('brief-')) {
+      return 'phase1';
+    }
+
+    // Phase 2 (PRD & UX)
+    if (
+      fp.includes('2-plan-workflows') ||
+      fp.includes('acl-prd') ||
+      fp.includes('acl-ux') ||
+      fn === 'prd.md' ||
+      fn === 'reconcile-brief.md' ||
+      fn === 'ux.md'
+    ) {
+      return 'phase2';
+    }
+
+    // Phase 3A (Architecture Spine)
+    if (
+      fp.includes('3-solutioning/acl-architecture') ||
+      fp.includes('acl-architecture') ||
+      fn === 'architecture-spine.md' ||
+      fn === 'architecture.md'
+    ) {
+      return 'phase3A';
+    }
+
+    // Phase 3B (Epics & Stories)
+    if (
+      fp.includes('3-solutioning/acl-create-epics-and-stories') ||
+      fp.includes('acl-create-epics-and-stories') ||
+      fn === 'epics.md'
+    ) {
+      return 'phase3B';
+    }
+
+    // Phase 4 (Implementation stories / Tier 1 specs)
+    if (fp.includes('4-implementation') || parseFileStoryId(fn) || fn.startsWith('spec-')) {
+      return 'phase4';
+    }
+
+    return null;
+  }
+
+  /**
+   * Helper to format document objects for UI list
+   */
+  function formatDocItem(f) {
+    const name = f.filename || f.name;
+    const st = getEffectiveStatus(f);
+    const stClass = st === 'Approved' ? 'status-approved' : st === 'Rejected' ? 'status-rejected' : 'status-in-review';
+    return {
+      doc: f,
+      name,
+      status: st,
+      statusClass: stClass,
+    };
+  }
+
+  /**
    * Real-time analysis of the current working directory / project state
+   * Enforces: Current agent advances ONLY when ALL markdown files created for that stage are Approved!
    */
   function analyzeWorkingDirectory() {
     const rawFileList = getWorkspaceFiles();
     const fileList = rawFileList.filter(isPrimaryDeliverable);
 
-    // Robust case-insensitive lookup helper matching filename, path, or id
-    const findDoc = (targetName) => {
-      const target = targetName.toLowerCase();
-      const targetNoExt = target.replace(/\.[^.]+$/, '');
-      return fileList.find((f) => {
-        if (!f) return false;
-        const fn = String(f.filename || f.name || '').toLowerCase();
-        const fp = String(f.folderPath || f.path || '').toLowerCase();
-        const id = String(f.id || '').toLowerCase();
-        if (fn === target || fn.endsWith('/' + target) || fn.endsWith('\\' + target)) return true;
-        if (fp.endsWith('/' + target) || fp.endsWith('\\' + target)) return true;
-        if (id.endsWith('_' + target.replace('.', '_')) || id.endsWith('_' + targetNoExt + '_md')) return true;
-        return false;
-      });
-    };
+    // Group files by phase category
+    const phase0Files = fileList.filter((f) => getFilePhaseCategory(f) === 'phase0');
+    const phase1Files = fileList.filter((f) => getFilePhaseCategory(f) === 'phase1');
+    const phase2Files = fileList.filter((f) => getFilePhaseCategory(f) === 'phase2');
+    const phase3AFiles = fileList.filter((f) => getFilePhaseCategory(f) === 'phase3A');
+    const phase3BFiles = fileList.filter((f) => getFilePhaseCategory(f) === 'phase3B');
+    const phase4Files = fileList.filter((f) => getFilePhaseCategory(f) === 'phase4');
 
-    const briefDoc = findDoc('brief.md');
-    const prdDoc = findDoc('prd.md');
-    const archDoc =
-      findDoc('architecture-spine.md') ||
-      findDoc('architecture.md') ||
-      fileList.find((f) => {
-        const fn = String(f.filename || f.name || '').toLowerCase();
-        return fn.includes('architecture-spine') || fn.includes('architecture.md');
-      });
-    const epicsDoc = findDoc('epics.md');
-    const contextDoc =
-      findDoc('project-context.md') ||
-      fileList.find((f) => {
-        const fn = String(f.filename || f.name || '').toLowerCase();
-        return fn.includes('project-context');
-      });
-
-    const tier1Specs = fileList.filter((f) => {
+    const tier1Specs = phase4Files.filter((f) => {
       const fn = String(f.filename || f.name || '').toLowerCase();
       return fn.startsWith('spec-') && !parseFileStoryId(fn);
     });
-
-    const storySpecs = fileList.filter((f) => parseFileStoryId(f.filename || f.name) !== null);
+    const storySpecs = phase4Files.filter((f) => parseFileStoryId(f.filename || f.name) !== null);
 
     // Resolve workflow mode: user explicit preference or discovered project files
     let userMode = null;
@@ -311,12 +361,13 @@
     } catch (_) {}
 
     let projectType = 'greenfield';
-    if (contextDoc || tier1Specs.length > 0) {
+    if (phase0Files.length > 0 || tier1Specs.length > 0) {
       projectType = 'brownfield';
-    } else if (briefDoc) {
+    } else if (phase1Files.length > 0) {
+      const bDoc = phase1Files[0];
       const isBf =
-        (briefDoc.projectType || '').toLowerCase() === 'brownfield' ||
-        (briefDoc.content && /project_type:\s*brownfield/i.test(briefDoc.content));
+        (bDoc.projectType || '').toLowerCase() === 'brownfield' ||
+        (bDoc.content && /project_type:\s*brownfield/i.test(bDoc.content));
       projectType = isBf ? 'brownfield' : 'greenfield';
     } else if (userMode === 'brownfield') {
       projectType = 'brownfield';
@@ -329,6 +380,7 @@
     let nextAgent = ACL_AGENTS_DIRECTORY.pm;
     let whereAreYou = '';
     let currentDoc = null;
+    let phaseDocs = [];
     let nextSteps = [];
     let gateStatus = 'Not Started';
     let pulseType = 'pulse-blue';
@@ -337,11 +389,17 @@
 
     // =========================================================================
     // BRANCH 1: GREENFIELD DELIVERY WORKFLOW
-    // (Phase 1 Brief -> Gate 1 -> Phase 2 PRD -> Gate 2 -> Phase 3A Architecture -> Gate 3A -> Phase 3B Epics -> Gate 3B -> Phase 4 Stories)
+    // (Gate 1: Brief -> Gate 2: PRD -> Gate 3A: Architecture -> Gate 3B: Epics -> Gate 4: Stories)
+    // Rule: Next agent unlocked ONLY when ALL markdown files in the current phase are Approved!
     // =========================================================================
     if (projectType === 'greenfield') {
-      // Step 1: Product Brief
-      if (!briefDoc) {
+      const unapprovedP1 = phase1Files.filter((f) => getEffectiveStatus(f) !== 'Approved');
+      const p1AllApproved = phase1Files.length > 0 && unapprovedP1.length === 0;
+
+      // -----------------------------------------------------------------------
+      // Step 1: Phase 1 (Product Brief) Evaluation
+      // -----------------------------------------------------------------------
+      if (phase1Files.length === 0) {
         currentStage = 'Phase 1 · Product Brief & Analysis';
         currentAgent = ACL_AGENTS_DIRECTORY.analyst;
         nextAgent = ACL_AGENTS_DIRECTORY.pm;
@@ -351,235 +409,282 @@
         whereAreYou = 'Brand-new Greenfield Project: Start with Mary (Business Analyst) to articulate your Product Brief (brief.md). Code and downstream specs are strictly locked.';
         gatedLockInfo = {
           title: '⏳ ACL-ADLC Greenfield Protocol Gate 1/4',
-          message: 'Initial project kickoff starts with Mary (@acl-product-brief). Once generated, brief.md is placed In Review and MUST be approved by Manager in Markdown Studio before PRD, Architecture, or Code can begin.',
+          message: 'Initial project kickoff starts with Mary (@acl-product-brief). Once generated, all Phase 1 brief deliverables enter status "In Review" and MUST be approved by Manager in Markdown Studio before Phase 2 PRD can begin.',
           statusClass: 'locked-amber',
         };
         nextSteps = [
           'Open your IDE AI chat (Cursor, Claude Code, Copilot, Windsurf, AGY).',
           'Run `@acl-product-brief` to generate Phase 1 Product Brief (brief.md).',
-          'Manager reviews brief.md in Markdown Studio and marks it "Approved".',
+          'Manager reviews brief deliverables in Markdown Studio and marks them "Approved".',
           'Gate 1 sign-off unlocks Phase 2: John (Product Manager) with `@acl-prd`.',
         ];
-      } else if (getEffectiveStatus(briefDoc) !== 'Approved') {
-        currentDoc = briefDoc;
-        gateStatus = getEffectiveStatus(briefDoc);
-        currentStage = 'Phase 1 · Product Brief (Gate 1/4 Locked)';
+      } else if (!p1AllApproved) {
+        // One or more Phase 1 files awaiting approval
+        currentDoc = unapprovedP1[0];
+        phaseDocs = phase1Files.map(formatDocItem);
+        gateStatus = getEffectiveStatus(unapprovedP1[0]);
+        currentStage = unapprovedP1.length === 1 ? 'Phase 1 · Product Brief (Gate 1/4 Locked)' : `Phase 1 · Product Brief (${unapprovedP1.length} Files In Review)`;
         currentAgent = ACL_AGENTS_DIRECTORY.analyst;
         nextAgent = ACL_AGENTS_DIRECTORY.pm;
         pulseType = 'pulse-amber';
         subtitle = '🟡 Awaiting Sign-off';
-        whereAreYou = 'Product Brief (brief.md) generated. Awaiting Manager Sign-Off in Markdown Studio.';
+        const pendingNames = unapprovedP1.map((f) => f.filename || f.name).join(', ');
+        whereAreYou = `Phase 1 deliverable (${pendingNames}) generated. Awaiting Manager Sign-Off in Markdown Studio.`;
         gatedLockInfo = {
-          title: '⏳ [GATE LOCKED — Phase 1/4]: Awaiting Manager Sign-Off',
-          message: 'As per the ACL-ADLC Greenfield sequential protocol, Phase 1 Product Brief is awaiting official Manager approval. ALL downstream phases (PRD, Architecture, Epics) and application code are strictly LOCKED.',
+          title: '⏳ [GATE LOCKED — Phase 1/4]: All Phase 1 Files Must Be Approved',
+          message: `As per ACL-ADLC protocol, ALL markdown files generated for Phase 1 must be Approved by Manager. Currently awaiting sign-off on: ${pendingNames}. Downstream phases (PRD, Architecture, Epics, Code) remain strictly LOCKED.`,
           statusClass: 'locked-red',
         };
         nextSteps = [
-          'Open brief.md in Markdown Studio editor (click "Review in Studio" below).',
+          `Open ${unapprovedP1[0].filename || unapprovedP1[0].name} in Markdown Studio editor.`,
           'Manager reviews strategic goals, target personas, and scope.',
           'Select "Approved" in the toolbar status dropdown and click "Update" (Ctrl+S).',
-          'Gate 1 approval immediately unlocks Phase 2: John (Product Manager) with `@acl-prd`.',
+          'Gate 1 will unlock Phase 2 (PRD) once all Phase 1 files are marked Approved.',
         ];
       }
-      // Step 2: PRD Planning (Gate 1 Approved, PRD missing)
-      else if (!prdDoc) {
-        currentStage = 'Phase 2 · PRD Planning (Gate 1 Approved)';
-        currentDoc = briefDoc;
-        currentAgent = ACL_AGENTS_DIRECTORY.pm;
-        nextAgent = ACL_AGENTS_DIRECTORY.architect;
-        gateStatus = 'Approved';
-        pulseType = 'pulse-green';
-        subtitle = 'Next: @acl-prd';
-        whereAreYou = 'Gate 1 (brief.md) Approved! Now access John (Product Manager) with @acl-prd to generate functional requirements and user journeys.';
-        gatedLockInfo = {
-          title: '🔓 Gate 1 Approved · Ready for Phase 2 (PRD)',
-          message: 'brief.md is Approved by Manager! Gate 1 is passed. Now run @acl-prd in your IDE chat. Once prd.md is generated, Gate 2 will require Manager Sign-Off before Winston can design the Architecture Spine.',
-          statusClass: 'locked-green',
-        };
-        nextSteps = [
-          'Run `@acl-prd` in your IDE chat to generate Phase 2 PRD (prd.md).',
-          'Optional: Run `@acl-ux` if high-fidelity UI component matrices or Figma links are needed.',
-          'Manager reviews functional requirements and marks prd.md as "Approved".',
-          'Gate 2 sign-off unlocks Phase 3A: Winston (System Architect) with `@acl-architecture`.',
-        ];
-      } else if (getEffectiveStatus(prdDoc) !== 'Approved') {
-        currentDoc = prdDoc;
-        gateStatus = getEffectiveStatus(prdDoc);
-        currentStage = 'Phase 2 · PRD Planning (Gate 2/4 Locked)';
-        currentAgent = ACL_AGENTS_DIRECTORY.pm;
-        nextAgent = ACL_AGENTS_DIRECTORY.architect;
-        pulseType = 'pulse-amber';
-        subtitle = '🟡 Awaiting Sign-off';
-        whereAreYou = 'PRD (prd.md) generated. Awaiting Manager Sign-Off in Markdown Studio.';
-        gatedLockInfo = {
-          title: '⏳ [GATE LOCKED — Phase 2/4]: Awaiting Manager Sign-Off',
-          message: 'PRD is awaiting Manager approval. Architecture Spine, Epics, and application code are strictly LOCKED until prd.md is marked Approved.',
-          statusClass: 'locked-red',
-        };
-        nextSteps = [
-          'Open prd.md in Markdown Studio editor.',
-          'Manager validates functional requirements, acceptance criteria, and 5-state matrices.',
-          'Select "Approved" in toolbar and click "Update".',
-          'Gate 2 approval unlocks Phase 3A: Winston (System Architect) with `@acl-architecture`.',
-        ];
-      }
-      // Step 3A: Architecture Spine (Gate 2 Approved, Spine missing)
-      else if (!archDoc) {
-        currentStage = 'Phase 3A · Solutioning (Architecture Spine Ready)';
-        currentDoc = prdDoc;
-        currentAgent = ACL_AGENTS_DIRECTORY.architect;
-        nextAgent = ACL_AGENTS_DIRECTORY.epicsPm;
-        gateStatus = 'Approved';
-        pulseType = 'pulse-green';
-        subtitle = 'Next: @acl-architecture';
-        whereAreYou = 'Gate 2 (PRD) Approved! Now access Winston (System Architect) to create the Architecture Spine.';
-        gatedLockInfo = {
-          title: '🔓 Gate 2 Approved · Ready for Architecture Spine',
-          message: 'Gate 2 approved. Winston will design system architecture and data schemas. Architecture Spine requires Manager Sign-Off before Epics decomposition.',
-          statusClass: 'locked-green',
-        };
-        nextSteps = [
-          'Run `@acl-architecture` in IDE chat to generate architecture-spine.md.',
-          'Winston defines component boundaries, database schemas, and API contracts.',
-          'Manager reviews and approves architecture-spine.md in Markdown Studio.',
-        ];
-      } else if (getEffectiveStatus(archDoc) !== 'Approved') {
-        currentDoc = archDoc;
-        gateStatus = getEffectiveStatus(archDoc);
-        currentStage = 'Phase 3A · Architecture Spine (Gate 3/4 Locked)';
-        currentAgent = ACL_AGENTS_DIRECTORY.architect;
-        nextAgent = ACL_AGENTS_DIRECTORY.epicsPm;
-        pulseType = 'pulse-amber';
-        subtitle = '🟡 Awaiting Sign-off';
-        whereAreYou = 'Architecture Spine generated. Awaiting Manager Sign-Off in Markdown Studio.';
-        gatedLockInfo = {
-          title: '⏳ [GATE LOCKED — Phase 3/4]: Awaiting Manager Sign-Off',
-          message: 'Architecture Spine is awaiting Manager approval. Epics & Stories decomposition and application code are strictly LOCKED.',
-          statusClass: 'locked-red',
-        };
-        nextSteps = [
-          'Open architecture-spine.md in Markdown Studio editor.',
-          'Manager reviews component boundaries, data models, and API specifications.',
-          'Mark "Approved" and click "Update" to unlock Epics & Stories decomposition.',
-        ];
-      }
-      // Step 3B: Epics & Stories Decomposition (Gate 3A Approved, Epics missing)
-      else if (!epicsDoc) {
-        currentStage = 'Phase 3B · Epics & Stories Ready';
-        currentDoc = archDoc;
-        currentAgent = ACL_AGENTS_DIRECTORY.epicsPm;
-        nextAgent = ACL_AGENTS_DIRECTORY.developer;
-        gateStatus = 'Approved';
-        pulseType = 'pulse-green';
-        subtitle = 'Next: @acl-create-epics-and-stories';
-        whereAreYou = 'Gate 3A Approved! Now access John (PM) to decompose into Epics & Stories.';
-        nextSteps = [
-          'Run `@acl-create-epics-and-stories` in your IDE chat.',
-          'John deconstructs PRD and Architecture into testable stories with acceptance checklists.',
-          'Manager approves epics.md in Markdown Studio to unlock Phase 4 Story Implementation.',
-        ];
-      } else if (getEffectiveStatus(epicsDoc) !== 'Approved') {
-        currentDoc = epicsDoc;
-        gateStatus = getEffectiveStatus(epicsDoc);
-        currentStage = 'Phase 3B · Epics (Gate 3B Locked)';
-        currentAgent = ACL_AGENTS_DIRECTORY.epicsPm;
-        nextAgent = ACL_AGENTS_DIRECTORY.developer;
-        pulseType = 'pulse-amber';
-        subtitle = '🟡 Awaiting Sign-off';
-        whereAreYou = 'Epics & Stories (epics.md) generated. Awaiting Manager Sign-Off in Markdown Studio.';
-        gatedLockInfo = {
-          title: '⏳ [GATE LOCKED — Phase 3B]: Awaiting Manager Sign-Off',
-          message: 'Epics & Stories backlog is in review. Story implementation specs and application code are strictly LOCKED until approved.',
-          statusClass: 'locked-red',
-        };
-        nextSteps = [
-          'Open epics.md in Markdown Studio editor.',
-          'Manager verifies story scope, sizing, and acceptance criteria.',
-          'Mark "Approved" and click "Update" to unlock Phase 4 Story Implementation.',
-        ];
-      }
-      // Step 4: Story Implementation & Release
+      // -----------------------------------------------------------------------
+      // Step 2: Phase 2 (PRD & UX) Evaluation (Phase 1 is completely Approved)
+      // -----------------------------------------------------------------------
       else {
-        const plannedStories = parsePlannedStoryIds(epicsDoc ? epicsDoc.content : '');
-        const coveredMap = new Map();
-        storySpecs.forEach((s) => {
-          const id = parseFileStoryId(s.filename || s.name);
-          if (id) coveredMap.set(id, s);
-        });
+        const unapprovedP2 = phase2Files.filter((f) => getEffectiveStatus(f) !== 'Approved');
+        const p2AllApproved = phase2Files.length > 0 && unapprovedP2.length === 0;
 
-        let pendingStory = null;
-        let missingStoryId = null;
-
-        if (plannedStories.length > 0) {
-          for (const id of plannedStories) {
-            const spec = coveredMap.get(id);
-            if (!spec) {
-              missingStoryId = id;
-              break;
-            }
-            if (getEffectiveStatus(spec) !== 'Approved') {
-              pendingStory = spec;
-              break;
-            }
-          }
-        }
-
-        if (pendingStory) {
-          currentDoc = pendingStory;
-          gateStatus = getEffectiveStatus(pendingStory);
-          const sId = parseFileStoryId(pendingStory.filename || pendingStory.name) || 'Spec';
-          currentStage = `Phase 4 · Story ${sId} Spec (Gate Locked)`;
-          currentAgent = ACL_AGENTS_DIRECTORY.developer;
-          nextAgent = ACL_AGENTS_DIRECTORY.developer;
+        if (phase2Files.length === 0) {
+          // Gate 1 passed, no PRD files created yet
+          currentStage = 'Phase 2 · PRD Planning (Gate 1 Approved)';
+          currentDoc = phase1Files[0];
+          phaseDocs = phase1Files.map(formatDocItem);
+          currentAgent = ACL_AGENTS_DIRECTORY.pm;
+          nextAgent = ACL_AGENTS_DIRECTORY.architect;
+          gateStatus = 'Approved';
+          pulseType = 'pulse-green';
+          subtitle = 'Next: @acl-prd';
+          whereAreYou = 'Gate 1 (brief.md) Approved! Now access John (Product Manager) with @acl-prd to generate functional requirements and user journeys.';
+          gatedLockInfo = {
+            title: '🔓 Gate 1 Approved · Ready for Phase 2 (PRD)',
+            message: 'All Phase 1 deliverables are Approved by Manager! Gate 1 is passed. Now run @acl-prd in your IDE chat. Once Phase 2 deliverables are generated, all must be Approved before Winston can design the Architecture Spine.',
+            statusClass: 'locked-green',
+          };
+          nextSteps = [
+            'Run `@acl-prd` in your IDE chat to generate Phase 2 PRD (prd.md).',
+            'Optional: Run `@acl-ux` if high-fidelity UI component matrices or Figma links are needed.',
+            'Manager reviews functional requirements and marks all Phase 2 deliverables as "Approved".',
+            'Gate 2 sign-off unlocks Phase 3A: Winston (System Architect) with `@acl-architecture`.',
+          ];
+        } else if (!p2AllApproved) {
+          // One or more Phase 2 files awaiting approval (e.g. prd.md, reconcile-brief.md, ux.md)
+          currentDoc = unapprovedP2[0];
+          phaseDocs = phase2Files.map(formatDocItem);
+          gateStatus = getEffectiveStatus(unapprovedP2[0]);
+          const pendingName = unapprovedP2[0].filename || unapprovedP2[0].name;
+          const isUx = pendingName.toLowerCase() === 'ux.md';
+          currentAgent = isUx ? ACL_AGENTS_DIRECTORY.ux : ACL_AGENTS_DIRECTORY.pm;
+          nextAgent = ACL_AGENTS_DIRECTORY.architect;
+          currentStage = unapprovedP2.length === 1 ? 'Phase 2 · Planning (Gate 2/4 Locked)' : `Phase 2 · Planning (${unapprovedP2.length} Files In Review)`;
           pulseType = 'pulse-amber';
           subtitle = '🟡 Awaiting Sign-off';
-          whereAreYou = `Story ${sId} spec is in review. Code implementation is strictly LOCKED until approved.`;
+          const pendingNames = unapprovedP2.map((f) => f.filename || f.name).join(', ');
+          whereAreYou = `Phase 2 deliverables in review (${pendingNames}). Awaiting Manager Sign-Off in Markdown Studio.`;
           gatedLockInfo = {
-            title: `⏳ [GATE LOCKED]: Story ${sId} Awaiting Manager Sign-Off`,
-            message: `Implementation spec ${pendingStory.filename || pendingStory.name} must be approved by Manager before writing application code.`,
+            title: '⏳ [GATE LOCKED — Phase 2/4]: All Phase 2 Files Must Be Approved',
+            message: `Architecture Spine is strictly locked until ALL Phase 2 deliverables are marked Approved by Manager. Currently awaiting sign-off on: ${pendingNames}.`,
             statusClass: 'locked-red',
           };
           nextSteps = [
-            `Review ${pendingStory.filename || pendingStory.name} in Markdown Studio editor.`,
-            'Manager signs off on technical contract and acceptance checklist by marking "Approved".',
-            'Once approved, Amelia will implement code for this story in your IDE.',
+            `Open ${pendingName} in Markdown Studio editor.`,
+            'Manager validates functional requirements, acceptance criteria, and matrices.',
+            'Select "Approved" in toolbar and click "Update".',
+            'Gate 2 approval unlocks Phase 3A: Winston (System Architect) with `@acl-architecture`.',
           ];
-        } else if (missingStoryId) {
-          currentStage = `Phase 4 · Story ${missingStoryId} Ready`;
-          currentAgent = ACL_AGENTS_DIRECTORY.developer;
-          nextAgent = ACL_AGENTS_DIRECTORY.developer;
-          gateStatus = 'Approved';
-          pulseType = 'pulse-green';
-          subtitle = 'Next: @acl-quick-dev';
-          whereAreYou = `Ready to generate specification for Story ${missingStoryId}.`;
-          nextSteps = [
-            `Run \`@acl-quick-dev\` in IDE to generate story-${missingStoryId.replace('.', '-')}.md.`,
-            'Manager reviews and approves the story spec in Markdown Studio.',
-            'Amelia implements application code and runs tests.',
-          ];
-        } else {
-          currentStage = 'Validate & Release · Production Ready';
-          currentAgent = ACL_AGENTS_DIRECTORY.qa;
-          nextAgent = ACL_AGENTS_DIRECTORY.qa;
-          gateStatus = 'Approved';
-          pulseType = 'pulse-green';
-          subtitle = 'Release Ready';
-          whereAreYou = 'All stories implemented and approved! Ready for end-to-end verification and release.';
-          nextSteps = [
-            'Run `@acl-qa-generate-e2e-tests` in IDE to ensure complete acceptance criteria validation.',
-            'Execute `npm run quality` on HEAD before pushing.',
-            'Deploy project to production with confidence!',
-          ];
+        }
+        // -----------------------------------------------------------------------
+        // Step 3A: Phase 3A (Architecture Spine) Evaluation (Phase 2 completely Approved)
+        // -----------------------------------------------------------------------
+        else {
+          const unapprovedP3A = phase3AFiles.filter((f) => getEffectiveStatus(f) !== 'Approved');
+          const p3AAllApproved = phase3AFiles.length > 0 && unapprovedP3A.length === 0;
+
+          if (phase3AFiles.length === 0) {
+            currentStage = 'Phase 3A · Solutioning (Architecture Spine Ready)';
+            currentDoc = phase2Files[0];
+            phaseDocs = phase2Files.map(formatDocItem);
+            currentAgent = ACL_AGENTS_DIRECTORY.architect;
+            nextAgent = ACL_AGENTS_DIRECTORY.epicsPm;
+            gateStatus = 'Approved';
+            pulseType = 'pulse-green';
+            subtitle = 'Next: @acl-architecture';
+            whereAreYou = 'Gate 2 (PRD) Approved! Now access Winston (System Architect) to create the Architecture Spine.';
+            gatedLockInfo = {
+              title: '🔓 Gate 2 Approved · Ready for Architecture Spine',
+              message: 'All Phase 2 deliverables approved. Winston will design system architecture and data schemas. All Phase 3A deliverables require Manager Sign-Off before Epics decomposition.',
+              statusClass: 'locked-green',
+            };
+            nextSteps = [
+              'Run `@acl-architecture` in IDE chat to generate architecture-spine.md.',
+              'Winston defines component boundaries, database schemas, and API contracts.',
+              'Manager reviews and approves architecture deliverables in Markdown Studio.',
+            ];
+          } else if (!p3AAllApproved) {
+            currentDoc = unapprovedP3A[0];
+            phaseDocs = phase3AFiles.map(formatDocItem);
+            gateStatus = getEffectiveStatus(unapprovedP3A[0]);
+            currentStage = unapprovedP3A.length === 1 ? 'Phase 3A · Architecture Spine (Gate 3/4 Locked)' : `Phase 3A · Solutioning (${unapprovedP3A.length} Files In Review)`;
+            currentAgent = ACL_AGENTS_DIRECTORY.architect;
+            nextAgent = ACL_AGENTS_DIRECTORY.epicsPm;
+            pulseType = 'pulse-amber';
+            subtitle = '🟡 Awaiting Sign-off';
+            const pendingNames = unapprovedP3A.map((f) => f.filename || f.name).join(', ');
+            whereAreYou = `Architecture Spine deliverables in review (${pendingNames}). Awaiting Manager Sign-Off in Markdown Studio.`;
+            gatedLockInfo = {
+              title: '⏳ [GATE LOCKED — Phase 3/4]: All Phase 3A Architecture Files Must Be Approved',
+              message: `Epics & Stories decomposition is strictly locked until ALL Phase 3A deliverables are Approved. Currently awaiting sign-off on: ${pendingNames}.`,
+              statusClass: 'locked-red',
+            };
+            nextSteps = [
+              `Open ${unapprovedP3A[0].filename || unapprovedP3A[0].name} in Markdown Studio editor.`,
+              'Manager reviews component boundaries, data models, and API specifications.',
+              'Mark "Approved" and click "Update" to unlock Epics & Stories decomposition.',
+            ];
+          }
+          // -----------------------------------------------------------------------
+          // Step 3B: Phase 3B (Epics & Stories) Evaluation (Phase 3A completely Approved)
+          // -----------------------------------------------------------------------
+          else {
+            const unapprovedP3B = phase3BFiles.filter((f) => getEffectiveStatus(f) !== 'Approved');
+            const p3BAllApproved = phase3BFiles.length > 0 && unapprovedP3B.length === 0;
+
+            if (phase3BFiles.length === 0) {
+              currentStage = 'Phase 3B · Epics & Stories Ready';
+              currentDoc = phase3AFiles[0];
+              phaseDocs = phase3AFiles.map(formatDocItem);
+              currentAgent = ACL_AGENTS_DIRECTORY.epicsPm;
+              nextAgent = ACL_AGENTS_DIRECTORY.developer;
+              gateStatus = 'Approved';
+              pulseType = 'pulse-green';
+              subtitle = 'Next: @acl-create-epics-and-stories';
+              whereAreYou = 'Gate 3A Approved! Now access John (PM) to decompose into Epics & Stories.';
+              nextSteps = [
+                'Run `@acl-create-epics-and-stories` in your IDE chat.',
+                'John deconstructs PRD and Architecture into testable stories with acceptance checklists.',
+                'Manager approves epics.md in Markdown Studio to unlock Phase 4 Story Implementation.',
+              ];
+            } else if (!p3BAllApproved) {
+              currentDoc = unapprovedP3B[0];
+              phaseDocs = phase3BFiles.map(formatDocItem);
+              gateStatus = getEffectiveStatus(unapprovedP3B[0]);
+              currentStage = 'Phase 3B · Epics (Gate 3B Locked)';
+              currentAgent = ACL_AGENTS_DIRECTORY.epicsPm;
+              nextAgent = ACL_AGENTS_DIRECTORY.developer;
+              pulseType = 'pulse-amber';
+              subtitle = '🟡 Awaiting Sign-off';
+              const pendingNames = unapprovedP3B.map((f) => f.filename || f.name).join(', ');
+              whereAreYou = `Epics & Stories backlog (${pendingNames}) generated. Awaiting Manager Sign-Off in Markdown Studio.`;
+              gatedLockInfo = {
+                title: '⏳ [GATE LOCKED — Phase 3B]: Epics Deliverables Awaiting Manager Sign-Off',
+                message: `Story implementation specs and application code are strictly LOCKED until ALL Phase 3B Epics deliverables are Approved. Currently awaiting sign-off on: ${pendingNames}.`,
+                statusClass: 'locked-red',
+              };
+              nextSteps = [
+                `Open ${unapprovedP3B[0].filename || unapprovedP3B[0].name} in Markdown Studio editor.`,
+                'Manager verifies story scope, sizing, and acceptance criteria.',
+                'Mark "Approved" and click "Update" to unlock Phase 4 Story Implementation.',
+              ];
+            }
+            // -----------------------------------------------------------------------
+            // Step 4: Phase 4 (Story Implementation & Release) Evaluation
+            // -----------------------------------------------------------------------
+            else {
+              const epicsDoc = phase3BFiles.find((f) => (f.filename || f.name || '').toLowerCase().includes('epics')) || phase3BFiles[0];
+              const plannedStories = parsePlannedStoryIds(epicsDoc ? epicsDoc.content : '');
+              const coveredMap = new Map();
+              storySpecs.forEach((s) => {
+                const id = parseFileStoryId(s.filename || s.name);
+                if (id) coveredMap.set(id, s);
+              });
+
+              // Check if any generated story specs are unapproved
+              const unapprovedStories = storySpecs.filter((s) => getEffectiveStatus(s) !== 'Approved');
+
+              let missingStoryId = null;
+              if (plannedStories.length > 0) {
+                for (const id of plannedStories) {
+                  if (!coveredMap.has(id)) {
+                    missingStoryId = id;
+                    break;
+                  }
+                }
+              }
+
+              if (unapprovedStories.length > 0) {
+                // If any story spec is in review, lock code generation for that story
+                currentDoc = unapprovedStories[0];
+                phaseDocs = storySpecs.map(formatDocItem);
+                gateStatus = getEffectiveStatus(unapprovedStories[0]);
+                const sId = parseFileStoryId(unapprovedStories[0].filename || unapprovedStories[0].name) || 'Spec';
+                currentStage = `Phase 4 · Story ${sId} Spec (Gate Locked)`;
+                currentAgent = ACL_AGENTS_DIRECTORY.developer;
+                nextAgent = ACL_AGENTS_DIRECTORY.developer;
+                pulseType = 'pulse-amber';
+                subtitle = '🟡 Awaiting Sign-off';
+                const pendingNames = unapprovedStories.map((f) => f.filename || f.name).join(', ');
+                whereAreYou = `Story specification (${pendingNames}) is in review. Code implementation is strictly LOCKED until approved.`;
+                gatedLockInfo = {
+                  title: `⏳ [GATE LOCKED]: Story Specification Awaiting Manager Sign-Off`,
+                  message: `All generated story specs must be approved by Manager before application code is written. Currently awaiting sign-off on: ${pendingNames}.`,
+                  statusClass: 'locked-red',
+                };
+                nextSteps = [
+                  `Review ${unapprovedStories[0].filename || unapprovedStories[0].name} in Markdown Studio editor.`,
+                  'Manager signs off on technical contract and acceptance checklist by marking "Approved".',
+                  'Once approved, Amelia will implement code for this story in your IDE.',
+                ];
+              } else if (missingStoryId) {
+                currentStage = `Phase 4 · Story ${missingStoryId} Ready`;
+                currentDoc = storySpecs.length > 0 ? storySpecs[storySpecs.length - 1] : epicsDoc;
+                phaseDocs = storySpecs.map(formatDocItem);
+                currentAgent = ACL_AGENTS_DIRECTORY.developer;
+                nextAgent = ACL_AGENTS_DIRECTORY.developer;
+                gateStatus = 'Approved';
+                pulseType = 'pulse-green';
+                subtitle = 'Next: @acl-quick-dev';
+                whereAreYou = `Ready to generate specification for Story ${missingStoryId}.`;
+                nextSteps = [
+                  `Run \`@acl-quick-dev\` in IDE to generate story-${missingStoryId.replace('.', '-')}.md.`,
+                  'Manager reviews and approves the story spec in Markdown Studio.',
+                  'Amelia implements application code and runs tests.',
+                ];
+              } else {
+                currentStage = 'Validate & Release · Production Ready';
+                currentDoc = storySpecs.length > 0 ? storySpecs[storySpecs.length - 1] : epicsDoc;
+                phaseDocs = storySpecs.map(formatDocItem);
+                currentAgent = ACL_AGENTS_DIRECTORY.qa;
+                nextAgent = ACL_AGENTS_DIRECTORY.qa;
+                gateStatus = 'Approved';
+                pulseType = 'pulse-green';
+                subtitle = 'Release Ready';
+                whereAreYou = 'All stories implemented and approved! Ready for end-to-end verification and release.';
+                nextSteps = [
+                  'Run `@acl-qa-generate-e2e-tests` in IDE to ensure complete acceptance criteria validation.',
+                  'Execute `npm run quality` on HEAD before pushing.',
+                  'Deploy project to production with confidence!',
+                ];
+              }
+            }
+          }
         }
       }
     }
     // =========================================================================
     // BRANCH 2: BROWNFIELD DELIVERY WORKFLOW
-    // (Phase 0 Project Context by Winston -> ACL-ADLC Gated Lock -> Tier 1 Spec or Tier 2 Cascade)
+    // (Phase 0: Project Context -> Tier Selection -> Tier 1 Spec or Tier 2 Cascade)
+    // Rule: Next step unlocked ONLY when ALL markdown files for that step are Approved!
     // =========================================================================
     else {
+      const unapprovedP0 = phase0Files.filter((f) => getEffectiveStatus(f) !== 'Approved');
+      const p0AllApproved = phase0Files.length > 0 && unapprovedP0.length === 0;
+
       // Step 1: Project Context Required
-      if (!contextDoc) {
+      if (phase0Files.length === 0) {
         currentStage = 'Phase 0 · Project Context Creation (Mandatory Gate)';
         currentAgent = ACL_AGENTS_DIRECTORY.contextArchitect;
         nextAgent = ACL_AGENTS_DIRECTORY.quickDevTier1;
@@ -599,31 +704,34 @@
           'Manager reviews and approves project-context.md in Markdown Studio.',
           'Once approved, choose Tier 1 (Self-Contained Spec) or Tier 2 (Major Overhaul).',
         ];
-      } else if (getEffectiveStatus(contextDoc) !== 'Approved') {
-        currentDoc = contextDoc;
-        gateStatus = getEffectiveStatus(contextDoc);
+      } else if (!p0AllApproved) {
+        currentDoc = unapprovedP0[0];
+        phaseDocs = phase0Files.map(formatDocItem);
+        gateStatus = getEffectiveStatus(unapprovedP0[0]);
         currentStage = 'Phase 0 · Project Context (Gate Locked)';
         currentAgent = ACL_AGENTS_DIRECTORY.contextArchitect;
         nextAgent = ACL_AGENTS_DIRECTORY.quickDevTier1;
         pulseType = 'pulse-amber';
         subtitle = '🟡 Awaiting Sign-off';
-        whereAreYou = 'Project Context (project-context.md) generated. Awaiting Manager Sign-Off in Markdown Studio.';
+        const pendingNames = unapprovedP0.map((f) => f.filename || f.name).join(', ');
+        whereAreYou = `Project Context (${pendingNames}) generated. Awaiting Manager Sign-Off in Markdown Studio.`;
         gatedLockInfo = {
           title: '⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)',
-          message: 'project-context.md is currently awaiting official Manager sign-off. As per ACL-ADLC Brownfield governance, all feature specs and application code remain strictly LOCKED until approved.',
+          message: `All Phase 0 Project Context deliverables must be Approved by Manager. Currently awaiting sign-off on: ${pendingNames}. All feature specs and application code remain strictly LOCKED until approved.`,
           statusClass: 'locked-red',
         };
         nextSteps = [
-          'Open project-context.md in Markdown Studio editor (click "Review in Studio" below).',
+          `Open ${unapprovedP0[0].filename || unapprovedP0[0].name} in Markdown Studio editor (click "Review in Studio" below).`,
           'Manager reviews existing codebase architecture, component map, and dependencies.',
           'Change status to "Approved" in the toolbar dropdown and click "Update" (Ctrl+S).',
           'Gate sign-off unlocks Tier 1 (1-Page Spec) and Tier 2 (Major Overhaul).',
         ];
       }
       // Step 2: Project Context Approved -> Tier Selection Ready
-      else if (tier1Specs.length === 0 && !briefDoc) {
+      else if (tier1Specs.length === 0 && phase1Files.length === 0) {
         currentStage = 'Brownfield · Tier Selection Ready';
-        currentDoc = contextDoc;
+        currentDoc = phase0Files[0];
+        phaseDocs = phase0Files.map(formatDocItem);
         currentAgent = ACL_AGENTS_DIRECTORY.quickDevTier1;
         nextAgent = ACL_AGENTS_DIRECTORY.analyst;
         gateStatus = 'Approved';
@@ -642,34 +750,39 @@
         ];
       }
       // Step 3: Tier 1 Spec Active
-      else if (tier1Specs.length > 0 && !briefDoc) {
-        const activeSpec = tier1Specs[tier1Specs.length - 1];
-        currentDoc = activeSpec;
-        gateStatus = getEffectiveStatus(activeSpec);
-        currentAgent = ACL_AGENTS_DIRECTORY.developer;
-        const specName = activeSpec.filename || activeSpec.name;
-        if (gateStatus !== 'Approved') {
-          currentStage = 'Tier 1 · Spec in Review (Gate Locked)';
+      else if (tier1Specs.length > 0 && phase1Files.length === 0) {
+        const unapprovedTier1 = tier1Specs.filter((f) => getEffectiveStatus(f) !== 'Approved');
+        phaseDocs = tier1Specs.map(formatDocItem);
+
+        if (unapprovedTier1.length > 0) {
+          currentDoc = unapprovedTier1[0];
+          gateStatus = getEffectiveStatus(unapprovedTier1[0]);
+          currentAgent = ACL_AGENTS_DIRECTORY.developer;
+          currentStage = unapprovedTier1.length === 1 ? 'Tier 1 · Spec in Review (Gate Locked)' : `Tier 1 · Specs in Review (${unapprovedTier1.length} Locked)`;
           nextAgent = ACL_AGENTS_DIRECTORY.developer;
           pulseType = 'pulse-amber';
           subtitle = '🟡 Awaiting Sign-off';
-          whereAreYou = `Tier 1 Spec (${specName}) is in review. Code implementation is strictly LOCKED until approved.`;
+          const pendingNames = unapprovedTier1.map((f) => f.filename || f.name).join(', ');
+          whereAreYou = `Tier 1 Spec (${pendingNames}) is in review. Code implementation is strictly LOCKED until approved.`;
           gatedLockInfo = {
             title: '⏳ [GATE LOCKED]: Tier 1 Spec Awaiting Manager Sign-Off',
-            message: `Spec ${specName} is awaiting Manager approval. Code generation is strictly forbidden until marked Approved in Markdown Studio.`,
+            message: `ALL Tier 1 specifications must be Approved by Manager before code implementation. Currently awaiting sign-off on: ${pendingNames}.`,
             statusClass: 'locked-red',
           };
           nextSteps = [
-            `Open ${specName} in Markdown Studio editor.`,
+            `Open ${unapprovedTier1[0].filename || unapprovedTier1[0].name} in Markdown Studio editor.`,
             'Manager reviews acceptance criteria checklist and marks document as "Approved".',
             'Once approved, Amelia will implement application code in your IDE.',
           ];
         } else {
+          currentDoc = tier1Specs[tier1Specs.length - 1];
+          gateStatus = 'Approved';
+          currentAgent = ACL_AGENTS_DIRECTORY.developer;
           currentStage = 'Tier 1 · Implementation Unlocked';
           nextAgent = ACL_AGENTS_DIRECTORY.qa;
           pulseType = 'pulse-green';
           subtitle = 'Next: @acl-quick-dev';
-          whereAreYou = `Tier 1 Spec (${specName}) is Approved! Code implementation is unlocked for Amelia.`;
+          whereAreYou = `All Tier 1 Specs are Approved! Code implementation is unlocked for Amelia.`;
           gatedLockInfo = {
             title: '🔓 Tier 1 Spec Approved: Implementation Unlocked',
             message: 'Manager sign-off granted. Amelia is authorized to implement application code and unit tests in your IDE.',
@@ -683,49 +796,55 @@
         }
       }
       // Step 4: Tier 2 Major Overhaul Cascade in Brownfield
-      else if (briefDoc && getEffectiveStatus(briefDoc) !== 'Approved') {
-        currentDoc = briefDoc;
-        gateStatus = getEffectiveStatus(briefDoc);
-        currentStage = 'Tier 2 · Product Brief (Gate 1/4 Locked)';
-        currentAgent = ACL_AGENTS_DIRECTORY.analyst;
-        nextAgent = ACL_AGENTS_DIRECTORY.pm;
-        pulseType = 'pulse-amber';
-        subtitle = '🟡 Awaiting Sign-off';
-        whereAreYou = 'Tier 2 Product Brief (brief.md) generated. Awaiting Manager Sign-Off in Markdown Studio.';
-        gatedLockInfo = {
-          title: '⏳ [GATE LOCKED — Tier 2 Phase 1/4]: Awaiting Manager Sign-Off',
-          message: 'Tier 2 Major Overhaul Product Brief is awaiting official Manager approval. PRD, Architecture, and code modifications are strictly LOCKED.',
-          statusClass: 'locked-red',
-        };
-        nextSteps = [
-          'Open brief.md in Markdown Studio editor.',
-          'Manager reviews overhaul scope and marks document as "Approved".',
-          'Gate 1 approval unlocks Phase 2 PRD update for John (Product Manager).',
-        ];
-      } else if (briefDoc && !prdDoc) {
-        currentStage = 'Tier 2 · PRD Planning Ready';
-        currentDoc = briefDoc;
-        currentAgent = ACL_AGENTS_DIRECTORY.pm;
-        nextAgent = ACL_AGENTS_DIRECTORY.architect;
-        gateStatus = 'Approved';
-        pulseType = 'pulse-green';
-        subtitle = 'Next: @acl-prd';
-        whereAreYou = 'Tier 2 Brief Approved! Now invoke John (@acl-prd) to define functional requirements.';
-        nextSteps = [
-          'Run `@acl-prd` in IDE chat to append overhaul requirements to prd.md.',
-          'Submit prd.md for Manager review in Markdown Studio.',
-        ];
-      } else {
-        currentStage = 'Tier 2 · Major Overhaul In Progress';
-        currentAgent = ACL_AGENTS_DIRECTORY.architect;
-        nextAgent = ACL_AGENTS_DIRECTORY.developer;
-        pulseType = 'pulse-green';
-        subtitle = 'Overhaul In Progress';
-        whereAreYou = 'Tier 2 cascade is actively progressing through sequential phase gates.';
-        nextSteps = [
-          'Continue sequential delivery across Architecture Spine, Epics, and Stories.',
-          'Verify all phase gates are approved in Markdown Studio.',
-        ];
+      else if (phase1Files.length > 0) {
+        const unapprovedTier2Brief = phase1Files.filter((f) => getEffectiveStatus(f) !== 'Approved');
+        if (unapprovedTier2Brief.length > 0) {
+          currentDoc = unapprovedTier2Brief[0];
+          phaseDocs = phase1Files.map(formatDocItem);
+          gateStatus = getEffectiveStatus(unapprovedTier2Brief[0]);
+          currentStage = 'Tier 2 · Product Brief (Gate 1/4 Locked)';
+          currentAgent = ACL_AGENTS_DIRECTORY.analyst;
+          nextAgent = ACL_AGENTS_DIRECTORY.pm;
+          pulseType = 'pulse-amber';
+          subtitle = '🟡 Awaiting Sign-off';
+          const pendingNames = unapprovedTier2Brief.map((f) => f.filename || f.name).join(', ');
+          whereAreYou = `Tier 2 Product Brief (${pendingNames}) generated. Awaiting Manager Sign-Off in Markdown Studio.`;
+          gatedLockInfo = {
+            title: '⏳ [GATE LOCKED — Tier 2 Phase 1/4]: Awaiting Manager Sign-Off',
+            message: `Tier 2 Major Overhaul Product Brief is awaiting official Manager approval. PRD, Architecture, and code modifications are strictly LOCKED until Approved. Currently awaiting: ${pendingNames}.`,
+            statusClass: 'locked-red',
+          };
+          nextSteps = [
+            `Open ${unapprovedTier2Brief[0].filename || unapprovedTier2Brief[0].name} in Markdown Studio editor.`,
+            'Manager reviews overhaul scope and marks document as "Approved".',
+            'Gate 1 approval unlocks Phase 2 PRD update for John (Product Manager).',
+          ];
+        } else if (phase2Files.length === 0) {
+          currentStage = 'Tier 2 · PRD Planning Ready';
+          currentDoc = phase1Files[0];
+          phaseDocs = phase1Files.map(formatDocItem);
+          currentAgent = ACL_AGENTS_DIRECTORY.pm;
+          nextAgent = ACL_AGENTS_DIRECTORY.architect;
+          gateStatus = 'Approved';
+          pulseType = 'pulse-green';
+          subtitle = 'Next: @acl-prd';
+          whereAreYou = 'Tier 2 Brief Approved! Now invoke John (@acl-prd) to define functional requirements.';
+          nextSteps = [
+            'Run `@acl-prd` in IDE chat to append overhaul requirements to prd.md.',
+            'Submit prd.md for Manager review in Markdown Studio.',
+          ];
+        } else {
+          currentStage = 'Tier 2 · Major Overhaul In Progress';
+          currentAgent = ACL_AGENTS_DIRECTORY.architect;
+          nextAgent = ACL_AGENTS_DIRECTORY.developer;
+          pulseType = 'pulse-green';
+          subtitle = 'Overhaul In Progress';
+          whereAreYou = 'Tier 2 cascade is actively progressing through sequential phase gates.';
+          nextSteps = [
+            'Continue sequential delivery across Architecture Spine, Epics, and Stories.',
+            'Verify all phase gates are approved in Markdown Studio.',
+          ];
+        }
       }
     }
 
@@ -736,6 +855,7 @@
       nextAgent,
       whereAreYou,
       currentDoc,
+      phaseDocs: phaseDocs.length > 0 ? phaseDocs : currentDoc ? [formatDocItem(currentDoc)] : [],
       gateStatus,
       pulseType,
       subtitle: subtitle || 'Next: ' + currentAgent.command.split(' ')[0],
@@ -845,16 +965,34 @@
             <div class="acl-position-headline">
               <span>${state.currentStage}</span>
             </div>
+
+            <!-- Documents in Current Phase with Status Badges -->
             ${
-              doc
+              state.phaseDocs && state.phaseDocs.length > 0
                 ? `
+              <div class="acl-phase-docs-list" style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+                ${state.phaseDocs
+                  .map(
+                    (item) => `
+                  <div class="acl-doc-info-row" style="margin: 0;">
+                    <span class="acl-doc-name" title="${item.doc.folderPath ? item.doc.folderPath + '/' : ''}${item.name}">📄 ${item.name}</span>
+                    <span class="acl-status-pill ${item.statusClass}">● ${item.status}</span>
+                  </div>
+                `,
+                  )
+                  .join('')}
+              </div>
+            `
+                : doc
+                  ? `
               <div class="acl-doc-info-row">
                 <span class="acl-doc-name" title="${docPath}">📄 ${docName}</span>
                 <span class="acl-status-pill ${statusClass}">● ${state.gateStatus}</span>
               </div>
             `
-                : ''
+                  : ''
             }
+
             <div class="acl-gate-message ${alertClass}">
               ${state.whereAreYou}
             </div>
@@ -1172,6 +1310,8 @@
       agentKey: state.currentAgent ? state.currentAgent.key : null,
       gateStatus: state.gateStatus,
       docName: state.currentDoc ? state.currentDoc.filename || state.currentDoc.name : null,
+      phaseDocsCount: state.phaseDocs ? state.phaseDocs.length : 0,
+      phaseDocsApproved: state.phaseDocs ? state.phaseDocs.filter((d) => d.status === 'Approved').length : 0,
       projectType: state.projectType,
       whereAreYou: state.whereAreYou,
       subtitle: state.subtitle,
