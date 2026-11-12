@@ -40,6 +40,9 @@ async function syncFromLiveDisk(quiet = false) {
       if (data && data.activeTier) {
         window.__serverActiveTier = String(data.activeTier);
       }
+      if (data && data.detectedLifecycle) {
+        window.__serverLifecycle = data.detectedLifecycle;
+      }
       if (data && Array.isArray(data.files)) {
         // The working-tree tracker is filtered out of the document list below, so read it first.
         const trackerChanged = captureWorkingTreeTracker(data.files);

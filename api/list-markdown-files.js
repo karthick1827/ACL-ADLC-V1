@@ -111,6 +111,49 @@ function compareStoriesAndFiles(a, b) {
   return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
 }
 
+function detectLifecycle(files, projectRoot) {
+  if (Array.isArray(files)) {
+    // 1. Any file has explicit projectType or brownfield markers
+    const bfFile = files.find(
+      (f) =>
+        (f.projectType || '').toLowerCase() === 'brownfield' ||
+        (f.filename || '').toLowerCase() === 'project-context.md' ||
+        ((f.filename || '').toLowerCase().startsWith('spec-') && !/spec[_-]\d+/i.test(f.filename || ''))
+    );
+    if (bfFile) return 'brownfield';
+
+    const gfFile = files.find((f) => (f.projectType || '').toLowerCase() === 'greenfield');
+    if (gfFile) return 'greenfield';
+  }
+
+  // 2. Check disk markers if projectRoot exists
+  if (projectRoot && fs.existsSync(projectRoot)) {
+    try {
+      if (
+        fs.existsSync(path.join(projectRoot, 'project-context.md')) ||
+        fs.existsSync(path.join(projectRoot, '_acl-output/0-context/project-context.md'))
+      ) {
+        return 'brownfield';
+      }
+
+      const pkgPath = path.join(projectRoot, 'package.json');
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        const pkgName = (pkg.name || '').toLowerCase();
+        const hasAppCode = ['src', 'app', 'components', 'pages', 'lib'].some((d) =>
+          fs.existsSync(path.join(projectRoot, d))
+        );
+        const hasBrief = fs.existsSync(path.join(projectRoot, '_acl-output/1-analysis/acl-product-brief/brief.md'));
+        if (pkgName !== 'acl-adlc' && (pkg.dependencies || hasAppCode) && !hasBrief) {
+          return 'brownfield';
+        }
+      }
+    } catch (_) {}
+  }
+
+  return 'greenfield';
+}
+
 async function universalHandler(arg1, arg2) {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -296,10 +339,13 @@ async function universalHandler(arg1, arg2) {
             ? '2'
             : deduplicated.find((f) => f.tier)?.tier || '1';
 
+          const detectedLifecycle = detectLifecycle(deduplicated, process.cwd());
+
           const responsePayload = {
             success: true,
             files: deduplicated,
             activeTier: activeTier,
+            detectedLifecycle: detectedLifecycle,
             frameworkVersion: frameworkVersion,
             version: frameworkVersion,
             source: 'github',
@@ -363,6 +409,8 @@ async function universalHandler(arg1, arg2) {
       ? '2'
       : finalDiskList.find((f) => f.tier)?.tier || '1';
 
+    const diskDetectedLifecycle = detectLifecycle(finalDiskList, process.cwd());
+
     if (!fs.existsSync(scanDir) && (!owner || !repo)) {
       return reply(400, {
         success: false,
@@ -376,6 +424,7 @@ async function universalHandler(arg1, arg2) {
       success: true,
       files: finalDiskList,
       activeTier: diskActiveTier,
+      detectedLifecycle: diskDetectedLifecycle,
       frameworkVersion: frameworkVersion,
       version: frameworkVersion,
       source: 'local-disk',

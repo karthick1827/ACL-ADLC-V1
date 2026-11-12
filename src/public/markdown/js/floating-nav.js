@@ -333,6 +333,66 @@
   }
 
   /**
+   * Autonomous Project Lifecycle Detection (Greenfield vs Brownfield)
+   * Automatically discovers whether the workspace is Greenfield or Brownfield
+   * based on project deliverables, frontmatter, server detection, and codebase indicators.
+   */
+  function detectProjectLifecycle(fileList, rawFileList) {
+    const allFiles = Array.isArray(rawFileList) && rawFileList.length > 0 ? rawFileList : fileList || [];
+
+    // 1. Direct Brownfield markers in project files:
+    // a. Phase 0 Project Context (project-context.md in root or _acl-output)
+    const hasPhase0 = allFiles.some((f) => {
+      const fn = String(f.filename || f.name || '').toLowerCase();
+      const fp = String(f.folderPath || f.path || '').toLowerCase();
+      return fn === 'project-context.md' || fn.includes('project-context') || fp.includes('0-context');
+    });
+    if (hasPhase0) return 'brownfield';
+
+    // b. Tier 1 Specs (spec-*.md that are self-contained brownfield specs)
+    const hasTier1Spec = allFiles.some((f) => {
+      const fn = String(f.filename || f.name || '').toLowerCase();
+      return fn.startsWith('spec-') && !parseFileStoryId(fn);
+    });
+    if (hasTier1Spec) return 'brownfield';
+
+    // c. Any document explicitly declaring project_type: brownfield in frontmatter
+    const hasBrownfieldFrontmatter = allFiles.some((f) => {
+      if ((f.projectType || '').toLowerCase() === 'brownfield') return true;
+      if (typeof f.content === 'string' && /project_type:\s*['"]?brownfield['"]?/i.test(f.content)) return true;
+      return false;
+    });
+    if (hasBrownfieldFrontmatter) return 'brownfield';
+
+    // 2. Direct Greenfield markers in deliverables:
+    // a. Phase 1 Brief or any deliverable explicitly declaring project_type: greenfield
+    const hasGreenfieldFrontmatter = allFiles.some((f) => {
+      if ((f.projectType || '').toLowerCase() === 'greenfield') return true;
+      if (typeof f.content === 'string' && /project_type:\s*['"]?greenfield['"]?/i.test(f.content)) return true;
+      return false;
+    });
+    if (hasGreenfieldFrontmatter) return 'greenfield';
+
+    // b. Active sequential greenfield deliverables (brief.md, prd.md, architecture-spine.md, epics.md)
+    const hasGreenfieldCascade = allFiles.some((f) => {
+      const fn = String(f.filename || f.name || '').toLowerCase();
+      return fn === 'brief.md' || fn === 'prd.md' || fn === 'architecture-spine.md' || fn === 'epics.md';
+    });
+    if (hasGreenfieldCascade) return 'greenfield';
+
+    // 3. Server-detected lifecycle (from /api/list-markdown-files inspection of project root)
+    if (window.__serverLifecycle === 'brownfield' || window.__detectedLifecycle === 'brownfield') {
+      return 'brownfield';
+    }
+    if (window.__serverLifecycle === 'greenfield' || window.__detectedLifecycle === 'greenfield') {
+      return 'greenfield';
+    }
+
+    // 4. Default for brand-new project workspace: Greenfield MVP
+    return 'greenfield';
+  }
+
+  /**
    * Real-time analysis of the current working directory / project state
    * Enforces: Current agent advances ONLY when ALL markdown files created for that stage are Approved!
    */
@@ -354,26 +414,8 @@
     });
     const storySpecs = phase4Files.filter((f) => parseFileStoryId(f.filename || f.name) !== null);
 
-    // Resolve workflow mode: user explicit preference or discovered project files
-    let userMode = null;
-    try {
-      userMode = localStorage.getItem('acl_workflow_mode') || window.activeWorkflowMode;
-    } catch (_) {}
-
-    let projectType = 'greenfield';
-    if (phase0Files.length > 0 || tier1Specs.length > 0) {
-      projectType = 'brownfield';
-    } else if (phase1Files.length > 0) {
-      const bDoc = phase1Files[0];
-      const isBf =
-        (bDoc.projectType || '').toLowerCase() === 'brownfield' ||
-        (bDoc.content && /project_type:\s*brownfield/i.test(bDoc.content));
-      projectType = isBf ? 'brownfield' : 'greenfield';
-    } else if (userMode === 'brownfield') {
-      projectType = 'brownfield';
-    } else {
-      projectType = 'greenfield';
-    }
+    // Autonomous project lifecycle detection
+    const projectType = detectProjectLifecycle(fileList, rawFileList);
 
     let currentStage = null;
     let currentAgent = ACL_AGENTS_DIRECTORY.analyst;
@@ -683,74 +725,8 @@
       const unapprovedP0 = phase0Files.filter((f) => getEffectiveStatus(f) !== 'Approved');
       const p0AllApproved = phase0Files.length > 0 && unapprovedP0.length === 0;
 
-      // Step 1: Project Context Required
-      if (phase0Files.length === 0) {
-        currentStage = 'Phase 0 · Project Context Creation (Mandatory Gate)';
-        currentAgent = ACL_AGENTS_DIRECTORY.contextArchitect;
-        nextAgent = ACL_AGENTS_DIRECTORY.quickDevTier1;
-        gateStatus = 'Not Started';
-        pulseType = 'pulse-amber';
-        subtitle = '🛑 Context Req.';
-        whereAreYou = 'Existing Brownfield Codebase: Project Context (project-context.md) must be created first by Winston to map architecture and boundaries.';
-        gatedLockInfo = {
-          title: '🛑 ACL-ADLC GATED LOCK: Project Context Required',
-          message: 'In Brownfield projects, project-context.md must be generated by Winston (@acl-generate-project-context) and approved by your Manager. ALL downstream feature additions, 1-page specs, and code modifications are strictly LOCKED until approved.',
-          statusClass: 'locked-red',
-        };
-        nextSteps = [
-          'Open your IDE AI chat (Cursor, Claude Code, Copilot, Windsurf, AGY).',
-          'Run `@acl-generate-project-context` to map existing codebase architecture.',
-          'Winston scans folder layout, dependencies, schemas, and design patterns into project-context.md.',
-          'Manager reviews and approves project-context.md in Markdown Studio.',
-          'Once approved, choose Tier 1 (Self-Contained Spec) or Tier 2 (Major Overhaul).',
-        ];
-      } else if (!p0AllApproved) {
-        currentDoc = unapprovedP0[0];
-        phaseDocs = phase0Files.map(formatDocItem);
-        gateStatus = getEffectiveStatus(unapprovedP0[0]);
-        currentStage = 'Phase 0 · Project Context (Gate Locked)';
-        currentAgent = ACL_AGENTS_DIRECTORY.contextArchitect;
-        nextAgent = ACL_AGENTS_DIRECTORY.quickDevTier1;
-        pulseType = 'pulse-amber';
-        subtitle = '🟡 Awaiting Sign-off';
-        const pendingNames = unapprovedP0.map((f) => f.filename || f.name).join(', ');
-        whereAreYou = `Project Context (${pendingNames}) generated. Awaiting Manager Sign-Off in Markdown Studio.`;
-        gatedLockInfo = {
-          title: '⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)',
-          message: `All Phase 0 Project Context deliverables must be Approved by Manager. Currently awaiting sign-off on: ${pendingNames}. All feature specs and application code remain strictly LOCKED until approved.`,
-          statusClass: 'locked-red',
-        };
-        nextSteps = [
-          `Open ${unapprovedP0[0].filename || unapprovedP0[0].name} in Markdown Studio editor (click "Review in Studio" below).`,
-          'Manager reviews existing codebase architecture, component map, and dependencies.',
-          'Change status to "Approved" in the toolbar dropdown and click "Update" (Ctrl+S).',
-          'Gate sign-off unlocks Tier 1 (1-Page Spec) and Tier 2 (Major Overhaul).',
-        ];
-      }
-      // Step 2: Project Context Approved -> Tier Selection Ready
-      else if (tier1Specs.length === 0 && phase1Files.length === 0) {
-        currentStage = 'Brownfield · Tier Selection Ready';
-        currentDoc = phase0Files[0];
-        phaseDocs = phase0Files.map(formatDocItem);
-        currentAgent = ACL_AGENTS_DIRECTORY.quickDevTier1;
-        nextAgent = ACL_AGENTS_DIRECTORY.analyst;
-        gateStatus = 'Approved';
-        pulseType = 'pulse-green';
-        subtitle = 'Tier Selection Ready';
-        whereAreYou = 'Project Context approved! Choose Tier 1 (Self-Contained 1-Page Spec) or Tier 2 (Major Architectural Overhaul).';
-        gatedLockInfo = {
-          title: '🔓 ACL-ADLC Gate Unlocked: Tier Selection Ready',
-          message: 'Project Context is approved. You may now initiate Tier 1 (Amelia quick dev) for self-contained changes, or Tier 2 (Mary product brief) for architectural overhauls.',
-          statusClass: 'locked-green',
-        };
-        nextSteps = [
-          'For self-contained features, dialogs, or bug fixes: Run `quick dev Tier 1: <feature-name>` in IDE chat.',
-          'For architectural migrations or database overhauls: Run `@acl-product-brief` for Tier 2 cascade.',
-          'Once a Tier 1 spec is generated, it will require Manager approval before coding begins.',
-        ];
-      }
-      // Step 3: Tier 1 Spec Active
-      else if (tier1Specs.length > 0 && phase1Files.length === 0) {
+      // Case A: Tier 1 Spec Active
+      if (tier1Specs.length > 0 && phase1Files.length === 0) {
         const unapprovedTier1 = tier1Specs.filter((f) => getEffectiveStatus(f) !== 'Approved');
         phaseDocs = tier1Specs.map(formatDocItem);
 
@@ -795,7 +771,7 @@
           ];
         }
       }
-      // Step 4: Tier 2 Major Overhaul Cascade in Brownfield
+      // Case B: Tier 2 Major Overhaul Cascade in Brownfield
       else if (phase1Files.length > 0) {
         const unapprovedTier2Brief = phase1Files.filter((f) => getEffectiveStatus(f) !== 'Approved');
         if (unapprovedTier2Brief.length > 0) {
@@ -845,6 +821,74 @@
             'Verify all phase gates are approved in Markdown Studio.',
           ];
         }
+      }
+      // Case C: Project Context In Review
+      else if (phase0Files.length > 0 && !p0AllApproved) {
+        currentDoc = unapprovedP0[0];
+        phaseDocs = phase0Files.map(formatDocItem);
+        gateStatus = getEffectiveStatus(unapprovedP0[0]);
+        currentStage = 'Phase 0 · Project Context (Gate Locked)';
+        currentAgent = ACL_AGENTS_DIRECTORY.contextArchitect;
+        nextAgent = ACL_AGENTS_DIRECTORY.quickDevTier1;
+        pulseType = 'pulse-amber';
+        subtitle = '🟡 Awaiting Sign-off';
+        const pendingNames = unapprovedP0.map((f) => f.filename || f.name).join(', ');
+        whereAreYou = `Project Context (${pendingNames}) generated. Awaiting Manager Sign-Off in Markdown Studio.`;
+        gatedLockInfo = {
+          title: '⏳ [GATE LOCKED]: Awaiting Manager Sign-Off (ACL-ADLC Protocol)',
+          message: `All Phase 0 Project Context deliverables must be Approved by Manager. Currently awaiting sign-off on: ${pendingNames}. All feature specs and application code remain strictly LOCKED until approved.`,
+          statusClass: 'locked-red',
+        };
+        nextSteps = [
+          `Open ${unapprovedP0[0].filename || unapprovedP0[0].name} in Markdown Studio editor (click "Review in Studio" below).`,
+          'Manager reviews existing codebase architecture, component map, and dependencies.',
+          'Change status to "Approved" in the toolbar dropdown and click "Update" (Ctrl+S).',
+          'Gate sign-off unlocks Tier 1 (1-Page Spec) and Tier 2 (Major Overhaul).',
+        ];
+      }
+      // Case D: Project Context Approved -> Tier Selection Ready
+      else if (p0AllApproved) {
+        currentStage = 'Brownfield · Tier Selection Ready';
+        currentDoc = phase0Files[0];
+        phaseDocs = phase0Files.map(formatDocItem);
+        currentAgent = ACL_AGENTS_DIRECTORY.quickDevTier1;
+        nextAgent = ACL_AGENTS_DIRECTORY.analyst;
+        gateStatus = 'Approved';
+        pulseType = 'pulse-green';
+        subtitle = 'Tier Selection Ready';
+        whereAreYou = 'Project Context approved! Choose Tier 1 (Self-Contained 1-Page Spec) or Tier 2 (Major Architectural Overhaul).';
+        gatedLockInfo = {
+          title: '🔓 ACL-ADLC Gate Unlocked: Tier Selection Ready',
+          message: 'Project Context is approved. You may now initiate Tier 1 (Amelia quick dev) for self-contained changes, or Tier 2 (Mary product brief) for architectural overhauls.',
+          statusClass: 'locked-green',
+        };
+        nextSteps = [
+          'For self-contained features, dialogs, or bug fixes: Run `quick dev Tier 1: <feature-name>` in IDE chat.',
+          'For architectural migrations or database overhauls: Run `@acl-product-brief` for Tier 2 cascade.',
+          'Once a Tier 1 spec is generated, it will require Manager approval before coding begins.',
+        ];
+      }
+      // Case E: Fresh Brownfield with No Deliverables -> Project Context Required
+      else {
+        currentStage = 'Phase 0 · Project Context Creation (Mandatory Gate)';
+        currentAgent = ACL_AGENTS_DIRECTORY.contextArchitect;
+        nextAgent = ACL_AGENTS_DIRECTORY.quickDevTier1;
+        gateStatus = 'Not Started';
+        pulseType = 'pulse-amber';
+        subtitle = '🛑 Context Req.';
+        whereAreYou = 'Existing Brownfield Codebase: Project Context (project-context.md) must be created first by Winston to map architecture and boundaries.';
+        gatedLockInfo = {
+          title: '🛑 ACL-ADLC GATED LOCK: Project Context Required',
+          message: 'In Brownfield projects, project-context.md must be generated by Winston (@acl-generate-project-context) and approved by your Manager. ALL downstream feature additions, 1-page specs, and code modifications are strictly LOCKED until approved.',
+          statusClass: 'locked-red',
+        };
+        nextSteps = [
+          'Open your IDE AI chat (Cursor, Claude Code, Copilot, Windsurf, AGY).',
+          'Run `@acl-generate-project-context` to map existing codebase architecture.',
+          'Winston scans folder layout, dependencies, schemas, and design patterns into project-context.md.',
+          'Manager reviews and approves project-context.md in Markdown Studio.',
+          'Once approved, choose Tier 1 (Self-Contained Spec) or Tier 2 (Major Overhaul).',
+        ];
       }
     }
 
@@ -941,15 +985,10 @@
             </div>
           </div>
           <div class="acl-floating-header-actions">
-            <!-- Greenfield vs Brownfield Mode Switcher -->
-            <div class="acl-mode-toggle-wrap">
-              <button type="button" class="acl-mode-toggle-btn ${state.projectType === 'greenfield' ? 'active mode-greenfield' : ''}" id="aclModeGreenfieldBtn" title="Switch to Greenfield MVP mode">
-                🌱 Greenfield
-              </button>
-              <button type="button" class="acl-mode-toggle-btn ${state.projectType === 'brownfield' ? 'active mode-brownfield' : ''}" id="aclModeBrownfieldBtn" title="Switch to Brownfield Existing Codebase mode">
-                🍂 Brownfield
-              </button>
-            </div>
+            <!-- Auto-detected Project Mode Indicator Pill -->
+            <span class="acl-mode-indicator-pill ${state.projectType === 'brownfield' ? 'pill-brownfield' : 'pill-greenfield'}" title="Auto-detected Project Mode: ${state.projectType === 'brownfield' ? 'Brownfield (Existing Codebase)' : 'Greenfield (MVP)'}">
+              ${state.projectType === 'brownfield' ? '🍂 Brownfield' : '🌱 Greenfield'}
+            </span>
             <button type="button" class="acl-floating-btn-icon" id="aclFloatingNavCloseBtn" title="Close Navigator">✕</button>
           </div>
         </div>
@@ -960,7 +999,7 @@
           <div class="acl-nav-section acl-position-card">
             <div class="acl-nav-section-title">
               <span>📍 Where You Are Right Now</span>
-              <span class="acl-phase-badge">${state.projectType.toUpperCase()}</span>
+              <span class="acl-phase-badge ${state.projectType === 'brownfield' ? 'badge-brownfield' : 'badge-greenfield'}">${state.projectType === 'brownfield' ? '🍂 BROWNFIELD' : '🌱 GREENFIELD'}</span>
             </div>
             <div class="acl-position-headline">
               <span>${state.currentStage}</span>
@@ -1142,8 +1181,6 @@
     const workflowBtn = document.getElementById('aclWorkflowDiagramBtn');
     const agentsBtn = document.getElementById('aclBrowseAgentsBtn');
     const treeBtn = document.getElementById('aclWorkingTreeBtn');
-    const greenfieldBtn = document.getElementById('aclModeGreenfieldBtn');
-    const brownfieldBtn = document.getElementById('aclModeBrownfieldBtn');
 
     if (triggerBtn) {
       triggerBtn.onclick = function (e) {
@@ -1156,20 +1193,6 @@
       closeBtn.onclick = function (e) {
         e.stopPropagation();
         closeFloatingNavPanel();
-      };
-    }
-
-    if (greenfieldBtn) {
-      greenfieldBtn.onclick = function (e) {
-        e.stopPropagation();
-        aclSetWorkflowMode('greenfield');
-      };
-    }
-
-    if (brownfieldBtn) {
-      brownfieldBtn.onclick = function (e) {
-        e.stopPropagation();
-        aclSetWorkflowMode('brownfield');
       };
     }
 
