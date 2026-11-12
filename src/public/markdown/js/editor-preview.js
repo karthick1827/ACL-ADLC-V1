@@ -51,6 +51,11 @@ function loadFile(id, openFolder = false) {
       }
     });
   }
+
+  // Refresh approval notification bar if the newly loaded file is approved
+  if (typeof window.updateApprovalNotificationBar === 'function') {
+    window.updateApprovalNotificationBar();
+  }
 }
 
 function getActiveFile() {
@@ -65,6 +70,7 @@ function getActiveFile() {
   }
   return null;
 }
+window.getActiveFile = getActiveFile;
 
 if (typeof marked !== 'undefined' && marked.setOptions) {
   marked.setOptions({ gfm: true, breaks: true });

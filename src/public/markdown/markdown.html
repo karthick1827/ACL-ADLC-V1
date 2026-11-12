@@ -296,6 +296,37 @@
       </div>
     </header>
 
+    <!-- Global Approval & Next Agent Notification Bar (Persists until user closes it) -->
+    <div id="aclApprovalNotificationBar" class="acl-notification-bar hidden" role="alert">
+      <div class="acl-notif-bar-left">
+        <span class="acl-notif-badge">
+          <span class="acl-notif-badge-icon">✅</span>
+          <span id="aclNotifDocName">Document Approved</span>
+        </span>
+        <div class="acl-notif-agent-group">
+          <span class="acl-notif-arrow">👉</span>
+          <span class="acl-notif-label">Next Agent:</span>
+          <span class="acl-notif-agent-name" id="aclNotifAgentName">—</span>
+          <span class="acl-notif-divider">|</span>
+          <span class="acl-notif-phase" id="aclNotifPhaseName">—</span>
+        </div>
+      </div>
+
+      <div class="acl-notif-bar-right">
+        <div class="acl-notif-cmd-box" title="Click to copy IDE command">
+          <span class="acl-notif-cmd-label">IDE Command:</span>
+          <code class="acl-notif-cmd-code" id="aclNotifCmdText">—</code>
+          <button type="button" class="acl-notif-copy-btn" id="aclNotifCopyBtn" title="Copy command for IDE chat">
+            <span class="acl-notif-copy-icon">📋</span>
+            <span id="aclNotifCopyLabel">Copy</span>
+          </button>
+        </div>
+        <button type="button" class="acl-notif-close-btn" id="aclNotifCloseBtn" title="Dismiss notification bar (persists until closed)" aria-label="Close notification bar">
+          ✕
+        </button>
+      </div>
+    </div>
+
     <!-- Main Layout -->
     <div class="app-container" id="studioView">
       <!-- Sidebar -->
@@ -469,7 +500,7 @@
     <script src="/markdown/js/dashboard.js?v=9"></script>
     <script src="/markdown/js/working-tree.js?v=9"></script>
     <script src="/markdown/js/agents.js?v=9"></script>
-    <script src="/markdown/js/floating-nav.js?v=2"></script>
+    <script src="/markdown/js/floating-nav.js?v=3"></script>
     <script src="/markdown/js/app.js?v=9"></script>
   </body>
 </html>

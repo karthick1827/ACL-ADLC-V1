@@ -255,6 +255,9 @@ async function saveCurrentFile() {
   const syncSuffix = resData && resData.gitPushed ? ' (Synced to GitHub)' : ' (Updated in IDE, not synced with GitHub)';
   if (status === 'Approved' || status === 'Accepted') {
     showToast(`🎉 Approved '${file.filename}'!${syncSuffix}`, 'success');
+    if (typeof window.clearDismissalForDoc === 'function') {
+      window.clearDismissalForDoc(file.id);
+    }
   } else if (status === 'Rejected') {
     showToast(`🔴 Rejected '${file.filename}'${syncSuffix}`, 'error');
   } else {
@@ -263,7 +266,9 @@ async function saveCurrentFile() {
   window.files = files;
   renderFileTree();
   evaluateProceedButton();
-  if (typeof updateFloatingNavWidget === 'function') {
+  if (typeof updateApprovalNotificationBar === 'function') {
+    updateApprovalNotificationBar();
+  } else if (typeof updateFloatingNavWidget === 'function') {
     updateFloatingNavWidget();
   }
   if (activeAppView === 'dashboard') {
