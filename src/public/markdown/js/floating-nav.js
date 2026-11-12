@@ -161,24 +161,48 @@
   }
 
   /**
-   * Clear dismissal record for a document when freshly saved or modified
+   * Clear dismissal record for a document (and optionally all files in its phase)
    */
   function clearDismissalForDoc(docId) {
-    if (!docId) return;
+    if (!docId) {
+      dismissedNotifications.clear();
+      return;
+    }
     const strId = String(docId).toLowerCase();
     for (const key of dismissedNotifications) {
-      if (key.toLowerCase().startsWith(strId + ':')) {
+      if (key.toLowerCase().includes(strId)) {
         dismissedNotifications.delete(key);
       }
     }
+    // Also clear dismissals for any sibling files in the same phase
+    try {
+      const allFiles = getWorkspaceFiles();
+      const doc = allFiles.find((f) => String(f.id || f.filename || f.name).toLowerCase() === strId);
+      if (doc) {
+        const category = getFilePhaseCategory(doc);
+        if (category) {
+          allFiles.forEach((f) => {
+            if (getFilePhaseCategory(f) === category) {
+              const fKey = String(f.id || f.filename || f.name || '').toLowerCase();
+              for (const key of dismissedNotifications) {
+                if (key.toLowerCase().startsWith(fKey + ':')) {
+                  dismissedNotifications.delete(key);
+                }
+              }
+            }
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   /**
-   * Dismiss notification bar for current document and status
+   * Dismiss notification bar for current document and status tag
    */
-  function dismissApprovalNotification(docId, status) {
+  function dismissApprovalNotification(docId, statusTag) {
     clearAutoDismissTimer();
-    const key = `${String(docId || '').toLowerCase()}:${String(status || 'Approved').toLowerCase()}`;
+    const tag = String(statusTag || 'approved-all').toLowerCase();
+    const key = `${String(docId || '').toLowerCase()}:${tag}`;
     dismissedNotifications.add(key);
     const bar = document.getElementById('aclApprovalNotificationBar');
     if (bar) {
@@ -422,6 +446,68 @@
   }
 
   /**
+   * Determine the collection of primary deliverable files that belong to the same
+   * agent / phase as the given document.
+   */
+  function getPhaseFilesForDocument(currentDoc, allFiles) {
+    if (!currentDoc) return [];
+    const primaryFiles = (allFiles || []).filter(isPrimaryDeliverable);
+    const currentFn = String(currentDoc.filename || currentDoc.name || '').toLowerCase();
+    const currentFp = String(currentDoc.folderPath || currentDoc.path || '').toLowerCase();
+
+    // If this is a story spec (e.g., story-1-1.md), group by specific story ID
+    const storyId = parseFileStoryId(currentFn);
+    if (storyId) {
+      const storyFiles = primaryFiles.filter((f) => {
+        const fn = String(f.filename || f.name || '').toLowerCase();
+        return parseFileStoryId(fn) === storyId;
+      });
+      return storyFiles.length > 0 ? storyFiles : [currentDoc];
+    }
+
+    // If this is a Tier 1 standalone spec (spec-*.md)
+    if (currentFn.startsWith('spec-')) {
+      const specFiles = primaryFiles.filter((f) => {
+        const fn = String(f.filename || f.name || '').toLowerCase();
+        return fn === currentFn;
+      });
+      return specFiles.length > 0 ? specFiles : [currentDoc];
+    }
+
+    // For Phase deliverables: Phase 0, 1, 2, 3A, 3B
+    const category = getFilePhaseCategory(currentDoc);
+    if (category) {
+      const phaseFiles = primaryFiles.filter((f) => getFilePhaseCategory(f) === category);
+      if (phaseFiles.length > 0) return phaseFiles;
+    }
+
+    // Fallback: check files in the exact same folder
+    if (currentFp) {
+      const folderFiles = primaryFiles.filter((f) => {
+        const fp = String(f.folderPath || f.path || '').toLowerCase();
+        return fp === currentFp;
+      });
+      if (folderFiles.length > 0) return folderFiles;
+    }
+
+    return [currentDoc];
+  }
+
+  /**
+   * Resolve effective status for a file, taking active editor status into account
+   * if the file is the currently opened document.
+   */
+  function getResolvedFileStatus(file, currentDoc) {
+    if (!file) return 'In Review';
+    const fileKey = String(file.id || file.filename || file.name || '').toLowerCase();
+    const currentKey = currentDoc ? String(currentDoc.id || currentDoc.filename || currentDoc.name || '').toLowerCase() : '';
+    if (currentDoc && fileKey === currentKey) {
+      return getCurrentDocumentStatus(currentDoc);
+    }
+    return getEffectiveStatus(file);
+  }
+
+  /**
    * Map the approved document to the exact Next Agent, Next Phase, and IDE Command
    */
   function getNextAgentForApprovedDoc(currentDoc, allFiles, projectType) {
@@ -556,8 +642,14 @@
   /**
    * Main Notification Bar Controller:
    * Displays status for In Review, Approved, and Rejected.
-   * If Approved: Shows next agent, IDE command with copy button. Persists until closed.
-   * If In Review or Rejected: Shows status & guidance, and automatically disappears after 10 seconds.
+   * If Approved and ALL phase/agent files are Approved:
+   *   - Shows next agent, IDE command with copy button.
+   *   - Persists until user explicitly closes it.
+   * If Approved but OTHER phase/agent files are pending or rejected:
+   *   - Gate is locked, shows remaining pending file(s).
+   *   - Disappears automatically after 10 seconds.
+   * If In Review or Rejected:
+   *   - Shows status & guidance, and automatically disappears after 10 seconds.
    */
   function updateApprovalNotificationBar() {
     // Clean up any old floating icons
@@ -590,7 +682,27 @@
     const docKey = String(currentDoc.id || currentDoc.filename || currentDoc.name || '').toLowerCase();
     const docName = currentDoc.filename || currentDoc.name || 'Document';
     const status = getCurrentDocumentStatus(currentDoc);
-    const dismissalKey = `${docKey}:${status.toLowerCase()}`;
+
+    const allFiles = getWorkspaceFiles();
+    const phaseFiles = getPhaseFilesForDocument(currentDoc, allFiles);
+    const totalPhaseCount = phaseFiles.length;
+    const approvedFiles = phaseFiles.filter((f) => getResolvedFileStatus(f, currentDoc) === 'Approved');
+    const approvedCount = approvedFiles.length;
+    const unapprovedFiles = phaseFiles.filter((f) => getResolvedFileStatus(f, currentDoc) !== 'Approved');
+    const rejectedFiles = phaseFiles.filter((f) => getResolvedFileStatus(f, currentDoc) === 'Rejected');
+    const allPhaseApproved = totalPhaseCount > 0 && unapprovedFiles.length === 0;
+
+    const phaseFingerprint = phaseFiles
+      .map((f) => `${String(f.id || f.filename || f.name).toLowerCase()}:${getResolvedFileStatus(f, currentDoc)}`)
+      .join('|');
+
+    const dismissalKey = allPhaseApproved
+      ? `${docKey}:approved-all`
+      : status === 'Approved'
+      ? `${docKey}:approved-partial:${approvedCount}/${totalPhaseCount}`
+      : status === 'Rejected'
+      ? `${docKey}:rejected`
+      : `${docKey}:in-review:${approvedCount}/${totalPhaseCount}`;
 
     // If this specific notification was dismissed or timed out, keep it hidden
     if (dismissedNotifications.has(dismissalKey)) {
@@ -598,7 +710,7 @@
       return;
     }
 
-    const fingerprint = `${docKey}:${status}`;
+    const fingerprint = `${docKey}:${status}:${phaseFingerprint}:${allPhaseApproved ? 'all' : 'partial'}`;
     const isNewState = fingerprint !== lastRenderedFingerprint || bar.classList.contains('hidden');
 
     if (!isNewState) {
@@ -610,24 +722,28 @@
     bar.className = 'acl-notification-bar';
 
     // =========================================================================
-    // CASE 1: STATUS APPROVED -> Show Next Agent + Command. Persist until closed!
+    // CASE 1: ALL PHASE MARKDOWN FILES APPROVED -> Show Next Agent + Command. Persist until closed!
     // =========================================================================
-    if (status === 'Approved') {
+    if (status === 'Approved' && allPhaseApproved) {
       clearAutoDismissTimer();
       bar.classList.add('status-approved');
 
-      const allFiles = getWorkspaceFiles();
       const projectType = detectProjectLifecycle(allFiles.filter(isPrimaryDeliverable), allFiles);
       const recommendation = getNextAgentForApprovedDoc(currentDoc, allFiles, projectType);
       const agent = recommendation ? recommendation.nextAgent : ACL_AGENTS_DIRECTORY.pm;
       const cmd = recommendation ? recommendation.command : '@acl-prd';
       const phase = recommendation ? recommendation.phase : 'Phase 2 · PRD Planning';
 
+      const approvalBadgeText =
+        totalPhaseCount > 1
+          ? `${docName} Approved (All ${totalPhaseCount} Files Approved)`
+          : `${docName} Approved`;
+
       bar.innerHTML = `
         <div class="acl-notif-bar-left">
           <span class="acl-notif-badge badge-approved">
             <span class="acl-notif-badge-icon">✅</span>
-            <span id="aclNotifDocName">${docName} Approved</span>
+            <span id="aclNotifDocName">${approvalBadgeText}</span>
           </span>
           <div class="acl-notif-agent-group">
             <span class="acl-notif-arrow">👉</span>
@@ -674,21 +790,94 @@
       if (closeBtn) {
         closeBtn.onclick = function (e) {
           e.stopPropagation();
-          dismissApprovalNotification(docKey, 'approved');
+          dismissApprovalNotification(docKey, 'approved-all');
         };
       }
     }
     // =========================================================================
-    // CASE 2: STATUS IN REVIEW -> Show Status & Gate Lock. Disappear after 10s!
+    // CASE 2: CURRENT FILE APPROVED BUT MULTIPLE FILES IN AGENT/PHASE PENDING -> Lock Gate & Disappear after 10s!
+    // =========================================================================
+    else if (status === 'Approved' && !allPhaseApproved) {
+      const isAnyRejected = rejectedFiles.length > 0;
+      const projectType = detectProjectLifecycle(allFiles.filter(isPrimaryDeliverable), allFiles);
+      const recommendation = getNextAgentForApprovedDoc(currentDoc, allFiles, projectType);
+      const nextAgentName = recommendation && recommendation.nextAgent ? recommendation.nextAgent.name : 'Next Agent';
+      const nextCmd = recommendation ? recommendation.command : '';
+
+      if (isAnyRejected) {
+        bar.classList.add('status-rejected');
+        const rejectedNames = rejectedFiles.map((f) => f.filename || f.name || 'file').join(', ');
+
+        bar.innerHTML = `
+          <div class="acl-notif-bar-left">
+            <span class="acl-notif-badge badge-rejected">
+              <span class="acl-notif-badge-icon">🛑</span>
+              <span id="aclNotifDocName">${docName} Approved (${rejectedNames} Rejected)</span>
+            </span>
+            <div class="acl-notif-status-message">
+              <span>⚠️ Revisions Required: ${rejectedNames} was rejected by Manager · All agent files must be approved before proceeding</span>
+            </div>
+          </div>
+
+          <div class="acl-notif-bar-right">
+            <button type="button" class="acl-notif-close-btn" id="aclNotifCloseBtn" title="Dismiss notification bar" aria-label="Close notification bar">
+              ✕
+            </button>
+          </div>
+        `;
+      } else {
+        bar.classList.add('status-in-review');
+        const pendingNames = unapprovedFiles.map((f) => f.filename || f.name || 'file').join(', ');
+
+        bar.innerHTML = `
+          <div class="acl-notif-bar-left">
+            <span class="acl-notif-badge badge-in-review">
+              <span class="acl-notif-badge-icon">⏳</span>
+              <span id="aclNotifDocName">${docName} Approved (${approvedCount}/${totalPhaseCount} Files Approved)</span>
+            </span>
+            <div class="acl-notif-status-message">
+              <span>🔒 Gate Locked: Awaiting approval on ${pendingNames} before proceeding to next agent (${nextAgentName} · ${nextCmd})</span>
+            </div>
+          </div>
+
+          <div class="acl-notif-bar-right">
+            <button type="button" class="acl-notif-close-btn" id="aclNotifCloseBtn" title="Dismiss notification bar" aria-label="Close notification bar">
+              ✕
+            </button>
+          </div>
+        `;
+      }
+
+      bar.classList.remove('hidden');
+
+      const closeBtn = document.getElementById('aclNotifCloseBtn');
+      if (closeBtn) {
+        closeBtn.onclick = function (e) {
+          e.stopPropagation();
+          dismissApprovalNotification(docKey, `approved-partial:${approvedCount}/${totalPhaseCount}`);
+        };
+      }
+
+      // Auto-dismiss after 10 seconds
+      clearAutoDismissTimer();
+      autoDismissTimer = setTimeout(() => {
+        dismissApprovalNotification(docKey, `approved-partial:${approvedCount}/${totalPhaseCount}`);
+      }, 10000);
+    }
+    // =========================================================================
+    // CASE 3: STATUS IN REVIEW -> Show Status & Gate Lock. Disappear after 10s!
     // =========================================================================
     else if (status === 'In Review') {
       bar.classList.add('status-in-review');
+
+      const badgeProgress =
+        totalPhaseCount > 1 ? ` (${approvedCount}/${totalPhaseCount} Approved)` : '';
 
       bar.innerHTML = `
         <div class="acl-notif-bar-left">
           <span class="acl-notif-badge badge-in-review">
             <span class="acl-notif-badge-icon">⏳</span>
-            <span id="aclNotifDocName">${docName} · In Review</span>
+            <span id="aclNotifDocName">${docName} · In Review${badgeProgress}</span>
           </span>
           <div class="acl-notif-status-message">
             <span>🔒 Gate Locked: Awaiting Manager Review & Sign-Off in Markdown Studio before downstream tasks can proceed</span>
@@ -708,18 +897,18 @@
       if (closeBtn) {
         closeBtn.onclick = function (e) {
           e.stopPropagation();
-          dismissApprovalNotification(docKey, 'in review');
+          dismissApprovalNotification(docKey, `in-review:${approvedCount}/${totalPhaseCount}`);
         };
       }
 
       // Auto-dismiss after 10 seconds
       clearAutoDismissTimer();
       autoDismissTimer = setTimeout(() => {
-        dismissApprovalNotification(docKey, 'in review');
+        dismissApprovalNotification(docKey, `in-review:${approvedCount}/${totalPhaseCount}`);
       }, 10000);
     }
     // =========================================================================
-    // CASE 3: STATUS REJECTED -> Show Status & Revision Required. Disappear after 10s!
+    // CASE 4: STATUS REJECTED -> Show Status & Revision Required. Disappear after 10s!
     // =========================================================================
     else if (status === 'Rejected') {
       bar.classList.add('status-rejected');
@@ -761,6 +950,7 @@
   }
 
   // Global Exports for integration into Studio lifecycle
+  window.getPhaseFilesForDocument = getPhaseFilesForDocument;
   window.updateApprovalNotificationBar = updateApprovalNotificationBar;
   window.updateFloatingNavWidget = updateApprovalNotificationBar;
   window.updateFloatingHelpWidget = updateApprovalNotificationBar;
