@@ -1,5 +1,13 @@
 # Changelog
 
+## v6.12.1 - 2026-11-15
+
+### Markdown Studio fixes
+
+- Summarized, Scrum Master and Developer dashboards no longer crash on `epics.md` lines such as `- [x] Story 1.1 completed — …` (wrong regex group in `telemetry.js`).
+- Git Details: accurate heading per state (rate limit / unreachable, not accessible, deleted, not linked) and a GitHub token field when GitHub is unreachable or the repo is not accessible (stored only in the browser, raises the API limit from 60 to 5,000 requests per hour).
+- Cache-busting versions for changed scripts and stylesheets so browsers load the fixed files.
+
 ## v6.12.0 - 2026-11-15
 
 ### One file per deliverable (greenfield & brownfield)

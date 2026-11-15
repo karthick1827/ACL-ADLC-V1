@@ -54,9 +54,10 @@ function parseEpicsAndStoriesFromMarkdown(markdownText, allFiles = []) {
           sTitle = rawRest;
         }
       } else if (checkboxMatch) {
+        // Groups: 1 = checkbox, 2 = "Story x.y" number, 3 = "STORY-x.y" number, 4 = title.
         isCheckboxDone = checkboxMatch[1].toLowerCase() === 'x';
-        sNum = checkboxMatch[2];
-        sTitle = checkboxMatch[3].trim().replace(/^[:\-]\s*/, '');
+        sNum = checkboxMatch[2] || checkboxMatch[3];
+        sTitle = (checkboxMatch[4] || '').trim().replace(/^[:\-]\s*/, '');
       } else if (bulletBoldMatch) {
         const cb1 = bulletBoldMatch[1];
         sNum = bulletBoldMatch[2] || bulletBoldMatch[3];

@@ -1582,6 +1582,55 @@ function gitFieldRow(label, value, { mono = false, html = false } = {}) {
     </div>`;
 }
 
+function hasStoredGitHubToken() {
+  try {
+    return Boolean((localStorage.getItem('acl_github_token') || '').trim());
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Personal access token form (stored only in this browser, sent only to the local Studio server). */
+function renderGitTokenForm() {
+  const stored = hasStoredGitHubToken();
+  return `
+        <form class="git-token-form" onsubmit="event.preventDefault(); saveGitHubToken();">
+          <label for="gitTokenInput">GitHub personal access token</label>
+          <div class="git-token-row">
+            <input type="password" id="gitTokenInput" autocomplete="off" spellcheck="false"
+              placeholder="${stored ? 'A token is saved — paste a new one to replace it' : 'ghp_… or github_pat_…'}" />
+            <button type="submit" class="git-toggle-btn">Save token</button>
+            ${stored ? '<button type="button" class="git-toggle-btn" onclick="removeGitHubToken()">Remove token</button>' : ''}
+          </div>
+          <p class="git-token-note">Raises the GitHub limit from 60 to 5,000 requests per hour and shows your own account. Stored only in this browser.</p>
+        </form>`;
+}
+
+function saveGitHubToken() {
+  const input = document.getElementById('gitTokenInput');
+  const value = input ? input.value.trim() : '';
+  if (!value) return;
+  try {
+    localStorage.setItem('acl_github_token', value);
+  } catch (e) {}
+  renderGitDashboard(true);
+}
+
+function removeGitHubToken() {
+  try {
+    localStorage.removeItem('acl_github_token');
+  } catch (e) {}
+  renderGitDashboard(true);
+}
+
+const GIT_CONNECT_HEADINGS = {
+  'not-linked': 'Connect a GitHub repository',
+  deleted: 'Repository deleted on GitHub',
+  inaccessible: 'Repository not accessible',
+  unreachable: 'GitHub could not be reached',
+  unknown: 'Git Details unavailable',
+};
+
 function renderGitConnectState(container, data) {
   const status = gitStatusOf(data);
   const remote = data && data.remoteOrigin ? `<code>${escapeHtmlText(data.remoteOrigin)}</code>` : '';
@@ -1592,8 +1641,9 @@ function renderGitConnectState(container, data) {
     deleted:
       'The linked repository no longer exists on GitHub. Cached repository data was cleared. Point <code>origin</code> at an existing repository and refresh.',
     inaccessible:
-      'Provide a GitHub token with access to this repository (environment variable <code>GITHUB_TOKEN</code>, <code>gh auth login</code>, or the Studio GitHub token), then refresh.',
-    unreachable: 'GitHub could not be reached right now. Nothing was cleared — try again when the connection is available.',
+      'Add a GitHub token with access to this repository below (or set <code>GITHUB_TOKEN</code> / run <code>gh auth login</code>), then refresh.',
+    unreachable:
+      'Nothing was cleared. If the GitHub request limit was reached, add a GitHub token below; otherwise try again when the connection is available.',
     unknown: 'The Studio server did not answer. Make sure it is running, then refresh.',
   };
   container.innerHTML = `
@@ -1609,9 +1659,10 @@ function renderGitConnectState(container, data) {
       </div>
       <div class="git-connect-state">
         <div class="git-connect-icon">${GIT_ICON_SVG}</div>
-        <h3>Connect a GitHub repository</h3>
+        <h3>${escapeHtmlText(GIT_CONNECT_HEADINGS[status] || GIT_CONNECT_HEADINGS.unknown)}</h3>
         <p class="git-connect-message">${escapeHtmlText(message)} ${remote}</p>
         <p class="git-connect-tip">${tips[status] || tips.unknown}</p>
+        ${status === 'unreachable' || status === 'inaccessible' ? renderGitTokenForm() : ''}
         <button type="button" class="git-toggle-btn" onclick="renderGitDashboard(true)">Refresh status</button>
       </div>
     </div>`;

@@ -1439,3 +1439,37 @@ body.view-dashboard #syncStatus {
 .atl-created-list {
   color: #1e40af;
 }
+
+/* Git Details: GitHub token form (shown when GitHub is unreachable / repo not accessible) */
+.git-token-form {
+  margin: 16px auto 12px;
+  max-width: 560px;
+  text-align: left;
+}
+.git-token-form label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.git-token-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.git-token-row input {
+  flex: 1 1 240px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-default, #d0d7de);
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  background: var(--bg-surface, #fff);
+  color: var(--text-primary, #1f2328);
+}
+.git-token-note {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--text-secondary, #656d76);
+}
