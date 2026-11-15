@@ -16,6 +16,7 @@ activation_steps_append = []
 # Entries: literal sentence, `skill:NAME`, or `file:PATH` (glob ok).
 persistent_facts = [
   "file:{project-root}/**/project-context.md",
+  "file:{project-root}/_acl/scripts/references/acl-deliverable-protocol.md",
 ]
 
 # Runs at workflow completion. String or array of instructions.
@@ -57,9 +58,10 @@ validation_report_template = "assets/validation-report-template.html"
 # (creative-tool artifacts), imports/ (user-supplied screens / brand decks /
 # Figma exports / sketches), optional mockups/ and wireframes/ (promoted
 # artifacts), optional validation-report.* all land inside
-# {ux_output_path}/{run_folder_pattern}/.
-ux_output_path = "{planning_artifacts}/ux-designs"
-run_folder_pattern = "ux-{project_name}-{date}"
+# {ux_output_path}/ — ONE canonical folder for the life of the project (ACL deliverable
+# protocol). No dated or per-run sub-folders; if DESIGN.md / EXPERIENCE.md already exist here they
+# are updated in place (append + In Review), never duplicated.
+ux_output_path = "{output_folder}/2-plan-workflows/acl-ux"
 
 # Creative tools registry. Collaborative renderers invoked on demand during
 # Discovery and at Finalize. Entry forms: `file:PATH`, `skill:NAME`,

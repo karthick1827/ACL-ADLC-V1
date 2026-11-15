@@ -5,7 +5,7 @@ description: "Deprecated: `acl-quick-dev` is now the official implementation met
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -109,10 +109,10 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
 ## Paths
 
 - `sprint_status` = `{implementation_artifacts}/sprint-status.yaml`
-- `epics_file` = `{planning_artifacts}/epics.md`
-- `prd_file` = `{planning_artifacts}/prd.md`
-- `architecture_file` = `{planning_artifacts}/architecture.md`
-- `ux_file` = `{planning_artifacts}/*ux*.md`
+- `epics_file` = `{output_folder}/3-solutioning/acl-create-epics-and-stories/epics.md`
+- `prd_file` = `{output_folder}/2-plan-workflows/acl-prd/prd.md`
+- `architecture_file` = `{output_folder}/3-solutioning/acl-architecture/architecture-spine.md`
+- `ux_file` = `{output_folder}/2-plan-workflows/acl-ux/*.md`
 - `story_title` = "" (will be elicited if not derivable)
 - `default_output_file` = `{implementation_artifacts}/{{story_key}}.md`
 
@@ -120,10 +120,10 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
 
 | Input | Description | Path Pattern(s) | Load Strategy |
 |-------|-------------|------------------|---------------|
-| prd | PRD (fallback - epics file should have most content) | whole: `{planning_artifacts}/*prd*.md`, sharded: `{planning_artifacts}/*prd*/*.md` | SELECTIVE_LOAD |
-| architecture | Architecture (fallback - epics file should have relevant sections) | whole: `{planning_artifacts}/*architecture*.md`, sharded: `{planning_artifacts}/*architecture*/*.md` | SELECTIVE_LOAD |
-| ux | UX design (fallback - epics file should have relevant sections) | whole: `{planning_artifacts}/*ux*.md`, sharded: `{planning_artifacts}/*ux*/*.md` | SELECTIVE_LOAD |
-| epics | Enhanced epics+stories file with BDD and source hints | whole: `{planning_artifacts}/*epic*.md`, sharded: `{planning_artifacts}/*epic*/*.md` | SELECTIVE_LOAD |
+| prd | PRD (fallback - epics file should have most content) | whole: `{output_folder}/2-plan-workflows/acl-prd/prd.md`, sharded: `{planning_artifacts}/*prd*/*.md` | SELECTIVE_LOAD |
+| architecture | Architecture (fallback - epics file should have relevant sections) | whole: `{output_folder}/3-solutioning/acl-architecture/architecture*.md`, sharded: `{planning_artifacts}/*architecture*/*.md` | SELECTIVE_LOAD |
+| ux | UX design (fallback - epics file should have relevant sections) | whole: `{output_folder}/2-plan-workflows/acl-ux/*.md`, sharded: `{planning_artifacts}/*ux*/*.md` | SELECTIVE_LOAD |
+| epics | Enhanced epics+stories file with BDD and source hints | whole: `{output_folder}/3-solutioning/acl-create-epics-and-stories/epics.md`, sharded: `{planning_artifacts}/*epic*/*.md` | SELECTIVE_LOAD |
 
 ## Execution
 

@@ -62,7 +62,7 @@ After applying the matching strategy, mark the pattern as **RESOLVED** and move 
 
 If no sharded matches were found OR no sharded pattern exists for this input:
 
-1. Attempt a glob match on the "whole" pattern (e.g., `{planning_artifacts}/*prd*.md`).
+1. Attempt a glob match on the "whole" pattern (e.g., `{output_folder}/2-plan-workflows/acl-prd/prd.md`).
 2. If matches are found, load ALL matching files completely (no offset/limit).
 3. Store content in variable: `{pattern_name_content}` (e.g., `{prd_content}`).
 4. Mark pattern as **RESOLVED** and move to the next pattern.

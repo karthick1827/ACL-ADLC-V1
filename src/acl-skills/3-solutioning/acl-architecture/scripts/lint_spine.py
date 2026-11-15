@@ -8,7 +8,7 @@ LLMs miscount IDs and miss literal placeholders; a grep does not. This linter ow
 checks a script does better than a prompt, and leaves the semantic half (is each Rule
 actually enforceable? does the boundary make sense?) to the rubric walker.
 
-It reads ARCHITECTURE-SPINE.md from a workspace and reports, as compact JSON on stdout:
+It reads architecture-spine.md (or a legacy ARCHITECTURE-SPINE.md / architecture.md) from a workspace and reports, as compact JSON on stdout:
 
   - placeholder    literal TBD / TODO / "similar to AD-n" / unfilled {template-token}
   - ad_id          duplicate or non-monotonic AD-n identifiers
@@ -29,7 +29,21 @@ import re
 import sys
 from pathlib import Path
 
-SPINE = "ARCHITECTURE-SPINE.md"
+SPINE = "architecture-spine.md"
+# Legacy spellings still read (never written) so existing projects keep linting.
+SPINE_NAMES = (SPINE, "ARCHITECTURE-SPINE.md", "architecture.md")
+
+
+def find_spine(workspace: Path) -> Path:
+    """Return the existing spine in `workspace` (exact filename match), else the canonical path."""
+    try:
+        present = set(p.name for p in workspace.iterdir())
+    except OSError:
+        present = set()
+    for name in SPINE_NAMES:
+        if name in present:
+            return workspace / name
+    return workspace / SPINE
 
 AD_HEADING = re.compile(r"^#{2,4}\s*AD-(\d+)\b(.*)$", re.MULTILINE)
 HEADING = re.compile(r"^#{1,6}\s", re.MULTILINE)
@@ -229,11 +243,11 @@ def lint(text: str) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Lint an architecture spine for mechanical integrity.")
-    ap.add_argument("--workspace", required=True, help="run folder containing ARCHITECTURE-SPINE.md")
+    ap.add_argument("--workspace", required=True, help="folder containing architecture-spine.md")
     ap.add_argument("-o", "--output", help="write JSON here instead of stdout")
     args = ap.parse_args(argv)
 
-    spine_path = Path(args.workspace) / SPINE
+    spine_path = find_spine(Path(args.workspace))
     if not spine_path.exists():
         result = {"ok": False, "error": f"{spine_path} not found", "findings": [], "total_findings": 0}
     else:

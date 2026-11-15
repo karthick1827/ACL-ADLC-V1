@@ -33,7 +33,7 @@ To generate all epics with their stories based on the approved epics_list, follo
 ## EXECUTION PROTOCOLS:
 
 - 🎯 Generate stories collaboratively with user input
-- 💾 Append epics and stories to {planning_artifacts}/epics.md following template
+- 💾 Append epics and stories to {epics_file} following template
 - 📖 Process epics one at a time in sequence
 - 🚫 FORBIDDEN to skip any epic or rush through stories
 
@@ -41,7 +41,7 @@ To generate all epics with their stories based on the approved epics_list, follo
 
 ### 1. Load Approved Epic Structure
 
-Load {planning_artifacts}/epics.md and review:
+Load {epics_file} and review:
 
 - Approved epics_list from Step 2
 - FR coverage map
@@ -165,7 +165,7 @@ After writing each story:
 
 When story is approved:
 
-- Append it to {planning_artifacts}/epics.md following template structure
+- Append it to {epics_file} following template structure
 - Use correct numbering (Epic N, Story M)
 - Maintain proper markdown formatting
 
@@ -194,7 +194,7 @@ After all epics and stories are generated:
 
 ## TEMPLATE STRUCTURE COMPLIANCE:
 
-The final {planning_artifacts}/epics.md must follow this structure exactly:
+The final {epics_file} must follow this structure exactly:
 
 1. **Overview** section with project name
 2. **Requirements Inventory** with all three subsections populated
@@ -216,7 +216,7 @@ Display: "**Select an Option:** [A] Advanced Elicitation [P] Party Mode [C] Cont
 
 - IF A: Invoke the `acl-advanced-elicitation` skill
 - IF P: Invoke the `acl-party-mode` skill
-- IF C: Save content to {planning_artifacts}/epics.md, update frontmatter, then read fully and follow: ./step-04-final-validation.md
+- IF C: Save content to {epics_file}, update frontmatter, then read fully and follow: ./step-04-final-validation.md
 - IF Any other comments or queries: help user respond then [Redisplay Menu Options](#7-present-final-menu-options)
 
 #### EXECUTION RULES:

@@ -5,7 +5,7 @@ description: Product manager for PRD creation and requirements discovery. Use wh
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -52,9 +52,9 @@ You are John, the Product Manager. You drive PRD creation through user interview
 - `{project-root}`-prefixed paths resolve from the project working directory.
 - `{skill-name}` resolves to the skill directory's basename.
 
-### Brownfield Tier 2 feature addition
+### Feature addition (greenfield & brownfield, Tier 2)
 
-For Tier 2 feature work on an approved pipeline, invoke `acl-prd` in **Update** mode on `_acl-output/2-plan-workflows/acl-prd/prd.md` only (append at bottom, `status: In Review`). Never create a second PRD under `{planning_artifacts}/prds/`.
+When the user adds or changes a feature and `{output_folder}/2-plan-workflows/acl-prd/prd.md` already exists, invoke `acl-prd` in **Update** mode on that file only (append a `## 🔄 Feature Update` block at the bottom, `status: In Review`, approval fields cleared). Never create a second PRD anywhere. Full rules: `{project-root}/_acl/scripts/references/acl-deliverable-protocol.md`.
 
 ## On Activation
 

@@ -134,7 +134,11 @@ async function syncFromLiveDisk(quiet = false) {
             renderDeveloperDashboard();
           } else if (activeAppView === 'working-tree') {
             renderWorkingTree();
+          } else if (activeAppView === 'dashboard-atlassian') {
+            // counts only — a full re-render would wipe the connection form while typing
+            if (typeof refreshAtlassianCounts === 'function') refreshAtlassianCounts();
           }
+          // 'dashboard-git' shows GitHub data (not file data); it is refreshed via refreshGitHubUserControl().
         }
         if (data && data.source === 'github') {
           setSyncStatus(`Synced live with GitHub (${data.repo || 'origin'})`, 'green');
@@ -160,9 +164,11 @@ async function syncFromLiveDisk(quiet = false) {
 
 let activeWorkflowMode = localStorage.getItem('acl_workflow_mode') || 'greenfield';
 
-async function saveCurrentFile() {
+async function saveCurrentFile(options = {}) {
   const file = getActiveFile();
   if (!file) return;
+  // Called directly from onclick / keyboard handlers, `options` may be an Event — only trust a plain flag.
+  const statusChanged = Boolean(options && options.statusChanged === true);
 
   const content = document.getElementById('markdownTextarea').value;
   const status = document.getElementById('statusSelect').value;
@@ -197,6 +203,7 @@ async function saveCurrentFile() {
       filename: file.filename,
       content: file.content,
       status: file.status,
+      statusChanged,
       autoPush: false,
       githubToken: cloudToken || undefined,
       githubOwner: cloudOwner || undefined,
@@ -213,6 +220,20 @@ async function saveCurrentFile() {
     resData = await resp.json().catch(() => ({}));
     if (resp.ok && resData.success !== false) {
       lastSaveTime = Date.now();
+      // The server enforces review invariants (approval hash, back-to-In-Review on edits after approval).
+      if (typeof resData.content === 'string' && resData.content !== file.content) {
+        file.content = resData.content;
+        const textareaEl = document.getElementById('markdownTextarea');
+        if (textareaEl) textareaEl.value = resData.content;
+      }
+      if (resData.status && resData.status !== file.status) {
+        file.status = resData.status;
+        const sel = document.getElementById('statusSelect');
+        if (sel) sel.value = resData.status;
+      }
+      if (resData.reviewAction === 'reset') {
+        showToast(`'${file.filename}' changed after approval — sent back to In Review for Manager sign-off.`, 'info');
+      }
       if (resData && resData.gitPushed) {
         setSyncStatus(`Saved to IDE & pushed to GitHub ✔`, 'green');
       } else if (resData && resData.repoConnected) {
@@ -238,12 +259,15 @@ async function saveCurrentFile() {
   isDirty = false;
 
   const syncSuffix = resData && resData.gitPushed ? ' (Synced to GitHub)' : ' (Updated in IDE, not synced with GitHub)';
-  if (status === 'Approved' || status === 'Accepted') {
+  const finalStatus = file.status || status;
+  if (resData && resData.reviewAction === 'reset') {
+    // toast already shown above
+  } else if (finalStatus === 'Approved' || finalStatus === 'Accepted') {
     showToast(`🎉 Approved '${file.filename}'!${syncSuffix}`, 'success');
-  } else if (status === 'Rejected') {
+  } else if (finalStatus === 'Rejected') {
     showToast(`🔴 Rejected '${file.filename}'${syncSuffix}`, 'error');
   } else {
-    showToast(`Saved '${file.filename}' [${status}]${syncSuffix}`, 'info');
+    showToast(`Saved '${file.filename}' [${finalStatus}]${syncSuffix}`, 'info');
   }
   renderFileTree();
   evaluateProceedButton();
@@ -257,7 +281,8 @@ function updateDocumentStatusFrontmatter(content, newStatus, nowIso = new Date()
   let cleanStatus = (newStatus || 'In Review').trim();
   if (cleanStatus.toLowerCase() === 'accepted') cleanStatus = 'Approved';
   const gateSig = 'ACL-STUDIO-APPROVAL-' + cleanStatus.toUpperCase().replace(/\s+/g, '-');
-  const managedKeys = ['status', 'reviewed_by', 'review_timestamp', 'review_source', 'gate_signature'];
+  // approved_hash is (re)computed server-side when a document is Approved; review_reason belongs to the previous cycle.
+  const managedKeys = ['status', 'reviewed_by', 'review_timestamp', 'review_source', 'gate_signature', 'approved_hash', 'review_reason'];
 
   if (content.startsWith('---')) {
     const parts = content.split('---');
@@ -317,7 +342,7 @@ async function onStatusChange(newStatus) {
   document.getElementById('markdownTextarea').value = updatedContent;
   file.content = updatedContent;
 
-  const ok = await saveCurrentFile();
+  const ok = await saveCurrentFile({ statusChanged: true });
   if (ok !== false && typeof notifyTeamOnStatusChange === 'function') {
     if (newStatus === 'In Review' || newStatus === 'Approved' || newStatus === 'Rejected') {
       notifyTeamOnStatusChange(file, newStatus);

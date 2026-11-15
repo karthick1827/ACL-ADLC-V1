@@ -5,7 +5,7 @@ description: 'Break requirements into epics and user stories. Use when the user 
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -37,18 +37,22 @@ Before executing any actions, adopting any persona, greeting the user, or produc
 - ONLY THE MANAGER is authorized and permitted to change the status via Markdown Studio (`markdown.html`).
 - The AI agent is **STRICTLY PROHIBITED** from prompting the developer to self-approve or change review statuses.
 - The AI agent MUST ONLY instruct the developer to wait for the manager's review.
-- **Brownfield Tier 2 feature addition:** agents **may** set `status: Approved` → `status: In Review` when appending to canonical `epics.md` (shared reference in `{workflow.persistent_facts}`). Never set `status: Approved`.
+- **Re-review on change:** whenever the agent changes the content of a `epics.md` whose status is `Approved` or `Rejected`, it **must** set `status: In Review` and remove `reviewed_by`, `review_timestamp`, `gate_signature` and `approved_hash`. Moving a status **to** `In Review` is the only status change an agent may make. Never set `status: Approved` or `Rejected`.
 
-## Brownfield Tier 2 feature addition
+## Single canonical epics file (greenfield & brownfield, every tier)
 
-Obey `file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md`. **Canonical epics file:** `{project-root}/_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`. If it exists, **append** new epics/stories at the bottom (preserve `- [x]` on completed stories); set frontmatter `status: In Review`. Do **not** initialize a second `epics.md` under `{planning_artifacts}/` when the canonical file exists.
+Obey `{project-root}/_acl/scripts/references/acl-deliverable-protocol.md` (also listed in `{workflow.persistent_facts}`). In short:
+
+1. **The ONE epics file** is `{output_folder}/3-solutioning/acl-create-epics-and-stories/epics.md` (default `{project-root}/_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`) — referred to below as `{epics_file}`. Never write `epics.md` anywhere else (not `{planning_artifacts}/epics.md`, not a dated folder, not a renamed copy).
+2. **If `{epics_file}` already exists** (greenfield or brownfield), never re-initialize it from the template — continue or update it in place.
+3. **Adding or changing a feature** (`quick dev Tier 2`, "add feature", "update feature"): keep every existing line (completed stories stay `- [x]`), **append at the bottom** a block headed `## 🔄 Feature Update — <feature> (<date>) · Tier 2` containing the new epics/stories (numbering continues after the last existing epic/story), set frontmatter `status: In Review` + `updated: {date}`, clear the approval fields above, then **halt** for Manager approval.
 
 
 # Create Epics and Stories
 
 ## 🚦 Phase Gate Guard Precondition (Mandatory)
 Before generating or breaking down epics and user stories:
-1. Verify that Phase 2 (PRD) has `status: Accepted` (or execute `node tools/adlc-gate-guard.cjs phase3`).
+1. Verify that Phase 2 (PRD) has `status: Approved` (or execute `node tools/adlc-gate-guard.cjs phase3`).
 2. If `prd.md` is `In Review` or `Rejected`:
    - **HALT IMMEDIATELY. DO NOT CREATE EPICS OR STORIES.**
    - Output structured gate blocked error:
@@ -56,7 +60,7 @@ Before generating or breaking down epics and user stories:
       🛑 Prerequisite: Phase 2: Planning (PRD & Workflows)
       📄 Artifact:     _acl-output/2-plan-workflows/acl-prd/prd.md
       🏷️ Current State: [IN REVIEW / REJECTED]
-      ⚠️ REASON: Epics and Stories cannot be created until your manager reviews and approves the PRD ('Accepted') in Markdown Studio."
+      ⚠️ REASON: Epics and Stories cannot be created until your manager reviews and approves the PRD ('Approved') in Markdown Studio."
 
 ## Conventions
 
@@ -124,7 +128,7 @@ Load config from `{project-root}/_acl/acl/config.yaml` and resolve:
 - Use `{user_name}` for greeting
 - Use `{communication_language}` for all communications
 - Use `{document_output_language}` for output documents
-- Use `{planning_artifacts}` for output location and artifact scanning
+- Output goes ONLY to `{epics_file}` (`{output_folder}/3-solutioning/acl-create-epics-and-stories/epics.md`); scan `{output_folder}` (canonical deliverables) and `{planning_artifacts}` (research, brainstorming) for inputs
 - Use `{project_knowledge}` for additional context scanning
 
 ### Step 5: Greet the User

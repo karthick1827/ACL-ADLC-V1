@@ -5,7 +5,7 @@ description: 'Generate sprint status tracking from epics. Use when the user says
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -103,7 +103,7 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
 - `project_key` = `NOKEY`
 - `story_location` = `{implementation_artifacts}`
 - `story_location_absolute` = `{implementation_artifacts}`
-- `epics_location` = `{planning_artifacts}`
+- `epics_location` = `{output_folder}/3-solutioning/acl-create-epics-and-stories` (the one canonical `epics.md`)
 - `epics_pattern` = `*epic*.md`
 - `status_file` = `{implementation_artifacts}/sprint-status.yaml`
 

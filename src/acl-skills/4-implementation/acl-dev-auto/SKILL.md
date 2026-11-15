@@ -5,7 +5,7 @@ description: 'One iteration of an unattended development loop. Use when invoked 
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Accepted` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -26,11 +26,11 @@ Before executing any actions, adopting any persona, greeting the user, or produc
 
      👉 NEXT STEP:
         Please wait for your manager to review and mark this document as 
-        'Accepted' or 'Rejected' in Markdown Studio before proceeding with 
+        'Approved' or 'Rejected' in Markdown Studio before proceeding with 
         downstream tasks.
      ========================================================================
      ```
-3. Only proceed if ALL existing documents in `_acl-output/` have `status: Accepted`.
+3. Only proceed if ALL existing documents in `_acl-output/` have `status: Approved`.
 
 
 

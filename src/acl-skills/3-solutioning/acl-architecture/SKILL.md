@@ -5,7 +5,7 @@ description: 'Produce the architecture: a lean spine of invariants that keeps ev
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -37,11 +37,15 @@ Before executing any actions, adopting any persona, greeting the user, or produc
 - ONLY THE MANAGER is authorized and permitted to change the status via Markdown Studio (`markdown.html`).
 - The AI agent is **STRICTLY PROHIBITED** from prompting the developer to self-approve or change review statuses.
 - The AI agent MUST ONLY instruct the developer to wait for the manager's review.
-- **Brownfield Tier 2 feature addition:** agents **may** set `status: Approved` → `status: In Review` when appending to an existing canonical spine (shared reference in `{workflow.persistent_facts}`). Never set `status: Approved`.
+- **Re-review on change:** whenever the agent changes the content of a spine whose status is `Approved` or `Rejected`, it **must** set `status: In Review` and remove `reviewed_by`, `review_timestamp`, `gate_signature` and `approved_hash`. Moving a status **to** `In Review` is the only status change an agent may make. Never set `status: Approved` or `Rejected`.
 
-## Brownfield Tier 2 feature addition
+## Single canonical spine (greenfield & brownfield, every tier)
 
-Obey `file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md`. Use the **existing** spine under `_acl-output/3-solutioning/acl-architecture/` (one file only). **Update** in place: append feature invariants at the bottom; set spine frontmatter `status: In Review`. Do **not** bind a new `{workflow.spine_output_path}/{run_folder_pattern}/` for gate deliverables when a canonical spine already exists.
+Obey `{project-root}/_acl/scripts/references/acl-deliverable-protocol.md` (also listed in `{workflow.persistent_facts}`). In short:
+
+1. **The ONE spine** is `{workflow.spine_output_path}/architecture-spine.md` (default `{project-root}/_acl-output/3-solutioning/acl-architecture/architecture-spine.md`). If a legacy `ARCHITECTURE-SPINE.md` or `architecture.md` already exists in that folder, that existing file **is** the spine — update it, never add a second one. `{doc_workspace}` is **always** `{workflow.spine_output_path}` — never a dated, per-run or per-epic folder.
+2. **If a spine already exists**, every run is **Update** or **Validate** — never Create.
+3. **Adding or changing a feature** (`quick dev Tier 2`, "add feature", "update feature", epic-level decisions): keep every existing line and AD ID, **append at the bottom** a block headed `## 🔄 Feature Update — <feature> (<date>) · Tier 2` (new ADs continue the existing numbering), set frontmatter `status: In Review` + `updated: {date}`, clear the approval fields above, then **halt** for Manager approval before epics work.
 
 
 # ACL Architecture
@@ -70,7 +74,7 @@ When the stack is open — greenfield, or a small/beginner project that could si
 
 The input itself tells you what kind of job this is — read it rather than quizzing the user about it. A spec package (`SPEC.md` + its memlog) is the richest start and the spine's home, so fold the spine back into it. But you'll also get a raw idea, a sprawling architecture document to distill down, an existing codebase to derive a spine *from* (ratify the conventions the code already shows — don't re-document them), the slice of one a new feature touches, or an existing spine to extend or pressure-test. Prefer a `.memlog.md` over re-reading the source it came from. Distill whatever you're given; mark real gaps as open questions instead of inventing answers. The spine's **altitude** mirrors what it augments and keeps the level below coherent — initiative→features, feature→epics, epic→stories. Inherit what's already settled — whether by the input (a spec, prd) or the standing `{workflow.persistent_facts}` — silently; don't re-decide or re-ask it. If the input is too thin to build on, suggest `acl-spec` first; else capture the missing answers into a shared spec workspace through the same `memlog.py`, so `acl-spec` can later derive `SPEC.md` without drift.
 
-**Inheriting a parent spine** (e.g. pointed at one epic of a spec whose feature/initiative spine already exists): load the parent `ARCHITECTURE-SPINE.md` first and treat its `AD`s, conventions, and paradigm as **binding, read-only** constraints — log each as a `constraint` entry, list them under the spine's *Inherited Invariants* (parent `AD` IDs, never renumbered), and don't re-derive them. Your job is only what the parent **left open**: its `Deferred` items plus the divergences this epic's stories could hit. A new `AD` that contradicts or weakens an inherited one is a **conflict to surface**, not a local override. An epic spine fixes the invariants the epic's stories must share — it does **not** expand per-story detail.
+**Inheriting a parent spine** (e.g. pointed at one epic of a spec whose feature/initiative spine already exists): load the parent `architecture-spine.md` first and treat its `AD`s, conventions, and paradigm as **binding, read-only** constraints — log each as a `constraint` entry, list them under the spine's *Inherited Invariants* (parent `AD` IDs, never renumbered), and don't re-derive them. Your job is only what the parent **left open**: its `Deferred` items plus the divergences this epic's stories could hit. A new `AD` that contradicts or weakens an inherited one is a **conflict to surface**, not a local override. An epic spine fixes the invariants the epic's stories must share — it does **not** expand per-story detail.
 
 ## How a run works
 
@@ -85,14 +89,14 @@ Writes go through the shared script (don't read the file back except on resume):
 
 - Bare paths and `{skill-root}` (e.g. `references/headless.md`) resolve from this skill's installed directory.
 - `{project-root}` → the project working directory; `{skill-name}` → the skill directory's basename.
-- `{workflow.<name>}` → a merged `customize.toml` field; `{doc_workspace}` → the bound run folder.
+- `{workflow.<name>}` → a merged `customize.toml` field; `{doc_workspace}` → the canonical spine folder `{workflow.spine_output_path}`.
 - Forward slashes only. Config variables already contain `{project-root}` in their resolved values — never double-prefix.
 
 ## On Activation
 
 **Phase Gate Guard Precondition (Mandatory):**
 Before proceeding with architecture creation or invoking subagents:
-1. Verify that Phase 2 (`2-plan-workflows/acl-prd/prd.md`) has `status: Accepted` (or execute `node tools/adlc-gate-guard.cjs phase3`).
+1. Verify that Phase 2 (`2-plan-workflows/acl-prd/prd.md`) has `status: Approved` (or execute `node tools/adlc-gate-guard.cjs phase3`).
 2. If `prd.md` is missing, or its status is `In Review` or `Rejected`:
    - **HALT IMMEDIATELY. DO NOT GENERATE ARCHITECTURE.**
    - Return a structured Gate Blocked error:
@@ -100,22 +104,22 @@ Before proceeding with architecture creation or invoking subagents:
       🛑 Prerequisite: Phase 2: Planning (PRD & Workflows)
       📄 Artifact:     _acl-output/2-plan-workflows/acl-prd/prd.md
       🏷️ Current State: [IN REVIEW / REJECTED]
-      ⚠️ REASON: Architecture cannot be created until your manager reviews and approves the PRD ('Accepted') in Markdown Studio."
+      ⚠️ REASON: Architecture cannot be created until your manager reviews and approves the PRD ('Approved') in Markdown Studio."
 
 **Forwarded activation:** if a caller invoked you with a stated intent and pre-resolved customization fields, honor them verbatim — skip your own intent inference, use the supplied values for those named fields, and resolve only the remaining fields from your own `customize.toml`.
 
 1. Resolve customization: `uv run {project-root}/_acl/scripts/resolve_customization.py --skill {skill-root} --key workflow` (on failure read `{skill-root}/customize.toml`, use defaults). Run `{workflow.activation_steps_prepend}`, then `{workflow.activation_steps_append}`. Hold `{workflow.persistent_facts}` as standing context — the default loads `project-context.md`, load-bearing for brownfield — and consult `{workflow.external_sources}` on demand.
-2. Resolve config: `uv run {project-root}/_acl/scripts/resolve_config.py --project-root {project-root}` (merges `_acl/config.toml`, `_acl/config.user.toml`, and the `_acl/custom/` overrides). From the merged JSON resolve `{user_name}`, `{communication_language}`, `{document_output_language}`, `{project_name}` (under `core`), `{planning_artifacts}` (under `modules.acl`), and `{date}`; missing keys take neutral defaults, never block.
+2. Resolve config: `uv run {project-root}/_acl/scripts/resolve_config.py --project-root {project-root}` (merges `_acl/config.toml`, `_acl/config.user.toml`, and the `_acl/custom/` overrides). From the merged JSON resolve `{user_name}`, `{communication_language}`, `{document_output_language}`, `{project_name}` and `{output_folder}` (under `core`), `{planning_artifacts}` (under `modules.acl`), and `{date}`; missing keys take neutral defaults, never block.
 3. Headless (no interactive user) → follow `references/headless.md` for the whole run. Otherwise greet `{user_name}` in `{communication_language}`. Detect the intent from the conversation and input — **create** (the default), **update** an existing spine, or **validate** one (see those sections). If the real ask is requirements / UX / a capability contract / epic breakdown / an agent, invoke the `acl-prd`, `acl-ux`, `acl-spec`, `acl-create-epics-and-stories`, or `acl-workflow-builder` (if the ACL Builder module is installed) skill instead.
-4. If a run folder for this target already exists under `{workflow.spine_output_path}`, offer to resume from its memlog rather than restart.
+4. If a spine already exists in `{workflow.spine_output_path}` (`architecture-spine.md`, or legacy `ARCHITECTURE-SPINE.md` / `architecture.md`), the intent is **Update** or **Validate**; if it is an unfinished draft, offer to resume from its memlog in place.
 5. Interactive create: offer the working mode in `{communication_language}` — **Coaching path** (default) or **Fast path** (see *How you work*) — before any drafting; default to Coaching unless the user asks for speed.
 6. **Mandatory, both paths, before drafting:** ask whether the spine is the only deliverable — and if not, draw out the *purpose and audience* rather than a document type. "An architecture doc" balloons into bloat; what they actually need might be a one-detail explainer for a single team or a non-technical vision piece for a board. Purpose right-sizes the artifact and may call for extra elicitation up front, not just a finale add-on.
 
-For a new spine, bind `{doc_workspace}` to `{workflow.spine_output_path}/{workflow.run_folder_pattern}/`, seed `ARCHITECTURE-SPINE.md` from `{workflow.spine_template}`, run `memlog.py init`, and tell the user the path. **Pre-check:** If any canonical spine already exists under `_acl-output/3-solutioning/acl-architecture/` (`architecture-spine.md`, `ARCHITECTURE-SPINE.md`, or `architecture.md`), do **not** create a new run folder — **Update** that file (Tier 2 feature addition). **At epic altitude, scope the folder to the epic** (set `run_folder_pattern` per `customize.toml`) so per-epic runs don't collide.
+**Pre-check:** If any spine already exists in `{workflow.spine_output_path}` (`architecture-spine.md`, `ARCHITECTURE-SPINE.md`, or `architecture.md`), do **not** create anything — **Update** that file (append + `status: In Review`). Only for the project's first spine: bind `{doc_workspace}` to the canonical folder `{workflow.spine_output_path}/` (create it if missing — no dated or per-run sub-folder), seed `architecture-spine.md` from `{workflow.spine_template}`, run `memlog.py init`, and tell the user the path. **At epic altitude**, epic-level invariants are appended to the same spine as an update block — never a separate per-epic spine.
 
 ## Reviewer Gate
 
-The spine's pre-handoff review — full mechanics in `references/reviewer-gate.md`. Load it when finalizing or validating: a deterministic `lint_spine.py` pass, then a rubric walker (good-spine checklist) + every `{workflow.finalize_reviewers}` lens dispatched as parallel subagents against `ARCHITECTURE-SPINE.md`, scaled to stakes. At Finalize you apply the clear fixes; under the Validate intent you deliver a bespoke HTML report and then get user input.
+The spine's pre-handoff review — full mechanics in `references/reviewer-gate.md`. Load it when finalizing or validating: a deterministic `lint_spine.py` pass, then a rubric walker (good-spine checklist) + every `{workflow.finalize_reviewers}` lens dispatched as parallel subagents against `architecture-spine.md`, scaled to stakes. At Finalize you apply the clear fixes; under the Validate intent you deliver a bespoke HTML report and then get user input.
 
 ## Finalize
 

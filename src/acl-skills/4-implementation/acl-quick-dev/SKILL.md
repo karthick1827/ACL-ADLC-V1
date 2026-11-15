@@ -7,7 +7,7 @@ description: "Implements any user intent, requirement, story, bug fix or change 
 
 Before executing any actions, adopting any persona, greeting the user, or producing output:
 
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -72,8 +72,14 @@ Before generating or modifying code artifacts, verify prerequisite document appr
      - **HALT IMMEDIATELY. DO NOT GENERATE OR MODIFY CODE.**
      - Output the Tier 1 Gate Locked banner and wait for Manager sign-off.
 2. **Tier 2 (Major Architectural Overhaul)**:
-   - Full sequential governance applies.
-   - Verify that `project-context.md`, `brief.md`, `prd.md`, `architecture-spine.md`, and `epics.md` are all marked `status: Approved`.
+   - Full sequential governance applies, greenfield **and** brownfield. Obey `{project-root}/_acl/scripts/references/acl-deliverable-protocol.md`.
+   - **Feature Update Cascade — update the EXISTING files, never create new ones.** For the requested feature, walk the canonical deliverables in order, **one at a time**:
+     `brief.md` (`acl-product-brief`) → `prd.md` (`acl-prd`) → `DESIGN.md`/`EXPERIENCE.md` (`acl-ux`, only if the project has UX) → `architecture-spine.md` (`acl-architecture`) → `epics.md` (`acl-create-epics-and-stories`), all under `{output_folder}/` at their canonical paths.
+     - **File exists** → invoke the owning skill in **Update** mode on that exact file: keep every existing line, append `## 🔄 Feature Update — <feature> (<date>) · Tier 2` at the **bottom**, set `status: In Review` + `updated`, remove `reviewed_by` / `review_timestamp` / `gate_signature` / `approved_hash`.
+     - **File missing** → create it at its canonical path (never a dated or alternate folder).
+     - **HALT** after each file and output the Gate Lock banner for that file. Continue to the next deliverable only after the Manager marks it `Approved` in Markdown Studio.
+     - **Forbidden:** a second `brief.md` / `prd.md` / spine / `epics.md`, renamed copies (`brief-v2.md`, `prd-feature.md`, …), or leaving the original file `Approved` while writing the feature elsewhere.
+   - Verify that `project-context.md`, `brief.md`, `prd.md`, `architecture-spine.md`, and `epics.md` are all marked `status: Approved` before any story work.
    - **Per-Story Implementation Gate**: Before implementing any individual story from `epics.md`, the AI Agent MUST create `_acl-output/4-implementation/story-<id>.md` (with `status: In Review` and the story's acceptance criteria checklist).
    - The AI Agent MUST halt immediately and await Manager sign-off in Markdown Studio (`status: Approved`) before generating or modifying application code for that story.
 

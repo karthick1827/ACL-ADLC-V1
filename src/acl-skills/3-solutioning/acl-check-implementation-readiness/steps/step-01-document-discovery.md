@@ -58,22 +58,22 @@ Search for each document type using these patterns:
 
 #### A. PRD Documents
 
-- Whole: `{planning_artifacts}/*prd*.md`
+- Whole: `{output_folder}/2-plan-workflows/acl-prd/prd.md`
 - Sharded: `{planning_artifacts}/*prd*/index.md` and related files
 
 #### B. Architecture Documents
 
-- Whole: `{planning_artifacts}/*architecture*.md`
+- Whole: `{output_folder}/3-solutioning/acl-architecture/architecture*.md`
 - Sharded: `{planning_artifacts}/*architecture*/index.md` and related files
 
 #### C. Epics & Stories Documents
 
-- Whole: `{planning_artifacts}/*epic*.md`
+- Whole: `{output_folder}/3-solutioning/acl-create-epics-and-stories/epics.md`
 - Sharded: `{planning_artifacts}/*epic*/index.md` and related files
 
 #### D. UX Design Documents
 
-- Whole: `{planning_artifacts}/*ux*.md`
+- Whole: `{output_folder}/2-plan-workflows/acl-ux/*.md`
 - Sharded: `{planning_artifacts}/*ux*/index.md` and related files
 
 ### 3. Organize Findings

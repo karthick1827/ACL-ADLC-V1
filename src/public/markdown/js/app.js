@@ -51,24 +51,22 @@ async function init() {
   } catch (e) {}
   updateDrawerFrameworkVersion();
   updateWorkflowModeUI();
-  fetch('/api/git-details?t=' + Date.now())
-    .then((r) => r.json())
+  // Git status is resolved first so caches of a deleted / unlinked repository are cleared
+  // before any cached file list could be used as a fallback below.
+  const gitDetailsReady = (typeof refreshGitHubUserControl === 'function' ? refreshGitHubUserControl(true) : Promise.resolve(null))
     .then((d) => {
-      if (typeof applyGitDetailsToStudio === 'function') applyGitDetailsToStudio(d);
-      else {
-        window.__ACL_GIT_CONNECTED__ = Boolean(d && d.repoConnected === true && !d.repoDeleted);
-        if (typeof updateNavUserControlCentre === 'function') updateNavUserControlCentre(d);
-      }
       if (!window.__ACL_GIT_CONNECTED__) {
         setSyncStatus('Synced with IDE (Not synced with GitHub)', 'yellow');
       } else {
         setSyncStatus('Synced with IDE and GitHub', 'green');
       }
+      return d;
     })
-    .catch(() => {});
+    .catch(() => null);
   const synced = await syncFromLiveDisk(true);
 
   if (!synced && files.length === 0) {
+    await gitDetailsReady;
     try {
       const cached = localStorage.getItem('acl_adlc_project_markdown_files');
       if (cached) {
@@ -117,7 +115,15 @@ async function init() {
   // View resolution: Hash deep-links take top priority; on reload, restore last seen view;
   // on fresh launch from IDE without hash, default cleanly to Summarized Dashboard.
   const hashView = (window.location.hash || '').slice(1);
-  const deepLinkViews = ['working-tree', 'dashboard-scrum', 'dashboard-developer', 'studio', 'agents', 'dashboard-git'];
+  const deepLinkViews = [
+    'working-tree',
+    'dashboard-scrum',
+    'dashboard-developer',
+    'studio',
+    'agents',
+    'dashboard-git',
+    'dashboard-atlassian',
+  ];
 
   let targetView = 'dashboard-summarized';
   if (deepLinkViews.includes(hashView)) {

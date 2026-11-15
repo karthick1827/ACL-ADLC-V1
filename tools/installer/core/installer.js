@@ -37,6 +37,8 @@ const API_ENDPOINT_FILES = [
 ];
 
 const STUDIO_TOOL_FILES = [
+  'acl-deliverables.cjs',
+  'adlc-gate-guard.cjs',
   'git-details-service.mjs',
   'acl-output-github.mjs',
   'github-api.mjs',
@@ -57,6 +59,15 @@ function convertCommonJsEndpointToEsm(content) {
   let defaultExport = null;
   const converted = content
     .replaceAll(/^const (\w+) = require\((['"][^'"]+['"])\);?[ \t]*$/gm, 'import $1 from $2;')
+    .replaceAll(/^const \{([\w\s,]+)\} = require\((['"][^'"]+['"])\);?[ \t]*$/gm, 'import {$1} from $2;')
+    .replaceAll(/^module\.exports = \{([\w\s,]+)\};?[ \t]*\r?$\n?/gm, (_m, names) => {
+      for (const name of names
+        .split(',')
+        .map((n) => n.trim())
+        .filter(Boolean))
+        namedExports.push(name);
+      return '';
+    })
     .replaceAll(/^module\.exports\.(\w+) = (\w+);?[ \t]*\r?$\n?/gm, (_m, name, value) => {
       namedExports.push(name === value ? name : `${value} as ${name}`);
       return '';
@@ -67,10 +78,29 @@ function convertCommonJsEndpointToEsm(content) {
       return '';
     })
     .trimEnd();
+  // Remaining CommonJS-only constructs (destructured / inline require, __dirname, __filename) get
+  // the standard Node shims so every endpoint keeps working unchanged in a "type": "module" project.
+  const shims = [];
+  if (/\brequire\s*\(/.test(converted)) {
+    shims.push(
+      "import { createRequire as __aclCreateRequire } from 'node:module';",
+      'const require = __aclCreateRequire(import.meta.url);',
+    );
+  }
+  const usesDirname = /\b__dirname\b/.test(converted);
+  if (usesDirname || /\b__filename\b/.test(converted)) {
+    shims.push(
+      "import { fileURLToPath as __aclFileURLToPath } from 'node:url';",
+      "import { dirname as __aclDirname } from 'node:path';",
+      'const __filename = __aclFileURLToPath(import.meta.url);',
+    );
+    if (usesDirname) shims.push('const __dirname = __aclDirname(__filename);');
+  }
+  const body = shims.length > 0 ? `${shims.join('\n')}\n${converted}` : converted;
   const exportLines = [];
   if (defaultExport) exportLines.push(`export default ${defaultExport};`);
   if (namedExports.length > 0) exportLines.push(`export { ${namedExports.join(', ')} };`);
-  return exportLines.length > 0 ? `${converted}\n\n${exportLines.join('\n')}\n` : `${converted}\n`;
+  return exportLines.length > 0 ? `${body}\n\n${exportLines.join('\n')}\n` : `${body}\n`;
 }
 
 class Installer {
@@ -921,83 +951,21 @@ class Installer {
           this.installedFiles.add(targetAgentsMd);
         }
 
-        // Deploy .cursorrules & .cursor/rules/acl-gate-protocol.mdc for Cursor AI
-        const srcCursorRules = path.join(frameworkRoot, '.cursorrules');
-        const targetCursorRules = path.join(projectRoot, '.cursorrules');
-        if (await fs.pathExists(srcCursorRules)) {
-          await fs.copy(srcCursorRules, targetCursorRules);
-          this.installedFiles.add(targetCursorRules);
-        } else if (await fs.pathExists(srcAgentsMd)) {
-          await fs.copy(srcAgentsMd, targetCursorRules);
-          this.installedFiles.add(targetCursorRules);
-        }
-
-        const cursorRulesDir = path.join(projectRoot, '.cursor', 'rules');
-        await fs.ensureDir(cursorRulesDir);
-        const srcCursorMdc = path.join(frameworkRoot, '.cursor', 'rules', 'acl-gate-protocol.mdc');
-        const targetCursorMdc = path.join(cursorRulesDir, 'acl-gate-protocol.mdc');
-        if (await fs.pathExists(srcCursorMdc)) {
-          await fs.copy(srcCursorMdc, targetCursorMdc);
-          this.installedFiles.add(targetCursorMdc);
-        } else if (await fs.pathExists(srcCursorRules)) {
-          const mdcHeader = `---\ndescription: ACL-ADLC Governance - Pre-flight tier selection and gate lock protocols\nglobs: ["**/*"]\nalwaysApply: true\n---\n\n`;
-          const content = await fs.readFile(srcCursorRules, 'utf8');
-          await fs.writeFile(targetCursorMdc, mdcHeader + content, 'utf8');
-          this.installedFiles.add(targetCursorMdc);
+        // Deploy every AI agent's rule file (Claude Code, Cursor, Windsurf, Cline/Roo, Copilot,
+        // Gemini/Antigravity, Augment) generated from ONE source: src/agent-rules/acl-protocol.md.
+        // Generating (instead of copying hand-maintained copies) keeps all agents on identical rules.
+        const { renderAgentRuleFiles } = require(path.join(frameworkRoot, 'tools', 'generate-agent-rules.cjs'));
+        for (const { file, content } of renderAgentRuleFiles(frameworkRoot)) {
+          const target = path.join(projectRoot, ...file.split('/'));
+          await fs.ensureDir(path.dirname(target));
+          await fs.writeFile(target, content, 'utf8');
+          this.installedFiles.add(target);
         }
 
         // Clean up legacy adlc-governance.mdc if present
-        const legacyMdc = path.join(cursorRulesDir, 'adlc-governance.mdc');
+        const legacyMdc = path.join(projectRoot, '.cursor', 'rules', 'adlc-governance.mdc');
         if (await fs.pathExists(legacyMdc)) {
           await fs.remove(legacyMdc);
-        }
-
-        // Deploy CLAUDE.md for Claude Code
-        const srcClaudeMd = path.join(frameworkRoot, 'CLAUDE.md');
-        const targetClaudeMd = path.join(projectRoot, 'CLAUDE.md');
-        if (await fs.pathExists(srcClaudeMd)) {
-          await fs.copy(srcClaudeMd, targetClaudeMd);
-          this.installedFiles.add(targetClaudeMd);
-        } else if (await fs.pathExists(srcAgentsMd)) {
-          await fs.copy(srcAgentsMd, targetClaudeMd);
-          this.installedFiles.add(targetClaudeMd);
-        }
-
-        // Deploy .windsurfrules for Windsurf Cascade
-        const srcWindsurf = path.join(frameworkRoot, '.windsurfrules');
-        const targetWindsurf = path.join(projectRoot, '.windsurfrules');
-        if (await fs.pathExists(srcWindsurf)) {
-          await fs.copy(srcWindsurf, targetWindsurf);
-          this.installedFiles.add(targetWindsurf);
-        } else if (await fs.pathExists(srcAgentsMd)) {
-          await fs.copy(srcAgentsMd, targetWindsurf);
-          this.installedFiles.add(targetWindsurf);
-        }
-
-        // Deploy .clinerules for Cline & Roo Code
-        const targetCline = path.join(projectRoot, '.clinerules');
-        if (await fs.pathExists(srcCursorRules)) {
-          await fs.copy(srcCursorRules, targetCline);
-          this.installedFiles.add(targetCline);
-        } else if (await fs.pathExists(srcAgentsMd)) {
-          await fs.copy(srcAgentsMd, targetCline);
-          this.installedFiles.add(targetCline);
-        }
-
-        // Deploy .github/copilot-instructions.md for GitHub Copilot
-        const srcCopilot = path.join(frameworkRoot, '.github', 'copilot-instructions.md');
-        const copilotDir = path.join(projectRoot, '.github');
-        await fs.ensureDir(copilotDir);
-        const targetCopilot = path.join(copilotDir, 'copilot-instructions.md');
-        if (await fs.pathExists(srcCopilot)) {
-          await fs.copy(srcCopilot, targetCopilot);
-          this.installedFiles.add(targetCopilot);
-        } else if (await fs.pathExists(srcCursorRules)) {
-          await fs.copy(srcCursorRules, targetCopilot);
-          this.installedFiles.add(targetCopilot);
-        } else if (await fs.pathExists(srcAgentsMd)) {
-          await fs.copy(srcAgentsMd, targetCopilot);
-          this.installedFiles.add(targetCopilot);
         }
       }
 
@@ -1246,10 +1214,29 @@ export async function GET() {
         const saveRouteCode = `import fs from 'node:fs';
 import path from 'node:path';
 
+
+// Review invariants (approval hash, back to In Review on edits after approval) from tools/acl-deliverables.cjs
+async function applyAclReview(content, statusChanged) {
+  try {
+    const { pathToFileURL } = await import('node:url');
+    const modPath = path.join(process.cwd(), 'tools', 'acl-deliverables.cjs');
+    if (!fs.existsSync(modPath)) return { content, action: 'none', status: null };
+    const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ pathToFileURL(modPath).href);
+    const d = mod.default || mod;
+    const result = d.applyReviewInvariants(content, { statusChanged: Boolean(statusChanged) });
+    return { content: result.content, action: result.action, status: d.readReviewStatus(result.content) };
+  } catch {
+    return { content, action: 'none', status: null };
+  }
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { folderPath, filename, content } = body || {};
+    const { folderPath, filename } = body || {};
+    let { content } = body || {};
+    const review = typeof content === 'string' ? await applyAclReview(content, body && body.statusChanged) : null;
+    if (review) content = review.content;
 
     if (!filename || typeof content !== 'string') {
       return Response.json({ success: false, error: 'Missing filename or content' }, { status: 400 });
@@ -1275,7 +1262,7 @@ export async function POST(request) {
     const targetFile = path.join(targetDir, filename);
     fs.writeFileSync(targetFile, content, 'utf8');
 
-    return Response.json({ success: true, path: targetFile });
+    return Response.json({ success: true, path: targetFile, content, status: review && review.status, reviewAction: review ? review.action : 'none' });
   } catch (err) {
     return Response.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -1406,13 +1393,32 @@ export default async function handler(req, res) {
         const pagesSaveCode = `import fs from 'node:fs';
 import path from 'node:path';
 
+
+// Review invariants (approval hash, back to In Review on edits after approval) from tools/acl-deliverables.cjs
+async function applyAclReview(content, statusChanged) {
+  try {
+    const { pathToFileURL } = await import('node:url');
+    const modPath = path.join(process.cwd(), 'tools', 'acl-deliverables.cjs');
+    if (!fs.existsSync(modPath)) return { content, action: 'none', status: null };
+    const mod = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ pathToFileURL(modPath).href);
+    const d = mod.default || mod;
+    const result = d.applyReviewInvariants(content, { statusChanged: Boolean(statusChanged) });
+    return { content: result.content, action: result.action, status: d.readReviewStatus(result.content) };
+  } catch {
+    return { content, action: 'none', status: null };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ success: false, error: 'Method Not Allowed' });
     return;
   }
   try {
-    const { folderPath, filename, content } = req.body || {};
+    const { folderPath, filename } = req.body || {};
+    let { content } = req.body || {};
+    const review = typeof content === 'string' ? await applyAclReview(content, req.body && req.body.statusChanged) : null;
+    if (review) content = review.content;
 
     if (!filename || typeof content !== 'string') {
       res.status(400).json({ success: false, error: 'Missing filename or content' });
@@ -1439,7 +1445,7 @@ export default async function handler(req, res) {
     const targetFile = path.join(targetDir, filename);
     fs.writeFileSync(targetFile, content, 'utf8');
 
-    res.status(200).json({ success: true, path: targetFile });
+    res.status(200).json({ success: true, path: targetFile, content, status: review && review.status, reviewAction: review ? review.action : 'none' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

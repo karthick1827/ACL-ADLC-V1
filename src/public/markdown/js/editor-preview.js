@@ -93,9 +93,88 @@ function renderPreview() {
         hljs.highlightElement(block);
       });
     }
+    decorateReviewChanges(previewEl, document.getElementById('markdownTextarea').value || '');
   } else {
     previewEl.textContent = displayContent;
   }
+}
+
+/** Read simple `key: value` frontmatter fields (only the leading YAML block). */
+function readFrontmatterFields(content) {
+  const match = String(content || '').match(/^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---/);
+  const fields = {};
+  if (!match) return fields;
+  for (const line of match[1].split(/\r?\n/)) {
+    const kv = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (kv) fields[kv[1].toLowerCase()] = kv[2].trim().replace(/^["']|["']$/g, '');
+  }
+  return fields;
+}
+
+/**
+ * For a document sent back to In Review, show what changed since the Manager last approved it:
+ * a banner listing the 🔄 Feature/Change Update blocks added after `last_approved`, with those
+ * sections highlighted in the preview.
+ */
+function decorateReviewChanges(previewEl, rawContent) {
+  const fm = readFrontmatterFields(rawContent);
+  const status = (fm.status || '').toLowerCase();
+  if (status !== 'in review' || !fm.last_approved) return;
+
+  const approvedDay = fm.last_approved.slice(0, 10);
+  const updateHeadings = Array.from(previewEl.querySelectorAll('h1, h2, h3')).filter((h) => /🔄/.test(h.textContent));
+  const changed = updateHeadings.filter((h) => {
+    const date = (h.textContent.match(/(\d{4}-\d{2}-\d{2})/) || [])[1];
+    return !date || date >= approvedDay;
+  });
+
+  for (const heading of changed) {
+    const level = Number(heading.tagName.slice(1));
+    let node = heading;
+    while (node) {
+      node.classList.add('acl-review-changed');
+      node = node.nextElementSibling;
+      if (!node) break;
+      const nodeLevel = /^H[1-6]$/.test(node.tagName) ? Number(node.tagName.slice(1)) : 99;
+      if (nodeLevel <= level) break;
+    }
+    heading.classList.add('acl-review-changed-heading');
+  }
+
+  const banner = document.createElement('div');
+  banner.className = 'acl-review-banner';
+  const title = document.createElement('div');
+  title.className = 'acl-review-banner-title';
+  title.textContent = `🔄 Changed since last approval (${approvedDay}) — awaiting Manager re-approval`;
+  banner.appendChild(title);
+  if (fm.review_reason) {
+    const reason = document.createElement('div');
+    reason.className = 'acl-review-banner-reason';
+    reason.textContent = fm.review_reason;
+    banner.appendChild(reason);
+  }
+  if (changed.length > 0) {
+    const list = document.createElement('ul');
+    for (const heading of changed) {
+      const item = document.createElement('li');
+      const link = document.createElement('a');
+      link.href = '#';
+      link.textContent = heading.textContent.trim();
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      item.appendChild(link);
+      list.appendChild(item);
+    }
+    banner.appendChild(list);
+  } else if (!fm.review_reason) {
+    const note = document.createElement('div');
+    note.className = 'acl-review-banner-reason';
+    note.textContent = 'The content was edited after approval. Review the full document.';
+    banner.appendChild(note);
+  }
+  previewEl.insertBefore(banner, previewEl.firstChild);
 }
 
 function setViewMode(mode) {

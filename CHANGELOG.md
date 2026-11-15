@@ -1,5 +1,40 @@
 # Changelog
 
+## v6.12.0 - 2026-11-15
+
+### One file per deliverable (greenfield & brownfield)
+
+- New single source of truth `tools/acl-deliverables.cjs`: canonical paths, configured `output_folder`, frontmatter-only status parsing, `resetToInReview`, approval hashing.
+- Brief, PRD, UX, architecture and epics skills write to ONE canonical folder each — dated run folders (`planning-artifacts/briefs/brief-<project>-<date>/…`) removed. Architecture always writes `architecture-spine.md` (legacy `ARCHITECTURE-SPINE.md` / `architecture.md` are read, never duplicated).
+- Consumer skills (readiness check, sprint planning, retrospective, correct course, create-story, project context) read the canonical paths.
+- Markdown Studio generator and listing use canonical paths; listing no longer hides different files that share a name.
+
+### Tier 2 feature updates append to the existing file
+
+- Feature additions/changes append a `## 🔄 Feature Update — <feature> (<date>) · Tier 2` block at the bottom of the existing deliverable and set it back to `In Review` (approval fields cleared) — greenfield and brownfield.
+- `acl-quick-dev` Tier 2 walks Brief → PRD → UX → Architecture → Epics one file at a time with a Manager gate after each.
+- Shared protocol moved to `src/scripts/references/acl-deliverable-protocol.md` so it is actually installed (`_acl/scripts/references/`).
+- Markdown Studio records `approved_hash` / `last_approved` on approval; any later content edit sends the document back to `In Review`, and the preview shows a "Changed since last approval" banner with the new sections highlighted. Applied in the shared save endpoint, the Vite plugin and the generated Next.js routes.
+- Gate guard: frontmatter-only status, duplicate detection via the shared module, "edited after approval" detection, timestamp-based out-of-order detection (the old downstream check never ran), `.js` entry point now runs the CLI, `.cjs` shipped to projects.
+
+### Same rules for every AI agent
+
+- `src/agent-rules/acl-protocol.md` generates `CLAUDE.md`, `.cursorrules`, `.cursor/rules/acl-gate-protocol.mdc`, `.windsurfrules`, `.clinerules`, `.github/copilot-instructions.md`, `GEMINI.md`, `.agent/rules/` (Antigravity) and `.augment/rules/` — in the repo (`npm run rules:generate`, checked by `npm test`) and by the installer.
+
+### User Control: Git Details and Jira & Confluence pages
+
+- Sidebar "User Control" now has two pages: **Git Details** and **Jira & Confluence**, each with its own route and refresh restore.
+- Git Details: sidebar shows the token user's GitHub avatar + login when connected, otherwise a git icon and "Git Details" (no Guest/Developer placeholders). Every field comes from GitHub (permission, org role, 2FA, teams) or shows "Not available". Deleted/disconnected repos show only the connect state and clear cached files; private repos without a token are no longer reported as deleted.
+- Jira & Confluence: either key is enough (Jira-only or Confluence-only works); token entered once and never sent back to the browser; no folder-derived default keys.
+- Jira pull: epics + stories, full pagination, status/labels/priority/assignee/points/epic link/components/versions/comments/attachments, ADF and wiki → Markdown; Jira status kept in `jira_status`. Jira push links stories to epics and sends full descriptions.
+- Confluence pull: full pagination, child pages, full storage → Markdown (headings, nested/ordered lists, tables, tasks, code, panels, images); hardcoded page skips removed. Confluence push publishes real formatted pages.
+- A pull that changes a file's content sets it back to `In Review` (listed in the pull result); unchanged files keep `Approved`; metadata-only write-backs never reset approval.
+
+### Fixes
+
+- Installer CommonJS→ESM endpoint conversion now handles destructured `require`, `module.exports = { … }`, inline `require` and `__dirname` — the Atlassian endpoints previously failed to load in `"type": "module"` projects.
+- Vite plugin `/api/git-details` delegates to the shared handler (removed hardcoded roles).
+
 ## v6.11.55 - 2026-11-04
 
 ### Brownfield Tier 2 feature addition (single canonical deliverables)

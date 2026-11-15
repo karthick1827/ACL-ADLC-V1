@@ -2,6 +2,66 @@
 // Works seamlessly across Vercel, Netlify, AWS Lambda, Firebase Functions, and local Node.js
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+
+/** Load tools/acl-deliverables.cjs (canonical paths + output folder). Optional: falls back to defaults. */
+async function loadDeliverables() {
+  const candidates = [path.join(process.cwd(), 'tools', 'acl-deliverables.cjs')];
+  if (typeof __dirname !== 'undefined') candidates.push(path.join(__dirname, '..', 'tools', 'acl-deliverables.cjs'));
+  const found = candidates.find((p) => fs.existsSync(p));
+  if (!found) return null;
+  try {
+    const mod = await import(pathToFileURL(found).href);
+    return mod.default || mod;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Collapse the listing so each one-per-project deliverable (brief, PRD, spine, epics,
+ * project-context) appears once — preferring its canonical path. Every other file is keyed by
+ * its full path, so legitimately repeated names (DESIGN.md, reconcile-*.md, …) are all shown.
+ */
+function dedupeListing(list, deliverables) {
+  const uniqueByName = new Map();
+  const canonicalPaths = new Map();
+  if (deliverables) {
+    for (const key of [...deliverables.UNIQUE_DELIVERABLE_KEYS, 'projectContext']) {
+      const def = deliverables.DELIVERABLES[key];
+      for (const name of [def.file, ...def.legacyNames]) uniqueByName.set(name.toLowerCase(), key);
+      canonicalPaths.set(
+        key,
+        deliverables.acceptedRelativePaths(key).map((p) => p.toLowerCase()),
+      );
+    }
+  } else {
+    for (const name of ['brief.md', 'prd.md', 'epics.md', 'architecture-spine.md', 'architecture.md', 'project-context.md']) {
+      uniqueByName.set(name, name);
+    }
+  }
+  const relOf = (f) =>
+    (f.folderPath && f.folderPath !== 'root' ? `${f.folderPath}/${f.filename}` : f.filename).replaceAll('\\', '/').toLowerCase();
+  const isCanonical = (f, key) => (canonicalPaths.get(key) || []).includes(relOf(f));
+
+  const seen = new Map();
+  for (const f of list) {
+    const lower = (f.filename || '').toLowerCase();
+    const uniqueKey = uniqueByName.get(lower);
+    const mapKey = uniqueKey ? `deliverable:${uniqueKey}` : `path:${relOf(f)}`;
+    if (!seen.has(mapKey)) {
+      seen.set(mapKey, f);
+      continue;
+    }
+    if (!uniqueKey) continue;
+    const existing = seen.get(mapKey);
+    if (isCanonical(existing, uniqueKey)) continue;
+    if (isCanonical(f, uniqueKey) || (!/[0-4]-/.test(existing.folderPath || '') && /[0-4]-/.test(f.folderPath || ''))) {
+      seen.set(mapKey, f);
+    }
+  }
+  return Array.from(seen.values());
+}
 
 const EXCLUDED_FILENAMES = new Set([
   'skill.md',
@@ -143,6 +203,8 @@ async function universalHandler(arg1, arg2) {
   }
 
   try {
+    const deliverables = await loadDeliverables();
+    const outputFolder = deliverables ? deliverables.resolveOutputFolder(process.cwd()) : '_acl-output';
     let qParams = {};
     let rawHeaders = {};
 
@@ -250,7 +312,13 @@ async function universalHandler(arg1, arg2) {
 
           const aclMdItems = treeItems.filter((item) => {
             if (item.type !== 'blob') return false;
-            if (!item.path.startsWith('_acl-output') && !item.path.startsWith('acl-output')) return false;
+            if (
+              !item.path.startsWith(`${outputFolder}/`) &&
+              !item.path.startsWith('_acl-output/') &&
+              !item.path.startsWith('acl-output/')
+            ) {
+              return false;
+            }
             if (!item.path.endsWith('.md')) return false;
             return !isExcludedFile(path.basename(item.path));
           });
@@ -258,7 +326,9 @@ async function universalHandler(arg1, arg2) {
           // Fetch blobs concurrently
           const files = await Promise.all(
             aclMdItems.map(async (item) => {
-              const relPath = item.path.replace(/^(_acl-output|_acl_output|acl-output)\/?/i, '');
+              const relPath = item.path.startsWith(`${outputFolder}/`)
+                ? item.path.slice(outputFolder.length + 1)
+                : item.path.replace(/^(_acl-output|_acl_output|acl-output)\/?/i, '');
               const blobRes = await fetch(item.url, { headers });
               if (!blobRes.ok) return null;
               const blobJson = await blobRes.json();
@@ -269,24 +339,7 @@ async function universalHandler(arg1, arg2) {
 
           const validFiles = files.filter(Boolean);
 
-          // Deduplicate project-context.md (prefer root over nested)
-          const seenMap = new Map();
-          for (const f of validFiles) {
-            const key = f.filename.toLowerCase();
-            if (!seenMap.has(key)) {
-              seenMap.set(key, f);
-            } else {
-              const existing = seenMap.get(key);
-              if (key === 'project-context.md') {
-                if (f.folderPath === 'root' || !f.folderPath.includes('0-context')) {
-                  seenMap.set(key, f);
-                }
-              } else if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && f.folderPath.match(/[0-4]-/))) {
-                seenMap.set(key, f);
-              }
-            }
-          }
-          const deduplicated = Array.from(seenMap.values());
+          const deduplicated = dedupeListing(validFiles, deliverables);
           deduplicated.sort(compareStoriesAndFiles);
 
           let activeTier = deduplicated.some(
@@ -316,7 +369,7 @@ async function universalHandler(arg1, arg2) {
 
     // 2. Fallback: Scan local disk if running locally or if disk files exist
     const diskList = [];
-    const scanDir = path.join(process.cwd(), '_acl-output');
+    const scanDir = path.join(process.cwd(), outputFolder);
     if (fs.existsSync(scanDir)) {
       function scan(dir, relPrefix) {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -338,23 +391,7 @@ async function universalHandler(arg1, arg2) {
       scan(scanDir, '');
     }
 
-    const seenDisk = new Map();
-    for (const f of diskList) {
-      const key = f.filename.toLowerCase();
-      if (!seenDisk.has(key)) {
-        seenDisk.set(key, f);
-      } else {
-        const existing = seenDisk.get(key);
-        if (key === 'project-context.md') {
-          if (f.folderPath === 'root' || !f.folderPath.includes('0-context')) {
-            seenDisk.set(key, f);
-          }
-        } else if (existing.folderPath === 'root' || (!existing.folderPath.match(/[0-4]-/) && f.folderPath.match(/[0-4]-/))) {
-          seenDisk.set(key, f);
-        }
-      }
-    }
-    const finalDiskList = Array.from(seenDisk.values());
+    const finalDiskList = dedupeListing(diskList, deliverables);
     finalDiskList.sort(compareStoriesAndFiles);
 
     let diskActiveTier = finalDiskList.some(

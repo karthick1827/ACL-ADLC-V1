@@ -90,7 +90,7 @@ Please choose which Tier you want to proceed with:
   - **Prerequisite Deliverables Scope (What Requires Approval)**:
     - Phase 1: `_acl-output/1-analysis/acl-product-brief/brief.md`
     - Phase 2: `_acl-output/2-plan-workflows/acl-prd/prd.md` (and `_acl-output/2-plan-workflows/acl-prd/reconcile-brief.md` if generated against an upstream brief)
-    - Phase 3A: `_acl-output/3-solutioning/acl-architecture/architecture-spine.md` (or `architecture.md`)
+    - Phase 3A: `_acl-output/3-solutioning/acl-architecture/architecture-spine.md` (a legacy `ARCHITECTURE-SPINE.md` / `architecture.md` in the same folder is used if it already exists — never both)
     - Phase 3B: `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`
     - Phase 4: `_acl-output/4-implementation/story-<epic_num>-<story_num>.md` (Tier 2) or `_acl-output/4-implementation/spec-<feature-slug>.md` (Tier 1)
   - **STRICT EXCLUSIONS & BAN ON `status` IN CHILD / INTERNAL FILES**:
@@ -127,7 +127,7 @@ Please choose which Tier you want to proceed with:
 
 > ℹ️ **PROJECT LIFECYCLE & TIER GOVERNANCE**:
 > - **Brand-New Greenfield Project (Day 0 Initial Creation)**: Always follows the full sequential cascade (Phase 1 Brief -> Phase 2 PRD -> Phase 3A Architecture -> Phase 3B Epics -> Phase 4 Stories). No tier selection is asked because all steps are required.
-> - **Brownfield / Existing Project (Feature Addition or Change)**: Execution tiers (**Tier 1 vs. Tier 2**) **ALWAYS apply**. The AI Agent must prompt the user to choose between Tier 1 (1-Page Spec) and Tier 2 (Major Overhaul) before writing any code.
+> - **Existing Project (Feature Addition or Change, greenfield or brownfield)**: Execution tiers (**Tier 1 vs. Tier 2**) apply **only when the user tags `quick dev`** (see the Pre-Flight Check). Without the tag, answer or apply changes normally.
 
 Whenever the developer asks for a feature, bugfix, or code change in a Brownfield / existing project **and explicitly tags or mentions `quick dev`**:
 
@@ -212,8 +212,8 @@ Please choose which Tier you want to proceed with:
 #### 🔴 Tier 2: Major Architectural Overhauls
 
 - **Scope**: Complete framework upgrades, database schema rewrites, replacing global state/auth paradigms, or major cross-cutting capabilities.
-- **Sequential Pipeline**:
-  1. **Phase 1 (Product Brief)**: The AI Agent **FIRST** creates `_acl-output/1-analysis/acl-product-brief/brief.md` with frontmatter:
+- **Sequential Pipeline** (greenfield and brownfield). Every phase below **updates the existing canonical file** when it exists — keep every existing line, append a `## 🔄 Feature Update — <feature> (<date>) · Tier 2` block at the **bottom**, set `status: In Review` + `updated`, and remove `reviewed_by` / `review_timestamp` / `gate_signature` / `approved_hash`. A phase **creates** its file only when that canonical file does not exist yet. Never a second copy, never a dated or renamed file.
+  1. **Phase 1 (Product Brief)**: The AI Agent **FIRST** updates (or, if absent, creates) `_acl-output/1-analysis/acl-product-brief/brief.md`. A newly created brief gets frontmatter:
      ```yaml
      ---
      title: 'Product Brief: <Feature/Overhaul Name>'
@@ -224,9 +224,9 @@ Please choose which Tier you want to proceed with:
      ---
      ```
      **Immediate Gate Lock**: The AI Agent **MUST IMMEDIATELY HALT** and output the Gate Lock banner for `brief.md`. Downstream deliverables (PRD, Architecture Spine, Epics) and application code are strictly locked until `brief.md` is approved by the Manager in Markdown Studio.
-  2. **Phase 2 (PRD)**: Once `brief.md` has `status: Approved`, the AI creates `_acl-output/2-plan-workflows/acl-prd/prd.md` (`status: In Review`) and halts for approval.
-  3. **Phase 3A (Architecture Spine)**: Once PRD has `status: Approved`, the AI creates `_acl-output/3-solutioning/acl-architecture/architecture-spine.md` (`status: In Review`) and halts for approval.
-  4. **Phase 3B (Epics & Stories)**: Once Architecture has `status: Approved`, the AI creates `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md` (`status: In Review`) and halts for approval.
+  2. **Phase 2 (PRD)**: Once `brief.md` has `status: Approved`, the AI updates (or, if absent, creates) `_acl-output/2-plan-workflows/acl-prd/prd.md` (`status: In Review`) and halts for approval.
+  3. **Phase 3A (Architecture Spine)**: Once PRD has `status: Approved` (and UX, if the project has `2-plan-workflows/acl-ux/`, has been updated the same way and approved), the AI updates (or, if absent, creates) `_acl-output/3-solutioning/acl-architecture/architecture-spine.md` (`status: In Review`) and halts for approval.
+  4. **Phase 3B (Epics & Stories)**: Once Architecture has `status: Approved`, the AI updates (or, if absent, creates) `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md` (`status: In Review`) and halts for approval.
   5. **Phase 4 (Story-Level Implementation & Mandatory Manager Sign-Off Gate)**:
      - Implementation proceeds **one story at a time** as defined in `epics.md`.
      - **Story Spec Generation**: Before writing or modifying any application code for a story (e.g. Story 1.1), the AI Agent **MUST FIRST** create the story implementation specification in `_acl-output/4-implementation/story-<epic_num>-<story_num>.md` (e.g. `story-1-1.md`) containing:
@@ -280,7 +280,7 @@ Please choose which Tier you want to proceed with:
 
 1. **Phase 1 — Product Brief Update (Gate 1/4)**:
    - The AI Agent **MUST NOT** immediately write or modify application code.
-   - The AI Agent **ONLY** appends the new feature description, problem statement, and scope at the **bottom** of the **existing** `_acl-output/1-analysis/acl-product-brief/brief.md` (never create a second `brief.md` under `{planning_artifacts}/briefs/` or another run folder); sets frontmatter `status: In Review` and `project_type: brownfield` (Tier 2 feature addition). Agents **may** change `Approved` → `In Review` on that canonical file only.
+   - The AI Agent **ONLY** appends the new feature description, problem statement, and scope at the **bottom** of the **existing** `_acl-output/1-analysis/acl-product-brief/brief.md` under a `## 🔄 Feature Update — <feature> (<date>) · Tier 2` heading (never create a second `brief.md` anywhere, never a dated or renamed copy); sets frontmatter `status: In Review` and `updated`, removes `reviewed_by` / `review_timestamp` / `gate_signature` / `approved_hash`, and leaves `project_type` unchanged (greenfield stays greenfield).
    - **NO OTHER DOCUMENT** (`prd.md`, `architecture-spine.md`, `epics.md`) is created or modified at this step.
    - **Immediate Gate Lock 1**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 
@@ -306,7 +306,7 @@ Please choose which Tier you want to proceed with:
 
 2. **Phase 2 — PRD Update (Gate 2/4)**:
    - **Prerequisite Check**: The AI Agent MUST verify `brief.md` has `status: Approved`. If it does not, the AI Agent MUST output Gate Lock 1 and halt immediately.
-   - The AI Agent **ONLY** appends functional requirements (FRs), user stories, and acceptance criteria at the **bottom** of the **existing** `_acl-output/2-plan-workflows/acl-prd/prd.md` (never a second `prd.md` under `{planning_artifacts}/prds/`); sets frontmatter `status: In Review`.
+   - The AI Agent **ONLY** appends functional requirements (FRs), user stories, and acceptance criteria at the **bottom** of the **existing** `_acl-output/2-plan-workflows/acl-prd/prd.md` under a `## 🔄 Feature Update` heading (never a second `prd.md` anywhere); sets frontmatter `status: In Review` and `updated` and removes the approval fields.
    - **NO OTHER DOCUMENT** (`architecture-spine.md`, `epics.md`) is created or modified at this step.
    - **Immediate Gate Lock 2**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 
@@ -331,7 +331,7 @@ Please choose which Tier you want to proceed with:
 
 3. **Phase 3A — Architecture Update (Gate 3/4)**:
    - **Prerequisite Check**: The AI Agent MUST verify BOTH `brief.md` AND `prd.md` have `status: Approved`. If either does not, the AI Agent MUST output the relevant Gate Lock and halt immediately.
-   - The AI Agent **ONLY** appends component interfaces, data models, and API contracts at the **bottom** of the **existing** canonical spine under `_acl-output/3-solutioning/acl-architecture/` (never a second spine file in a new run folder); sets frontmatter `status: In Review`.
+   - The AI Agent **ONLY** appends component interfaces, data models, and API contracts at the **bottom** of the **existing** canonical spine under `_acl-output/3-solutioning/acl-architecture/` under a `## 🔄 Feature Update` heading (never a second spine file); sets frontmatter `status: In Review` and `updated` and removes the approval fields.
    - **NO OTHER DOCUMENT** (`epics.md`) is created or modified at this step.
    - **Immediate Gate Lock 3**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 
@@ -356,7 +356,7 @@ Please choose which Tier you want to proceed with:
 
 4. **Phase 3B — Epics & Stories Update (Gate 4/4)**:
    - **Prerequisite Check**: The AI Agent MUST verify `brief.md`, `prd.md`, AND `architecture-spine.md` ALL have `status: Approved`. If any does not, the AI Agent MUST output the relevant Gate Lock and halt immediately.
-   - The AI Agent **ONLY** appends the new Epic or Story at the **bottom** of the **existing** `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md` (never a second `epics.md` elsewhere), with an unchecked acceptance criteria checklist (`- [ ]`), strictly preserving all existing completed stories (`- [x]`); sets frontmatter `status: In Review`.
+   - The AI Agent **ONLY** appends the new Epic or Story at the **bottom** of the **existing** `_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md` (never a second `epics.md` elsewhere), with an unchecked acceptance criteria checklist (`- [ ]`), strictly preserving all existing completed stories (`- [x]`), under a `## 🔄 Feature Update` heading; sets frontmatter `status: In Review` and `updated` and removes the approval fields.
    - **NO APPLICATION CODE** is generated at this step.
    - **Immediate Gate Lock 4**: The AI Agent **MUST IMMEDIATELY HALT** and output:
 
@@ -452,8 +452,29 @@ Please choose which Tier you want to proceed with:
 
 ---
 
+## 📁 One File Per Deliverable (Greenfield & Brownfield, Every Tier, Every Agent)
+
+Each deliverable exists exactly once, at this path under `_acl-output/` (or the configured `output_folder`):
+
+| Deliverable | Canonical file |
+|---|---|
+| Product Brief | `1-analysis/acl-product-brief/brief.md` |
+| PRD | `2-plan-workflows/acl-prd/prd.md` |
+| UX Design | `2-plan-workflows/acl-ux/DESIGN.md` + `EXPERIENCE.md` |
+| Architecture Spine | `3-solutioning/acl-architecture/architecture-spine.md` |
+| Epics & Stories | `3-solutioning/acl-create-epics-and-stories/epics.md` |
+| Project Context | `project-context.md` |
+
+- **NEVER** create dated or per-run folders (`brief-<project>-<date>/`, `planning-artifacts/prds/...`), second copies in other folders, or renamed copies (`brief-v2.md`, `prd-feature.md`).
+- If the canonical file exists, **update it in place** (append at the bottom for feature additions). Create it only when it does not exist.
+- Companion files (`addendum.md`, `.memlog.md`, `reconcile-*.md`, reviews) live in the deliverable's own folder.
+- Full rules: `_acl/scripts/references/acl-deliverable-protocol.md`. Verify with `node tools/adlc-gate-guard.cjs --validate-all` (fails on duplicates, out-of-order writes, and files edited after approval without returning to `In Review`).
+
+---
+
 ## 🛑 STRICT PROHIBITION: No Direct AI Status Manipulation & Manager-Only Approval
 
+- **Re-review on change:** whenever the agent changes the content of any `.md` file under `_acl-output/` whose status is `Approved` or `Rejected` (greenfield or brownfield), it MUST set `status: In Review` and remove `reviewed_by`, `review_timestamp`, `gate_signature`, `approved_hash`. Moving a status **to** `In Review` is the only status change an agent may make. Metadata-only edits (e.g. writing back `jira_key`) are not content changes.
 - The AI agent is **STRICTLY PROHIBITED** from using tools (`replace_file_content`, `write_to_file`, `run_command`, etc.) to change `status: In Review` -> `status: Approved` at ANY cost.
 - ONLY THE MANAGER is authorized and permitted to change the status via Markdown Studio (`markdown.html`).
 - The AI agent is **STRICTLY PROHIBITED** from prompting the developer to self-approve or change review statuses.

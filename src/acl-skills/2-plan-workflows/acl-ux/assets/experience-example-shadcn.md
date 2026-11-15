@@ -2,7 +2,7 @@
 name: Drift
 status: final
 sources:
-  - {planning_artifacts}/prds/drift-2026-03-12/prd.md
+  - {output_folder}/2-plan-workflows/acl-prd/prd.md
 updated: 2026-04-02
 ---
 

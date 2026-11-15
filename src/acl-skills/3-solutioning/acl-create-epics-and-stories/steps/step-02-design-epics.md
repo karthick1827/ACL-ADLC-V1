@@ -33,7 +33,7 @@ To design and get approval for the epics_list that will organize all requirement
 ## EXECUTION PROTOCOLS:
 
 - 🎯 Design epics collaboratively based on extracted requirements
-- 💾 Update {{epics_list}} in {planning_artifacts}/epics.md
+- 💾 Update {{epics_list}} in {epics_file}
 - 📖 Document the FR coverage mapping
 - 🚫 FORBIDDEN to load next step until user approves epics_list
 
@@ -41,7 +41,7 @@ To design and get approval for the epics_list that will organize all requirement
 
 ### 1. Review Extracted Requirements
 
-Load {planning_artifacts}/epics.md and review:
+Load {epics_file} and review:
 
 - **Functional Requirements:** Count and review FRs from Step 1
 - **Non-Functional Requirements:** Review NFRs that need to be addressed
@@ -191,7 +191,7 @@ If user wants changes:
 
 ## CONTENT TO UPDATE IN DOCUMENT:
 
-After approval, update {planning_artifacts}/epics.md:
+After approval, update {epics_file}:
 
 1. Replace {{epics_list}} placeholder with the approved epic list
 2. Replace {{requirements_coverage_map}} with the coverage map
@@ -205,7 +205,7 @@ Display: "**Select an Option:** [A] Advanced Elicitation [P] Party Mode [C] Cont
 
 - IF A: Invoke the `acl-advanced-elicitation` skill
 - IF P: Invoke the `acl-party-mode` skill
-- IF C: Save approved epics_list to {planning_artifacts}/epics.md, update frontmatter, then read fully and follow: ./step-03-create-stories.md
+- IF C: Save approved epics_list to {epics_file}, update frontmatter, then read fully and follow: ./step-03-create-stories.md
 - IF Any other comments or queries: help user respond then [Redisplay Menu Options](#8-present-menu-options)
 
 #### EXECUTION RULES:

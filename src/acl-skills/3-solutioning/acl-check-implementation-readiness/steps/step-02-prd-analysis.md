@@ -1,6 +1,6 @@
 ---
 outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
-epicsFile: '{planning_artifacts}/*epic*.md' # Will be resolved to actual file
+epicsFile: '{output_folder}/3-solutioning/acl-create-epics-and-stories/epics.md' # Will be resolved to actual file
 ---
 
 # Step 2: PRD Analysis

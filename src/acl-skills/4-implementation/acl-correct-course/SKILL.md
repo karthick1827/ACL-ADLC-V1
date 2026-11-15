@@ -5,7 +5,7 @@ description: 'Manage significant changes during sprint execution. Use when the u
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -108,10 +108,10 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
 
 | Input | Path | Load Strategy |
 |-------|------|---------------|
-| PRD | `{planning_artifacts}/*prd*.md` (whole) or `{planning_artifacts}/*prd*/*.md` (sharded) | FULL_LOAD |
-| Epics | `{planning_artifacts}/*epic*.md` (whole) or `{planning_artifacts}/*epic*/*.md` (sharded) | FULL_LOAD |
-| Architecture | `{planning_artifacts}/*architecture*.md` (whole) or `{planning_artifacts}/*architecture*/*.md` (sharded) | FULL_LOAD |
-| UX Design | `{planning_artifacts}/*ux*.md` (whole) or `{planning_artifacts}/*ux*/*.md` (sharded) | FULL_LOAD |
+| PRD | `{output_folder}/2-plan-workflows/acl-prd/prd.md` (whole) or `{planning_artifacts}/*prd*/*.md` (sharded) | FULL_LOAD |
+| Epics | `{output_folder}/3-solutioning/acl-create-epics-and-stories/epics.md` (whole) or `{planning_artifacts}/*epic*/*.md` (sharded) | FULL_LOAD |
+| Architecture | `{output_folder}/3-solutioning/acl-architecture/architecture*.md` (whole) or `{planning_artifacts}/*architecture*/*.md` (sharded) | FULL_LOAD |
+| UX Design | `{output_folder}/2-plan-workflows/acl-ux/*.md` (whole) or `{planning_artifacts}/*ux*/*.md` (sharded) | FULL_LOAD |
 | Spec | `{planning_artifacts}/*spec-*.md` (whole) | FULL_LOAD |
 | Document Project | `{project_knowledge}/index.md` (sharded) | INDEX_GUIDED |
 

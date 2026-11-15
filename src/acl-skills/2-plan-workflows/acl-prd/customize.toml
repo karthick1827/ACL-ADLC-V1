@@ -31,7 +31,7 @@ activation_steps_append = []
 #   "Investor PRDs must include a market sizing section."                    # generic agent instruction
 persistent_facts = [
   "file:{project-root}/**/project-context.md",
-  "file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md",
+  "file:{project-root}/_acl/scripts/references/acl-deliverable-protocol.md",
 ]
 
 # Executed when the workflow completes (after the user has been told the
@@ -61,11 +61,11 @@ validation_checklist_template = "assets/prd-validation-checklist.md"
 # collapse — no JS.
 validation_report_template = "assets/validation-report-template.html"
 
-# Run folder location. The PRD, optional addendum, memlog, and optional
-# validation report all land inside `{prd_output_path}/{run_folder_pattern}/`.
-# Resume-check scans `{prd_output_path}` for prior unfinished runs.
-prd_output_path = "{planning_artifacts}/prds"
-run_folder_pattern = "prd-{project_name}-{date}"
+# Canonical PRD folder (ACL deliverable protocol). prd.md, addendum, memlog, reconcile-*.md and
+# validation reports all live directly in this ONE folder — no dated or per-run sub-folders.
+# If prd.md already exists here, the skill updates it in place (append + In Review); it never
+# creates a second PRD.
+prd_output_path = "{output_folder}/2-plan-workflows/acl-prd"
 
 # Document standards applied to human-consumed docs at finalize. Each entry is
 # a `skill:`, `file:`, or plain-text directive; the parent LLM applies the

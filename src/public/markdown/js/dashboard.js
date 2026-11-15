@@ -1411,34 +1411,103 @@ function renderDeveloperDashboard() {
 }
 
 // ===================================================
-// User Control Centre (Git Identity & Permissions Dashboard)
+// Git Details (GitHub identity, repository & permissions)
 // ===================================================
+const GIT_ICON_SVG =
+  '<svg class="nav-git-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="9" r="2.4"/>' +
+  '<path d="M6 8.4v7.2"/><path d="M18 11.4c0 3.6-4.8 3-10.4 5.2"/></svg>';
+
+const ATLASSIAN_ICON_SVG =
+  '<svg class="nav-atl-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M7.2 11.3c-.3-.4-.9-.3-1.1.1L2.6 18.6c-.2.4.1.9.6.9h5c.3 0 .5-.1.6-.4 1.1-2.3.4-5.8-1.6-7.8z"/>' +
+  '<path d="M11.4 3.2c-2 3.2-1.9 6.7-.4 9.8l2.9 6.1c.1.3.4.4.6.4h5c.5 0 .8-.5.6-.9L12.5 3.2c-.2-.4-.8-.4-1.1 0z"/></svg>';
+
+const GIT_STATUS_LABELS = {
+  'not-linked': 'Not connected',
+  deleted: 'Repository deleted',
+  inaccessible: 'Repository not accessible',
+  unreachable: 'GitHub unreachable',
+  connected: 'GitHub account not available',
+  unknown: 'Status unavailable',
+};
+
+const GIT_DETAILS_TTL_MS = 60_000;
+let gitDetailsCache = { data: null, at: 0, inflight: null };
+
+function escapeHtmlText(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function safeUrl(value) {
+  const s = String(value || '');
+  return /^https?:\/\//i.test(s) ? s : '';
+}
+
+/** Normalise any /api/git-details payload (also older ones without repoStatus). */
+function gitStatusOf(data) {
+  if (!data) return 'unknown';
+  if (data.repoStatus) return data.repoStatus;
+  if (data.repoDeleted) return 'deleted';
+  if (data.repoConnected === true) return 'connected';
+  return 'not-linked';
+}
+
+function githubTokenHeaders() {
+  const headers = { 'Cache-Control': 'no-store' };
+  try {
+    const token = (localStorage.getItem('acl_github_token') || '').trim();
+    if (token) headers['X-GitHub-Token'] = token;
+  } catch (e) {}
+  return headers;
+}
+
+function renderNavIdentity(iconEl, avatarUrl, login, size) {
+  if (!iconEl) return;
+  iconEl.innerHTML = '';
+  const url = safeUrl(avatarUrl);
+  if (url) {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = login || 'GitHub avatar';
+    img.className = 'nav-git-avatar';
+    img.style.width = size + 'px';
+    img.style.height = size + 'px';
+    img.addEventListener('error', () => {
+      iconEl.innerHTML = GIT_ICON_SVG;
+    });
+    iconEl.appendChild(img);
+  } else {
+    iconEl.innerHTML = GIT_ICON_SVG;
+  }
+}
+
 function updateNavUserControlCentre(data) {
-  const isConnected = Boolean(data && data.repoConnected === true && !data.repoDeleted);
-  const hasUser = Boolean(isConnected && data.userDetails && (data.userDetails.fullName || data.userDetails.username));
+  const status = gitStatusOf(data);
+  const authUser = data && data.authenticatedUser;
+  const showUser = status === 'connected' && Boolean(authUser && authUser.login);
+  const title = showUser ? authUser.login : 'Git Details';
+  const subtitle = showUser ? 'Git Details' : GIT_STATUS_LABELS[status] || GIT_STATUS_LABELS.unknown;
+
   const navTitle = document.getElementById('navGitTitle');
+  const navSubtitle = document.getElementById('navGitSubtitle');
   const navIcon = document.getElementById('navGitIcon');
   const railIcon = document.getElementById('railGitIcon');
+  const railItem = document.getElementById('railItemGit');
 
-  const ownerName = hasUser ? data.userDetails.fullName || data.userDetails.username : isConnected ? 'Developer' : 'No Repo Connected';
-  const avatarUrl = hasUser ? data.userDetails.avatarUrl : null;
-
-  if (navTitle) {
-    navTitle.textContent = ownerName;
-  }
-  if (navIcon) {
-    if (avatarUrl) {
-      navIcon.innerHTML = `<img src="${avatarUrl}" alt="${ownerName}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
-    } else {
-      navIcon.innerHTML = `<span style="font-size: 1.15rem;">${isConnected ? '🐙' : '👤'}</span>`;
-    }
-  }
-  if (railIcon) {
-    if (avatarUrl) {
-      railIcon.innerHTML = `<img src="${avatarUrl}" alt="${ownerName}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid #2563eb;" />`;
-    } else {
-      railIcon.innerHTML = `<span style="font-size: 1.15rem;">${isConnected ? '🐙' : '👤'}</span>`;
-    }
+  if (navTitle) navTitle.textContent = title;
+  if (navSubtitle) navSubtitle.textContent = subtitle;
+  renderNavIdentity(navIcon, showUser ? authUser.avatarUrl : null, title, 24);
+  renderNavIdentity(railIcon, showUser ? authUser.avatarUrl : null, title, 28);
+  if (railItem) {
+    const label = showUser ? `Git Details (${authUser.login})` : `Git Details — ${subtitle}`;
+    railItem.title = label;
+    railItem.setAttribute('aria-label', label);
   }
 }
 
@@ -1448,11 +1517,16 @@ function clearGithubLocalStorageKeys() {
   } catch (e) {}
 }
 
+/** Drop cached data that could belong to a repository that no longer exists / is not linked. */
+function clearStaleRepoCaches() {
+  clearGithubLocalStorageKeys();
+  try {
+    localStorage.removeItem('acl_adlc_project_markdown_files');
+  } catch (e) {}
+}
+
 function hydrateGithubRepoFromGitDetails(data) {
-  if (!data || !data.repoConnected || data.repoDeleted) {
-    clearGithubLocalStorageKeys();
-    return;
-  }
+  if (gitStatusOf(data) !== 'connected') return;
   try {
     if (data.githubOwner) localStorage.setItem('acl_github_owner', data.githubOwner);
     if (data.githubRepo) localStorage.setItem('acl_github_repo', data.githubRepo);
@@ -1461,295 +1535,245 @@ function hydrateGithubRepoFromGitDetails(data) {
 }
 
 function applyGitDetailsToStudio(data) {
-  const payload = data || { repoConnected: false };
-  const isConnected = Boolean(payload.repoConnected === true && !payload.repoDeleted);
-  window.__ACL_GIT_CONNECTED__ = isConnected;
-  if (!isConnected || payload.repoDeleted) clearGithubLocalStorageKeys();
-  else hydrateGithubRepoFromGitDetails(payload);
-  if (typeof updateNavUserControlCentre === 'function') updateNavUserControlCentre(payload);
+  const status = gitStatusOf(data);
+  window.__ACL_GIT_CONNECTED__ = status === 'connected';
+  window.__ACL_GIT_STATUS__ = status;
+  // Only a definitive answer wipes caches: never on network errors or private-repo ambiguity.
+  if (status === 'not-linked' || status === 'deleted') clearStaleRepoCaches();
+  else if (status === 'connected') hydrateGithubRepoFromGitDetails(data);
+  updateNavUserControlCentre(data);
 }
 
-async function refreshGitHubUserControl() {
-  try {
-    const res = await fetch('/api/git-details?t=' + Date.now(), { cache: 'no-store' });
-    const data = res.ok ? await res.json() : { repoConnected: false };
-    applyGitDetailsToStudio(data);
-    return data;
-  } catch (e) {
-    applyGitDetailsToStudio({ repoConnected: false });
-    return null;
-  }
+/** Fetch /api/git-details (cached for GIT_DETAILS_TTL_MS unless `force`). */
+async function fetchGitDetails(force = false) {
+  const fresh = gitDetailsCache.data && Date.now() - gitDetailsCache.at < GIT_DETAILS_TTL_MS;
+  if (!force && fresh) return gitDetailsCache.data;
+  if (gitDetailsCache.inflight) return gitDetailsCache.inflight;
+  gitDetailsCache.inflight = (async () => {
+    try {
+      const res = await fetch('/api/git-details?t=' + Date.now() + (force ? '&refresh=1' : ''), {
+        cache: 'no-store',
+        headers: githubTokenHeaders(),
+      });
+      const data = res.ok ? await res.json() : null;
+      gitDetailsCache = { data, at: Date.now(), inflight: null };
+      return data;
+    } catch (e) {
+      gitDetailsCache = { data: null, at: Date.now(), inflight: null };
+      return null;
+    }
+  })();
+  return gitDetailsCache.inflight;
 }
 
-async function renderGitDashboard() {
+async function refreshGitHubUserControl(force = false) {
+  const data = await fetchGitDetails(force === true);
+  applyGitDetailsToStudio(data);
+  return data;
+}
+
+function gitFieldRow(label, value, { mono = false, html = false } = {}) {
+  const missing = value === null || value === undefined || value === '' || value === 'Not available';
+  const shown = missing ? 'Not available' : html ? value : escapeHtmlText(value);
+  return `
+    <div class="git-field-row">
+      <div class="git-field-label">${escapeHtmlText(label)}</div>
+      <div class="git-field-value ${missing ? 'empty' : ''}"${mono ? ' style="font-family: monospace; font-size: 0.82rem;"' : ''}>${shown}</div>
+    </div>`;
+}
+
+function renderGitConnectState(container, data) {
+  const status = gitStatusOf(data);
+  const remote = data && data.remoteOrigin ? `<code>${escapeHtmlText(data.remoteOrigin)}</code>` : '';
+  const message = (data && data.message) || 'Git details could not be loaded from the Studio server.';
+  const tips = {
+    'not-linked':
+      'Link this project to a GitHub repository (<code>git remote add origin https://github.com/&lt;owner&gt;/&lt;repo&gt;.git</code> and push), then refresh.',
+    deleted:
+      'The linked repository no longer exists on GitHub. Cached repository data was cleared. Point <code>origin</code> at an existing repository and refresh.',
+    inaccessible:
+      'Provide a GitHub token with access to this repository (environment variable <code>GITHUB_TOKEN</code>, <code>gh auth login</code>, or the Studio GitHub token), then refresh.',
+    unreachable: 'GitHub could not be reached right now. Nothing was cleared — try again when the connection is available.',
+    unknown: 'The Studio server did not answer. Make sure it is running, then refresh.',
+  };
+  container.innerHTML = `
+    <div class="git-dashboard-wrapper">
+      <div class="dashboard-header-card">
+        <div class="dashboard-header-top">
+          <div class="dashboard-title-group">
+            <h2><span class="git-title-icon">${GIT_ICON_SVG}</span> Git Details</h2>
+            <p>GitHub identity, repository and permissions for this project.</p>
+          </div>
+          <div><span class="project-type-badge badge-brownfield git-badge-off">${escapeHtmlText(GIT_STATUS_LABELS[status] || GIT_STATUS_LABELS.unknown)}</span></div>
+        </div>
+      </div>
+      <div class="git-connect-state">
+        <div class="git-connect-icon">${GIT_ICON_SVG}</div>
+        <h3>Connect a GitHub repository</h3>
+        <p class="git-connect-message">${escapeHtmlText(message)} ${remote}</p>
+        <p class="git-connect-tip">${tips[status] || tips.unknown}</p>
+        <button type="button" class="git-toggle-btn" onclick="renderGitDashboard(true)">Refresh status</button>
+      </div>
+    </div>`;
+}
+
+async function renderGitDashboard(force = false) {
   const container = document.getElementById('dashboardContainerRoot');
   if (!container) return;
+  container.innerHTML = `
+    <div class="git-loading-state">
+      <div>Loading Git Details…</div>
+      <div class="git-loading-sub">Checking the GitHub connection and repository records</div>
+    </div>`;
+
+  let data = null;
+  let atlCfg = null;
+  try {
+    const [gitData, cfgRes] = await Promise.all([fetchGitDetails(force === true), safeFetchJson('/api/atlassian/config')]);
+    data = gitData;
+    atlCfg = cfgRes.ok ? cfgRes.data : null;
+  } catch (e) {
+    data = null;
+  }
+  if (activeAppView !== 'dashboard-git') return; // user navigated away while loading
+  applyGitDetailsToStudio(data);
+
+  if (gitStatusOf(data) !== 'connected') {
+    renderGitConnectState(container, data);
+    return;
+  }
+
+  const user = data.userDetails || {};
+  const project = data.projectDetails || {};
+  const git = data.gitDetails || {};
+  const authUser = data.authenticatedUser || null;
+  const avatar = safeUrl(user.avatarUrl);
+  const jiraLinked = Boolean(atlCfg && atlCfg.connected && atlCfg.jiraProjectKey);
+  const confluenceLinked = Boolean(atlCfg && atlCfg.connected && atlCfg.confluenceSpaceKey);
+
+  const avatarHtml = avatar
+    ? `<img src="${escapeHtmlText(avatar)}" alt="${escapeHtmlText(user.username || 'GitHub avatar')}" onerror="this.onerror=null; this.replaceWith(Object.assign(document.createElement('span'), { className: 'git-profile-avatar-placeholder', innerHTML: GIT_ICON_SVG }));" />`
+    : `<span class="git-profile-avatar-placeholder">${GIT_ICON_SVG}</span>`;
+
+  const repos = Array.isArray(project.linkedRepositories) ? project.linkedRepositories.filter(Boolean) : [];
+  const reposHtml = repos.length
+    ? repos
+        .map((r) => {
+          const url = safeUrl(r);
+          return url
+            ? `<div><a href="${escapeHtmlText(url)}" target="_blank" rel="noopener noreferrer" class="git-repo-link">${escapeHtmlText(r)}</a></div>`
+            : `<div><code>${escapeHtmlText(r)}</code></div>`;
+        })
+        .join('')
+    : '';
+
+  let teamsHtml = 'Not available';
+  if (Array.isArray(git.teams)) {
+    teamsHtml = git.teams.length ? git.teams.map((t) => `<span class="git-team-chip">${escapeHtmlText(t)}</span>`).join(' ') : 'No teams';
+  }
+
+  const accountNote = authUser
+    ? ''
+    : `<div class="git-account-note">GitHub account details need a token: ${escapeHtmlText(data.authenticatedUserError || 'no GitHub token is configured')} — set <code>GITHUB_TOKEN</code>, run <code>gh auth login</code>, or add the Studio GitHub token.</div>`;
 
   container.innerHTML = `
-    <div style="text-align: center; padding: 3rem 0; color: #64748b;">
-      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">👤 Loading User Control Centre...</div>
-      <div style="font-size: 0.85rem;">Checking GitHub connection and repository records...</div>
+    <div class="git-dashboard-wrapper">
+      <div class="dashboard-header-card">
+        <div class="dashboard-header-top">
+          <div class="dashboard-title-group">
+            <h2><span class="git-title-icon">${GIT_ICON_SVG}</span> Git Details</h2>
+            <p>GitHub identity, repository and permissions read live from GitHub.</p>
+          </div>
+          <div><span class="project-type-badge badge-greenfield">GitHub linked</span></div>
+        </div>
+        <div class="git-status-banner pushed">
+          <div class="git-banner-row">
+            <div>
+              <strong>Connected to GitHub</strong> — <code class="git-remote-code">${escapeHtmlText(data.remoteOrigin || '')}</code>
+              <div class="git-banner-sub">${escapeHtmlText(data.message || '')}</div>
+            </div>
+            <button type="button" class="git-toggle-btn" onclick="renderGitDashboard(true)">Refresh GitHub</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="git-profile-card">
+        <div class="git-profile-avatar-wrap">${avatarHtml}</div>
+        <div class="git-profile-info">
+          <div class="git-profile-info-top">
+            <span class="git-profile-name">${user.fullName ? escapeHtmlText(user.fullName) : '<span class="empty">Not available</span>'}</span>
+            <span class="git-profile-login">${user.username ? '@' + escapeHtmlText(user.username) : '<span class="empty">GitHub login not available</span>'}</span>
+            <span class="git-role-badge">Org role: ${escapeHtmlText(user.orgRole || 'Not available')}</span>
+          </div>
+          <div class="git-profile-sub">
+            <span><strong>Email:</strong> ${user.email ? escapeHtmlText(user.email) : '<span class="empty">Not available</span>'}</span>
+            <span><strong>Repository access:</strong> ${escapeHtmlText(git.permissionLevel || 'Not available')}</span>
+          </div>
+          <div class="git-integrations-bar">
+            <span>Linked workspaces:</span>
+            <span class="git-int-pill ${jiraLinked ? 'linked' : ''}">${jiraLinked ? `Jira linked (${escapeHtmlText(atlCfg.jiraProjectKey)})` : 'Jira not linked'}</span>
+            <span class="git-int-pill ${confluenceLinked ? 'linked' : ''}">${confluenceLinked ? `Confluence linked (${escapeHtmlText(atlCfg.confluenceSpaceKey)})` : 'Confluence not linked'}</span>
+          </div>
+          ${accountNote}
+        </div>
+      </div>
+
+      <div class="git-sections-grid">
+        <div class="git-card">
+          <div class="git-card-header">
+            <div class="git-card-title">Project Details</div>
+            <span class="git-read-only-pill">Read-only</span>
+          </div>
+          <div class="git-field-list">
+            ${gitFieldRow('Project Name', project.projectName)}
+            ${gitFieldRow('Repository', project.fullName)}
+            ${gitFieldRow('Visibility', project.visibility)}
+            ${gitFieldRow("User's Role in Project", project.userRole)}
+            ${gitFieldRow('Project Status', project.projectStatus)}
+            ${gitFieldRow('Linked Repositories', reposHtml, { html: true })}
+            ${gitFieldRow('Repository Created', project.createdAt ? new Date(project.createdAt).toLocaleDateString() : '')}
+          </div>
+        </div>
+
+        <div class="git-card">
+          <div class="git-card-header">
+            <div class="git-card-title">Git Details</div>
+            <span class="git-read-only-pill">Read-only</span>
+          </div>
+          <div class="git-field-list">
+            ${gitFieldRow('Permission Level', git.permissionLevel)}
+            ${gitFieldRow('Organization Role', git.orgRole)}
+            ${gitFieldRow('Organization Teams', teamsHtml, { html: true })}
+            ${gitFieldRow('2FA Status', git.twoFactorStatus)}
+            ${gitFieldRow('Last Activity (latest commit)', git.lastActivity, { mono: true })}
+          </div>
+        </div>
+      </div>
+
+      <div class="git-footer-note">All fields are read live from Git and the GitHub API. Fields GitHub does not expose for this account show “Not available”.</div>
     </div>
   `;
-
-  try {
-    let data = null;
-    try {
-      const res = await fetch('/api/git-details?t=' + Date.now());
-      if (res.ok) {
-        data = await res.json();
-      }
-    } catch (e) {
-      data = null;
-    }
-    if (!data) {
-      data = { isPushed: false, repoConnected: false, userDetails: {}, projectDetails: {}, gitDetails: {} };
-    }
-    applyGitDetailsToStudio(data);
-    const isConnected = Boolean(data && data.repoConnected === true && !data.repoDeleted);
-    const isPushed = Boolean(data && data.isPushed);
-
-    const user = data.userDetails || {};
-    const project = data.projectDetails || {};
-    const git = data.gitDetails || {};
-
-    const hasUsername = isConnected && Boolean(user.username);
-    const hasFullName = isConnected && Boolean(user.fullName);
-    const hasEmail = isConnected && Boolean(user.email);
-    const hasAvatar = isConnected && Boolean(user.avatarUrl);
-    const hasOrgRole = isConnected && Boolean(user.orgRole);
-
-    const hasProjectName = isConnected && Boolean(project.projectName);
-    const hasUserRole = isConnected && Boolean(project.userRole);
-    const hasProjectStatus = Boolean(project.projectStatus);
-    const hasLinkedRepos = isConnected && Boolean(project.linkedRepositories && project.linkedRepositories.length > 0);
-    const hasAssignedDate = isConnected && Boolean(project.assignedDate);
-
-    const hasPermission = isConnected && Boolean(git.permissionLevel);
-    const hasTeams = isConnected && Boolean(git.teams && git.teams.length > 0);
-    const has2FA = isConnected && Boolean(git.twoFactorStatus);
-    const hasLastActivity = isConnected && Boolean(git.lastActivity);
-
-    const bannerHtml = isConnected
-      ? `
-        <div class="git-status-banner pushed" style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 1rem 1.25rem; border-radius: 8px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-            <div>
-              <strong style="font-size: 0.95rem;">🟢 Connected to GitHub</strong> &nbsp;—&nbsp;
-              <span>Remote: <code style="font-size: 0.82rem; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${data.remoteOrigin || 'origin'}</code></span>
-              <div style="font-size: 0.82rem; margin-top: 0.25rem; color: #15803d;">
-                ${isPushed ? 'All commits pushed and in sync with GitHub.' : 'Repository linked. Local commits pending push to remote.'}
-              </div>
-            </div>
-            <button type="button" class="git-toggle-btn" onclick="renderGitDashboard()" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; cursor: pointer; border-radius: 4px; border: 1px solid #86efac; background: #fff; color: #166534;">
-              🔄 Refresh GitHub
-            </button>
-          </div>
-        </div>
-      `
-      : `
-        <div class="git-status-banner unpushed" style="background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem 1.25rem; border-radius: 8px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-            <div>
-              <strong style="font-size: 0.95rem;">⚠️ No Repository Connected to GitHub</strong>
-              <div style="font-size: 0.82rem; margin-top: 0.25rem; color: #b91c1c;">
-                ${
-                  data.repoDeleted
-                    ? 'The remote repository (' + (data.remoteOrigin || 'origin') + ') was deleted or does not exist on GitHub.'
-                    : data.remoteOrigin
-                      ? 'Remote ' + data.remoteOrigin + ' not reachable on GitHub. Please verify repository or token.'
-                      : 'No remote repository has been linked to this project.'
-                }
-              </div>
-            </div>
-            <button type="button" class="git-toggle-btn" onclick="renderGitDashboard()" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; cursor: pointer; border-radius: 4px; border: 1px solid #fca5a5; background: #fff; color: #991b1b;">
-              🔄 Refresh Status
-            </button>
-          </div>
-        </div>
-      `;
-
-    const avatarHtml = hasAvatar
-      ? `<img src="${user.avatarUrl}" alt="${user.fullName || user.username || 'User Avatar'}" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'git-profile-avatar-placeholder\'>👤</span>';" />`
-      : `<span class="git-profile-avatar-placeholder">👤</span>`;
-
-    const linkedReposHtml = hasLinkedRepos
-      ? project.linkedRepositories
-          .map(
-            (r) =>
-              `<div style="margin-bottom: 0.25rem;"><a href="${r}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-family: monospace; font-size: 0.86rem;">${r}</a></div>`,
-          )
-          .join('')
-      : '<span class="empty">—</span>';
-
-    container.innerHTML = `
-      <div class="git-dashboard-wrapper">
-        <!-- Top App Title Card -->
-        <div class="dashboard-header-card">
-          <div class="dashboard-header-top">
-            <div class="dashboard-title-group">
-              <h2><span>👤</span> User Control Centre</h2>
-              <p>Git identity, project assignment, and repository permissions imported from GitHub / GitLab.</p>
-            </div>
-            <div>
-              <span class="project-type-badge ${isConnected ? 'badge-greenfield' : 'badge-brownfield'}" style="${!isConnected ? 'background: #fef2f2; color: #991b1b; border-color: #fecaca;' : ''}">
-                ${isConnected ? '🟢 GitHub Linked' : '⚪ No Repo Connected'}
-              </span>
-            </div>
-          </div>
-          ${bannerHtml}
-        </div>
-
-        <!-- USER DETAILS CARD (Source: Git - GitHub / GitLab) -->
-        <div class="git-profile-card">
-          <div class="git-profile-avatar-wrap">
-            ${avatarHtml}
-          </div>
-          <div class="git-profile-info">
-            <div class="git-profile-info-top">
-              <span class="git-profile-name">${hasFullName ? user.fullName : '<span class="empty">—</span>'}</span>
-              <span class="git-profile-login">${hasUsername ? '@' + user.username : '<span class="empty">@—</span>'}</span>
-              ${hasOrgRole ? `<span class="git-role-badge">🛡️ Org Role: ${user.orgRole}</span>` : '<span class="git-role-badge" style="background:#f1f5f9; color:#94a3b8; border-color:#e2e8f0;">🛡️ Org Role: —</span>'}
-            </div>
-            <div class="git-profile-sub">
-              <span>📧 <strong>Email:</strong> ${hasEmail ? user.email : '<span class="empty">—</span>'}</span>
-              <span>🔒 <strong>Access Level:</strong> ${hasOrgRole ? user.orgRole : '<span class="empty">—</span>'}</span>
-            </div>
-            <div class="git-integrations-bar">
-              <span>Linked Workspaces:</span>
-              <span class="git-int-pill">${isConnected && hasEmail ? '✅ Atlassian JIRA (Linked)' : '⚪ JIRA (Unlinked)'}</span>
-              <span class="git-int-pill">${isConnected && hasEmail ? '✅ Confluence (Linked)' : '⚪ Confluence (Unlinked)'}</span>
-              <span class="git-int-pill">${isConnected ? '🔒 Read-Only Identity' : '⚪ Disconnected'}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 2-COLUMN GRID: PROJECT DETAILS & GIT ACCESS -->
-        <div class="git-sections-grid">
-          
-          <!-- PROJECT DETAILS (Source: Dashboard / Project Records) -->
-          <div class="git-card">
-            <div class="git-card-header">
-              <div class="git-card-title">
-                <span>📁</span> Project Details
-              </div>
-              <span class="git-read-only-pill">🔒 Read-Only Records</span>
-            </div>
-
-            <div class="git-field-list">
-              <!-- Field: Project Name -->
-              <div class="git-field-row">
-                <div class="git-field-label">Project Name</div>
-                <div class="git-field-value ${hasProjectName ? '' : 'empty'}">${hasProjectName ? project.projectName : '—'}</div>
-              </div>
-
-              <!-- Field: User's Role in Project -->
-              <div class="git-field-row">
-                <div class="git-field-label">User's Role in Project</div>
-                <div class="git-field-value ${hasUserRole ? '' : 'empty'}">
-                  ${hasUserRole ? `👤 ${project.userRole}` : '—'}
-                </div>
-              </div>
-
-              <!-- Field: Project Status -->
-              <div class="git-field-row">
-                <div class="git-field-label">Project Status</div>
-                <div class="git-field-value ${hasProjectStatus ? '' : 'empty'}">
-                  ${hasProjectStatus ? `${isConnected ? '🟢' : '⚪'} ${project.projectStatus}` : '—'}
-                </div>
-              </div>
-
-              <!-- Field: Linked Repositories -->
-              <div class="git-field-row">
-                <div class="git-field-label">Linked Repositories</div>
-                <div class="git-field-value ${hasLinkedRepos ? '' : 'empty'}">
-                  ${linkedReposHtml}
-                </div>
-              </div>
-
-              <!-- Field: Assigned Date -->
-              <div class="git-field-row">
-                <div class="git-field-label">Assigned Date</div>
-                <div class="git-field-value ${hasAssignedDate ? '' : 'empty'}">${hasAssignedDate ? project.assignedDate : '—'}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- GIT DETAILS (Source: GitHub / GitLab API) -->
-          <div class="git-card">
-            <div class="git-card-header">
-              <div class="git-card-title">
-                <span>🐙</span> Git Details
-              </div>
-              <span class="git-read-only-pill">🔒 Read-Only Telemetry</span>
-            </div>
-
-            <div class="git-field-list">
-              <!-- Field: Permission Level -->
-              <div class="git-field-row">
-                <div class="git-field-label">Permission Level</div>
-                <div class="git-field-value ${hasPermission ? '' : 'empty'}">
-                  ${hasPermission ? `👑 ${git.permissionLevel}` : '—'}
-                </div>
-              </div>
-
-              <!-- Field: Teams -->
-              <div class="git-field-row">
-                <div class="git-field-label">Organization Teams / Department</div>
-                <div class="git-field-value ${hasTeams ? '' : 'empty'}">
-                  ${hasTeams ? git.teams.map((t) => `<span style="background: #e2e8f0; padding: 2px 7px; border-radius: 4px; font-size: 0.8rem; margin-right: 4px;">👥 ${t}</span>`).join(' ') : '—'}
-                </div>
-              </div>
-
-              <!-- Field: 2FA Status -->
-              <div class="git-field-row">
-                <div class="git-field-label">2FA Status (Security Compliance)</div>
-                <div class="git-field-value ${has2FA ? '' : 'empty'}">
-                  ${has2FA ? `🔒 ${git.twoFactorStatus}` : '—'}
-                </div>
-              </div>
-
-              <!-- Field: Last Activity -->
-              <div class="git-field-row">
-                <div class="git-field-label">Last Activity (Recent Push / Commit / PR)</div>
-                <div class="git-field-value ${hasLastActivity ? '' : 'empty'}" style="font-family: monospace; font-size: 0.82rem;">
-                  ${hasLastActivity ? `🕒 ${git.lastActivity}` : '—'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- ATLASSIAN JIRA & CONFLUENCE INTEGRATION SUITE -->
-        <div id="atlassianSuiteRoot" style="margin-top: 1.5rem;"></div>
-
-        <!-- Footer -->
-        <div style="text-align: center; font-size: 0.76rem; color: #94a3b8; padding-top: 1rem;">
-          User Control Centre &bull; VelocityONE Telemetry &bull; All fields are read-only and automatically retrieved from Git.
-        </div>
-      </div>
-    `;
-
-    // Initialize Atlassian JIRA & Confluence Integration Suite
-    renderAtlassianSuite(isPushed);
-  } catch (err) {
-    container.innerHTML = `
-      <div style="padding: 2rem; background: #fee2e2; color: #991b1b; border-radius: 8px;">
-        <h3>Error loading User Control Centre details</h3>
-        <p>${err.message}</p>
-        <button class="git-toggle-btn" onclick="renderGitDashboard()">Retry</button>
-      </div>
-    `;
-  }
 }
 
-// Auto-check GitHub link on page load to update navbar
-if (typeof window !== 'undefined') {
-  fetch('/api/git-details')
-    .then((r) => r.json())
-    .then((d) => updateNavUserControlCentre(d))
-    .catch(() => updateNavUserControlCentre(null));
+// ===================================================
+// Jira & Confluence page
+// ===================================================
+async function renderAtlassianDashboard() {
+  const container = document.getElementById('dashboardContainerRoot');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="git-dashboard-wrapper">
+      <div class="dashboard-header-card">
+        <div class="dashboard-header-top">
+          <div class="dashboard-title-group">
+            <h2><span class="git-title-icon">${ATLASSIAN_ICON_SVG}</span> Jira &amp; Confluence</h2>
+            <p>Two-way sync between the project deliverables and your Jira project / Confluence space.</p>
+          </div>
+        </div>
+      </div>
+      <div id="atlassianSuiteRoot"></div>
+    </div>`;
+  await renderAtlassianSuite();
 }
 
 // Safe JSON Fetch Helper (Resilient against HTML error pages or empty response bodies)
@@ -1771,570 +1795,467 @@ async function safeFetchJson(url, options = {}) {
   }
 }
 
-// ATLASSIAN JIRA & CONFLUENCE INTEGRATION CONTROLLER
-// =========================================================================
+let atlassianState = { cfg: null };
 
-async function renderAtlassianSuite(isPushed) {
+function atlassianEngineState(cfg, engine) {
+  const connected = Boolean(cfg && cfg.connected);
+  const key = engine === 'jira' ? cfg && cfg.jiraProjectKey : cfg && cfg.confluenceSpaceKey;
+  if (!connected) return { enabled: false, reason: 'Connect to Atlassian (site, email and API token) to enable.' };
+  if (!key)
+    return { enabled: false, reason: engine === 'jira' ? 'Add a Jira Project Key to enable.' : 'Add a Confluence Space Key to enable.' };
+  return { enabled: true, reason: '' };
+}
+
+async function renderAtlassianSuite() {
   const mount = document.getElementById('atlassianSuiteRoot');
   if (!mount) return;
+  try {
+    localStorage.removeItem('__acl_atlassian_config__'); // legacy browser copy of the config (could hold a token)
+  } catch (e) {}
+
+  mount.innerHTML = `<div class="atlassian-suite-card"><div class="atl-loading">Loading Atlassian workspace…</div></div>`;
+
+  const [cfgResRaw, discResRaw, histResRaw] = await Promise.all([
+    safeFetchJson('/api/atlassian/config'),
+    safeFetchJson('/api/atlassian/discover'),
+    safeFetchJson('/api/atlassian/sync-history'),
+  ]);
+  if (!document.getElementById('atlassianSuiteRoot')) return;
+
+  if (!cfgResRaw.ok) {
+    mount.innerHTML = `<div class="atlassian-suite-card"><p class="atl-error">Failed loading the Atlassian configuration: ${escapeHtmlText((cfgResRaw.data && cfgResRaw.data.error) || 'HTTP ' + cfgResRaw.status)}</p></div>`;
+    return;
+  }
+  const cfg = cfgResRaw.data || {};
+  atlassianState.cfg = cfg;
+  const disc = discResRaw.ok ? discResRaw.data : { epics: [], stories: [], deliverables: [] };
+  const history = histResRaw.ok && Array.isArray(histResRaw.data) ? histResRaw.data : [];
+  const isConnected = Boolean(cfg.connected);
+  const jira = atlassianEngineState(cfg, 'jira');
+  const conf = atlassianEngineState(cfg, 'confluence');
+  const userLabel = cfg.user && (cfg.user.displayName || cfg.user.emailAddress);
+
+  const statusBadge = isConnected
+    ? `<span class="atlassian-status-badge connected">Connected: ${escapeHtmlText(cfg.domain)}${userLabel ? ' · ' + escapeHtmlText(userLabel) : ''}</span>`
+    : `<span class="atlassian-status-badge standby">Not configured</span>`;
+
+  const engineCard = (engine, state, opts) => `
+    <div class="atlassian-engine-card ${engine} ${state.enabled ? '' : 'atl-engine-disabled'}" aria-disabled="${state.enabled ? 'false' : 'true'}">
+      <div class="atlassian-engine-header">
+        <div class="atlassian-engine-info">
+          <span class="atlassian-engine-icon">${opts.icon}</span>
+          <div class="atlassian-engine-title">
+            <h4>${opts.title}</h4>
+            <span>${opts.subtitle}</span>
+          </div>
+        </div>
+        <span class="atlassian-status-badge ${state.enabled ? 'connected' : 'standby'}">${state.enabled ? escapeHtmlText(opts.keyLabel) : 'Disabled'}</span>
+      </div>
+      <div class="atlassian-engine-body">
+        ${opts.body}
+        <div><span class="atlassian-count-badge">${opts.counts}</span></div>
+        ${state.enabled ? '' : `<div class="atl-disabled-note">${escapeHtmlText(state.reason)}</div>`}
+      </div>
+      <div class="atl-engine-actions">
+        <button type="button" class="atlassian-btn-sync ${engine}" id="${opts.pushId}" onclick="${opts.pushFn}()" ${state.enabled ? '' : 'disabled'}>${opts.pushLabel}</button>
+        <button type="button" class="atlassian-btn-sync ${engine} atl-btn-pull" id="${opts.pullId}" onclick="${opts.pullFn}()" ${state.enabled ? '' : 'disabled'}>${opts.pullLabel}</button>
+      </div>
+    </div>`;
 
   mount.innerHTML = `
-    <div class="atlassian-suite-card">
-      <div style="text-align: center; padding: 1.5rem; color: #64748b;">
-        <span>🔄 Loading Atlassian Workspace Telemetry...</span>
+    <div class="atlassian-suite-card" id="atlassianCard">
+      <div class="atlassian-header">
+        <div class="atlassian-title-group">
+          <h3>Atlassian connection</h3>
+          <p>One connection (site, email, API token) is shared by Jira and Confluence. Each product is enabled by its own key.</p>
+        </div>
+        <div class="atlassian-badges">
+          ${statusBadge}
+          <button type="button" class="atlassian-toggle-btn" onclick="toggleAtlassianConfigPanel()">Configure connection</button>
+        </div>
+      </div>
+
+      <div class="atlassian-config-box" id="atlassianConfigPanel" style="display: ${isConnected ? 'none' : 'flex'};">
+        <div class="atl-config-head">
+          <strong>Atlassian Cloud connection</strong>
+          <span>Stored on the Studio server in <code>_acl/atlassian-config.json</code> — the API token is never sent back to the browser.</span>
+        </div>
+        <form id="atlassianConfigForm" onsubmit="saveAtlassianConfig(event); return false;">
+          <div class="atlassian-config-grid">
+            <div class="atlassian-input-group">
+              <label for="atlDomain">Site URL</label>
+              <input type="text" id="atlDomain" value="${escapeHtmlText(cfg.domain || '')}" placeholder="https://your-site.atlassian.net" autocomplete="url" required />
+            </div>
+            <div class="atlassian-input-group">
+              <label for="atlEmail">Account email</label>
+              <input type="email" id="atlEmail" value="${escapeHtmlText(cfg.email || '')}" placeholder="you@company.com" autocomplete="email" required />
+            </div>
+            <div class="atlassian-input-group">
+              <label for="atlToken">API token</label>
+              <div class="atl-token-row">
+                <input type="password" id="atlToken" value="" placeholder="${cfg.hasApiToken ? 'Stored — leave blank to keep the saved token' : 'Atlassian API token'}" autocomplete="off" />
+                <button type="button" class="atlassian-toggle-btn" onclick="togglePasswordVisibility('atlToken')" title="Show / hide">Show</button>
+              </div>
+            </div>
+            <div class="atlassian-input-group">
+              <label for="atlJiraKey">Jira Project Key <span class="atl-optional">(optional)</span></label>
+              <input type="text" id="atlJiraKey" value="${escapeHtmlText(cfg.jiraProjectKey || '')}" placeholder="e.g. SCRUM — leave empty to disable Jira" class="atl-upper" />
+            </div>
+            <div class="atlassian-input-group">
+              <label for="atlConfSpace">Confluence Space Key <span class="atl-optional">(optional)</span></label>
+              <input type="text" id="atlConfSpace" value="${escapeHtmlText(cfg.confluenceSpaceKey || '')}" placeholder="e.g. DOCS — leave empty to disable Confluence" class="atl-upper" />
+            </div>
+          </div>
+          ${cfg.lastError ? `<div class="atl-error">${escapeHtmlText(cfg.lastError)}</div>` : ''}
+          <div class="atlassian-config-actions">
+            <div class="atl-config-buttons">
+              ${isConnected ? '<button type="button" class="atlassian-toggle-btn atl-danger" onclick="disconnectAtlassian()">Disconnect</button>' : ''}
+              ${isConnected ? '<button type="button" class="atlassian-toggle-btn" onclick="toggleAtlassianConfigPanel()">Cancel</button>' : ''}
+              <button type="submit" class="atlassian-btn-sync jira atl-save-btn" id="btnSaveAtlassian">Save &amp; Connect</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="atlassian-engines-grid">
+        ${engineCard('jira', jira, {
+          icon: '🎯',
+          title: 'Jira',
+          subtitle: 'Epics & stories',
+          keyLabel: 'Project ' + (cfg.jiraProjectKey || ''),
+          body: 'Push creates/updates Jira <strong>Epics</strong> from <code>epics.md</code> and <strong>Stories</strong> (linked to their epic) with the full description. Pull brings back every epic and story with status, labels, priority, assignee, story points, comments and attachments.',
+          counts: `Detected: <strong>${(disc.epics || []).length} epics</strong> · <strong>${(disc.stories || []).length} stories</strong>`,
+          pushId: 'btnSyncJira',
+          pullId: 'btnPullJira',
+          pushFn: 'executeJiraSync',
+          pullFn: 'executeJiraPull',
+          pushLabel: 'Push to Jira',
+          pullLabel: 'Pull from Jira',
+        })}
+        ${engineCard('confluence', conf, {
+          icon: '📘',
+          title: 'Confluence',
+          subtitle: 'Documentation pages',
+          keyLabel: 'Space ' + (cfg.confluenceSpaceKey || ''),
+          body: 'Push publishes deliverables (<strong>Brief</strong>, <strong>PRD</strong>, <strong>Architecture</strong>, <strong>UX</strong>, <strong>Epics</strong>) as native Confluence pages. Pull brings back every page of the space, including child pages, into the canonical files.',
+          counts: `Detected: <strong>${(disc.deliverables || []).length} deliverables</strong>`,
+          pushId: 'btnSyncConfluence',
+          pullId: 'btnPullConfluence',
+          pushFn: 'executeConfluenceSync',
+          pullFn: 'executeConfluencePull',
+          pushLabel: 'Push to Confluence',
+          pullLabel: 'Pull from Confluence',
+        })}
+      </div>
+
+      <div class="atl-syncall-bar">
+        <div>
+          <strong>Sync all</strong>
+          <p>Pushes to every enabled product${jira.enabled || conf.enabled ? ` (${[jira.enabled ? 'Jira' : '', conf.enabled ? 'Confluence' : ''].filter(Boolean).join(' + ')})` : ''}.</p>
+        </div>
+        <button type="button" class="atlassian-btn-syncall" id="btnSyncAll" onclick="executeSyncAll()" ${jira.enabled || conf.enabled ? '' : 'disabled'}>Sync all enabled</button>
+      </div>
+
+      <div id="atlassianPullResult"></div>
+
+      <div id="atlassianSyncResultContainer">
+        <div class="atl-history-head">
+          <strong>Sync history</strong>
+          <span>Last synced: ${cfg.lastSynced ? escapeHtmlText(new Date(cfg.lastSynced).toLocaleString()) : 'never'}</span>
+        </div>
+        <div class="atlassian-log-box" id="atlassianLogBox">${renderSyncHistoryItems(history)}</div>
       </div>
     </div>
   `;
+}
 
-  try {
-    const [cfgResRaw, discResRaw, histResRaw] = await Promise.all([
-      safeFetchJson('/api/atlassian/config'),
-      safeFetchJson('/api/atlassian/discover'),
-      safeFetchJson('/api/atlassian/sync-history'),
-    ]);
-
-    let cfgRes = cfgResRaw.ok ? cfgResRaw.data : {};
-    if (!cfgRes || Object.keys(cfgRes).length === 0) {
-      try {
-        const localCfg = localStorage.getItem('__acl_atlassian_config__');
-        if (localCfg) cfgRes = JSON.parse(localCfg);
-      } catch (e) {}
-    }
-    const discRes = discResRaw.ok ? discResRaw.data : { epics: [], stories: [], deliverables: [] };
-    const histRes = histResRaw.ok && Array.isArray(histResRaw.data) ? histResRaw.data : [];
-
-    const epicsCount = (discRes.epics || []).length;
-    const storiesCount = (discRes.stories || []).length;
-    const deliverablesCount = (discRes.deliverables || []).length;
-    const isConnected = Boolean(cfgRes.connected);
-
-    let statusBadgeHtml = '';
-    if (isConnected) {
-      statusBadgeHtml = `<span class="atlassian-status-badge connected">🟢 Connected: ${cfgRes.domain || 'Cloud'}</span>`;
-    } else {
-      statusBadgeHtml = `<span class="atlassian-status-badge standby">⚪ Not Configured</span>`;
-    }
-
-    mount.innerHTML = `
-      <div class="atlassian-suite-card" id="atlassianCard">
-        <!-- Header -->
-        <div class="atlassian-header">
-          <div class="atlassian-title-group">
-            <h3><span>🎯 📘</span> Atlassian Workspace Integration (JIRA & Confluence)</h3>
-            <p>Direct two-way bridge connecting <code>_acl-output/</code> specifications with live JIRA backlog and Confluence documentation spaces.</p>
-          </div>
-          <div class="atlassian-badges">
-            ${statusBadgeHtml}
-            <button type="button" class="atlassian-toggle-btn" onclick="toggleAtlassianConfigPanel()">
-              <span>⚙️</span> Configure Connection
-            </button>
-          </div>
-        </div>
-
-        <!-- Collapsible Configuration Panel -->
-        <div class="atlassian-config-box" id="atlassianConfigPanel" style="display: none;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="color: #0f172a; font-size: 0.95rem;">Atlassian Cloud Credentials & Workspace Keys</strong>
-            <span style="font-size: 0.78rem; color: #64748b;">Stored locally in <code>_acl/atlassian-config.json</code></span>
-          </div>
-
-          <form id="atlassianConfigForm" onsubmit="saveAtlassianConfig(event); return false;">
-            <div class="atlassian-config-grid">
-              <div class="atlassian-input-group">
-                <label>Atlassian Domain URL</label>
-                <input type="text" id="atlDomain" name="domain" value="${cfgRes.domain || ''}" placeholder="https://your-domain.atlassian.net" required />
-              </div>
-              <div class="atlassian-input-group">
-                <label>Atlassian Account Email</label>
-                <input type="email" id="atlEmail" name="email" value="${cfgRes.email || ''}" placeholder="user@company.com" required />
-              </div>
-              <div class="atlassian-input-group">
-                <label>API Token (Atlassian Cloud)</label>
-                <div style="display: flex; gap: 0.25rem;">
-                  <input type="password" id="atlToken" name="apiToken" value="${cfgRes.apiToken || ''}" placeholder="••••••••••••••••••••" style="flex: 1;" />
-                  <button type="button" class="atlassian-toggle-btn" onclick="togglePasswordVisibility('atlToken')" title="Show/Hide">👁️</button>
-                </div>
-              </div>
-              <div class="atlassian-input-group">
-                <label>JIRA Project Key</label>
-                <input type="text" id="atlJiraKey" name="jiraProjectKey" value="${cfgRes.jiraProjectKey || ''}" placeholder="e.g. PROJ" style="text-transform: uppercase;" required />
-              </div>
-              <div class="atlassian-input-group">
-                <label>Confluence Space Key</label>
-                <input type="text" id="atlConfSpace" name="confluenceSpaceKey" value="${cfgRes.confluenceSpaceKey || ''}" placeholder="e.g. DOCS" style="text-transform: uppercase;" required />
-              </div>
-            </div>
-
-            <div class="atlassian-config-actions">
-              <div style="display: flex; gap: 0.5rem; margin-left: auto;">
-                ${isConnected ? '<button type="button" class="atlassian-toggle-btn" onclick="disconnectAtlassian()" style="color: #ef4444; border-color: #fca5a5;">Disconnect</button>' : ''}
-                <button type="button" class="atlassian-toggle-btn" onclick="toggleAtlassianConfigPanel()">Cancel</button>
-                <button type="button" class="atlassian-btn-sync jira" onclick="saveAtlassianConfig(event)" style="width: auto; padding: 0.45rem 1rem;">Save & Connect</button>
-              </div>
-            </div>
-          </form>
-        </div>
-
-        <!-- 2-Engine Execution Cards -->
-        <div class="atlassian-engines-grid">
-          
-          <!-- JIRA ENGINE -->
-          <div class="atlassian-engine-card jira">
-            <div class="atlassian-engine-header">
-              <div class="atlassian-engine-info">
-                <span class="atlassian-engine-icon">🎯</span>
-                <div class="atlassian-engine-title">
-                  <h4>JIRA Backlog & Story Engine</h4>
-                  <span>Sprint & Issue Management</span>
-                </div>
-              </div>
-              <span class="atlassian-status-badge ${isConnected ? 'connected' : 'standby'}">
-                ${isConnected ? 'Ready to Sync' : '⚪ Not Configured'}
-              </span>
-            </div>
-
-            <div class="atlassian-engine-body">
-              Automatically creates and updates JIRA <strong>Epics</strong> from <code>epics.md</code> and links child <strong>User Stories</strong> with their complete technical Acceptance Criteria checklists attached.
-              <div>
-                <span class="atlassian-count-badge">📦 Detected: <strong>${epicsCount} Epics</strong> • <strong>${storiesCount} Stories</strong></span>
-              </div>
-            </div>
-
-            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-              <button type="button" class="atlassian-btn-sync jira" id="btnSyncJira" onclick="executeJiraSync()" style="flex: 1; min-width: 170px;" title="Push local epics & stories to JIRA without duplicates">
-                <span>🎯</span> Sync to JIRA (Push)
-              </button>
-              <button type="button" class="atlassian-btn-sync jira" id="btnPullJira" onclick="executeJiraPull()" style="flex: 1; min-width: 170px; background: #0284c7; border-color: #0369a1;" title="Fetch JIRA board stories into _acl-output/ with status: In Review">
-                <span>📥</span> Pull from JIRA (Fetch)
-              </button>
-            </div>
-          </div>
-
-          <!-- CONFLUENCE ENGINE -->
-          <div class="atlassian-engine-card confluence">
-            <div class="atlassian-engine-header">
-              <div class="atlassian-engine-info">
-                <span class="atlassian-engine-icon">📘</span>
-                <div class="atlassian-engine-title">
-                  <h4>Confluence Documentation Hub</h4>
-                  <span>Living Product & Architecture Pages</span>
-                </div>
-              </div>
-              <span class="atlassian-status-badge ${isConnected ? 'connected' : 'standby'}">
-                ${isConnected ? 'Ready to Sync' : '⚪ Not Configured'}
-              </span>
-            </div>
-
-            <div class="atlassian-engine-body">
-              Publishes and versions your primary phase deliverables (<strong>Product Brief</strong>, <strong>PRD</strong>, <strong>Architecture Spine</strong>, and <strong>UX Specs</strong>) directly to company Confluence spaces.
-              <div>
-                <span class="atlassian-count-badge">📄 Detected: <strong>${deliverablesCount} Primary Deliverables</strong></span>
-              </div>
-            </div>
-
-            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-              <button type="button" class="atlassian-btn-sync confluence" id="btnSyncConfluence" onclick="executeConfluenceSync()" style="flex: 1; min-width: 170px;" title="Publish local phase deliverables to Confluence without duplicates">
-                <span>📘</span> Sync to Confluence (Push)
-              </button>
-              <button type="button" class="atlassian-btn-sync confluence" id="btnPullConfluence" onclick="executeConfluencePull()" style="flex: 1; min-width: 170px; background: #2563eb; border-color: #1d4ed8;" title="Fetch Confluence pages into _acl-output/ with status: In Review">
-                <span>📥</span> Pull from Confluence (Fetch)
-              </button>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Global Batch Sync Button -->
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1rem 1.25rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-          <div>
-            <strong style="color: #0f172a; font-size: 0.95rem;">Full Enterprise Synchronization</strong>
-            <p style="font-size: 0.78rem; color: #64748b; margin: 0.2rem 0 0 0;">Synchronize all Epics, User Stories, and Documentation deliverables across both platforms in a single atomic pass.</p>
-          </div>
-          <button type="button" class="atlassian-btn-syncall" id="btnSyncAll" onclick="executeSyncAll()">
-            <span>⚡</span> Sync All to Atlassian
-          </button>
-        </div>
-
-        <!-- Live Sync Results & Audit Table -->
-        <div id="atlassianSyncResultContainer" style="${histRes && histRes.length > 0 ? '' : 'display: none;'}">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-            <strong style="font-size: 0.88rem; color: #0f172a;">Recent Atlassian Synchronization Audit</strong>
-            <span style="font-size: 0.75rem; color: #64748b;">Last Updated: ${cfgRes.lastSynced ? new Date(cfgRes.lastSynced).toLocaleString() : 'Just now'}</span>
-          </div>
-          <div class="atlassian-log-box" id="atlassianLogBox">
-            ${renderSyncHistoryItems(histRes)}
-          </div>
-        </div>
-
-      </div>
-    `;
-  } catch (err) {
-    mount.innerHTML = `
-      <div class="atlassian-suite-card">
-        <p style="color: #dc2626; margin: 0;">Failed loading Atlassian Workspace data: ${err.message}</p>
-      </div>
-    `;
-  }
+/** Lightweight refresh of the detected counts (called when files change on disk). */
+async function refreshAtlassianCounts() {
+  if (!document.getElementById('atlassianCard')) return;
+  const res = await safeFetchJson('/api/atlassian/discover');
+  if (!res.ok) return;
+  const badges = document.querySelectorAll('#atlassianCard .atlassian-count-badge');
+  if (badges[0])
+    badges[0].innerHTML = `Detected: <strong>${(res.data.epics || []).length} epics</strong> · <strong>${(res.data.stories || []).length} stories</strong>`;
+  if (badges[1]) badges[1].innerHTML = `Detected: <strong>${(res.data.deliverables || []).length} deliverables</strong>`;
 }
 
 window.toggleAtlassianConfigPanel = function () {
   const panel = document.getElementById('atlassianConfigPanel');
-  if (panel) {
-    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
-  }
+  if (panel) panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
 };
 
 window.togglePasswordVisibility = function (inputId) {
   const input = document.getElementById(inputId);
-  if (input) {
-    input.type = input.type === 'password' ? 'text' : 'password';
-  }
+  if (input) input.type = input.type === 'password' ? 'text' : 'password';
 };
 
 window.disconnectAtlassian = async function () {
-  if (!confirm('Are you sure you want to disconnect Atlassian JIRA & Confluence?')) return;
-  try {
-    localStorage.removeItem('__acl_atlassian_config__');
-    const emptyPayload = {
-      domain: '',
-      email: '',
-      apiToken: '',
-      jiraProjectKey: '',
-      confluenceSpaceKey: '',
-      connected: false,
-    };
-    await safeFetchJson('/api/atlassian/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(emptyPayload),
-    });
-    alert('✅ Atlassian integration disconnected.');
-    renderAtlassianSuite(true);
-  } catch (err) {
-    alert('⚠️ Error disconnecting: ' + err.message);
-  }
+  if (!confirm('Disconnect Jira & Confluence? The stored site, email, API token and keys will be removed.')) return;
+  const res = await safeFetchJson('/api/atlassian/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ domain: '', email: '', apiToken: '', jiraProjectKey: '', confluenceSpaceKey: '', connected: false }),
+  });
+  if (!res.ok) alert('Error disconnecting: ' + ((res.data && res.data.error) || 'HTTP ' + res.status));
+  renderAtlassianSuite();
 };
 
 window.saveAtlassianConfig = async function (e) {
-  if (e) {
-    if (e.preventDefault) e.preventDefault();
-    if (e.stopPropagation) e.stopPropagation();
-  }
-  const domain = document.getElementById('atlDomain')?.value?.trim();
-  const email = document.getElementById('atlEmail')?.value?.trim();
-  const apiToken = document.getElementById('atlToken')?.value?.trim();
-  const jiraProjectKey = document.getElementById('atlJiraKey')?.value?.trim()?.toUpperCase();
-  const confluenceSpaceKey = document.getElementById('atlConfSpace')?.value?.trim()?.toUpperCase();
+  if (e && e.preventDefault) e.preventDefault();
+  const val = (id) => ((document.getElementById(id) || {}).value || '').trim();
   const payload = {
-    domain: domain || '',
-    email: email || '',
-    apiToken: apiToken || '',
-    jiraProjectKey: jiraProjectKey || '',
-    confluenceSpaceKey: confluenceSpaceKey || '',
+    domain: val('atlDomain'),
+    email: val('atlEmail'),
+    apiToken: val('atlToken'),
+    jiraProjectKey: val('atlJiraKey').toUpperCase(),
+    confluenceSpaceKey: val('atlConfSpace').toUpperCase(),
     connected: true,
   };
-
-  if (!domain || !email || !apiToken || !jiraProjectKey || !confluenceSpaceKey) {
-    alert('⚠️ Please fill in all required fields (Domain, Email, API Token, JIRA Key, Confluence Space Key).');
+  const hasStoredToken = Boolean(atlassianState.cfg && atlassianState.cfg.hasApiToken);
+  const missing = [];
+  if (!payload.domain) missing.push('Site URL');
+  if (!payload.email) missing.push('Account email');
+  if (!payload.apiToken && !hasStoredToken) missing.push('API token');
+  if (missing.length) {
+    alert('Please fill in: ' + missing.join(', ') + '.');
     return;
   }
-
-  const saveBtn = document.querySelector('#atlassianConfigForm button[type="submit"]') || (e && e.target);
-  const origBtnText = saveBtn ? saveBtn.textContent : '';
-  if (saveBtn) {
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Verifying...';
+  if (!payload.jiraProjectKey && !payload.confluenceSpaceKey) {
+    if (!confirm('No Jira Project Key and no Confluence Space Key — both products will stay disabled. Save the connection anyway?')) return;
   }
 
-  try {
-    const res = await safeFetchJson('/api/atlassian/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (res.ok && res.data && res.data.success && res.data.config && res.data.config.connected) {
-      try {
-        localStorage.setItem('__acl_atlassian_config__', JSON.stringify(res.data.config));
-      } catch (e) {}
-      alert('✅ Atlassian credentials verified and workspace keys saved successfully!');
-      renderAtlassianSuite(true);
-    } else {
-      try {
-        localStorage.removeItem('__acl_atlassian_config__');
-      } catch (e) {}
-      const errMsg = (res.data && res.data.error) || (res.data && res.data.message) || 'Server returned HTTP ' + res.status;
-      alert('⚠️ Error saving configuration: ' + errMsg);
-      renderAtlassianSuite(true);
-    }
-  } catch (err) {
-    try {
-      localStorage.removeItem('__acl_atlassian_config__');
-    } catch (e) {}
-    alert('⚠️ Failed to save Atlassian configuration: ' + err.message);
-    renderAtlassianSuite(true);
-  } finally {
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = origBtnText;
-    }
+  const btn = document.getElementById('btnSaveAtlassian');
+  const original = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Verifying…';
+  }
+  const res = await safeFetchJson('/api/atlassian/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+  if (res.ok && res.data && res.data.success) {
+    renderAtlassianSuite();
+  } else {
+    alert('Could not save the Atlassian connection: ' + ((res.data && res.data.error) || 'HTTP ' + res.status));
   }
 };
 
-window.executeJiraSync = async function () {
-  if (typeof window.saveCurrentFile === 'function') {
+function setBusy(id, busyLabel) {
+  const btn = document.getElementById(id);
+  if (!btn) return () => {};
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+  return () => {
+    const again = document.getElementById(id);
+    if (again) {
+      again.disabled = false;
+      again.innerHTML = original;
+    }
+  };
+}
+
+async function postAtlassian(route) {
+  return safeFetchJson('/api/atlassian/' + route, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+}
+
+function renderPullResult(product, result) {
+  const box = document.getElementById('atlassianPullResult');
+  if (!box) return;
+  const resets = Array.isArray(result.reviewReset) ? result.reviewReset : [];
+  const created = Array.isArray(result.created) ? result.created : [];
+  const fileName = (f) =>
+    String(f || '')
+      .split('/')
+      .pop();
+  const changedIn = (r) => {
+    const keys = Array.isArray(r.keys) && r.keys.length ? r.keys.join(', ') : '';
+    return keys ? `changed in ${product}: ${keys}` : r.reason || `changed in ${product}`;
+  };
+  box.innerHTML = `
+    <div class="atl-review-reset">
+      <div class="atl-review-reset-head">
+        <strong>${escapeHtmlText(product)} pull result</strong>
+        <span>${resets.length} sent back to In Review · ${created.length} created · ${Number(result.unchanged || 0)} unchanged</span>
+      </div>
+      ${
+        resets.length
+          ? `<ul class="atl-review-reset-list">${resets
+              .map(
+                (r) =>
+                  `<li><span class="atl-file" title="${escapeHtmlText(r.file)}">${escapeHtmlText(fileName(r.file))}</span> → <span class="atl-inreview">In Review</span> <span class="atl-reason">(${escapeHtmlText(changedIn(r))})</span></li>`,
+              )
+              .join('')}</ul>`
+          : '<div class="atl-review-reset-none">No existing document changed — approvals were kept.</div>'
+      }
+      ${
+        created.length
+          ? `<ul class="atl-review-reset-list atl-created-list">${created
+              .map(
+                (c) =>
+                  `<li><span class="atl-file" title="${escapeHtmlText(c.file)}">${escapeHtmlText(fileName(c.file))}</span> created (In Review)</li>`,
+              )
+              .join('')}</ul>`
+          : ''
+      }
+    </div>`;
+}
+
+async function afterPullRefresh() {
+  if (typeof window.syncFromLiveDisk === 'function') {
+    try {
+      await window.syncFromLiveDisk(false);
+    } catch (e) {}
+  }
+}
+
+async function runPush(route, buttonId, busyLabel, productLabel, summarize) {
+  if (typeof window.saveCurrentFile === 'function' && typeof isDirty !== 'undefined' && isDirty) {
     try {
       await window.saveCurrentFile();
     } catch (e) {}
   }
-
-  const btn = document.getElementById('btnSyncJira');
-  const originalHtml = btn ? btn.innerHTML : '';
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span> Syncing Epics & Stories to JIRA...';
+  const done = setBusy(buttonId, busyLabel);
+  const res = await postAtlassian(route);
+  done();
+  if (res.ok && res.data && res.data.success) {
+    displaySyncResultBanner(summarize(res.data), res.data.failedCount ? 'warn' : 'ok');
+    return res.data;
   }
+  displaySyncResultBanner(`${productLabel} error: ${(res.data && res.data.error) || 'HTTP ' + res.status}`, 'error');
+  return null;
+}
 
-  try {
-    const res = await safeFetchJson('/api/atlassian/sync-jira', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-    const result = res.data;
-    if (res.ok && result.success) {
-      displaySyncResultBanner(
-        `🎯 Successfully synced ${result.totalEpics} Epics and ${result.totalStories} Stories to JIRA (${result.projectKey})!`,
-        'jira',
-      );
-      renderAtlassianSuite(true);
-    } else {
-      alert('⚠️ JIRA Sync error: ' + (result.error || 'Failed to sync'));
-    }
-  } catch (err) {
-    alert('⚠️ Network error during JIRA sync: ' + err.message);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = originalHtml;
-    }
+async function runPull(route, buttonId, busyLabel, productLabel) {
+  const done = setBusy(buttonId, busyLabel);
+  const res = await postAtlassian(route);
+  done();
+  if (res.ok && res.data && res.data.success) {
+    renderPullResult(productLabel, res.data);
+    await afterPullRefresh();
+    return res.data;
   }
+  displaySyncResultBanner(`${productLabel} pull error: ${(res.data && res.data.error) || 'HTTP ' + res.status}`, 'error');
+  return null;
+}
+
+window.executeJiraSync = async function () {
+  const r = await runPush('sync-jira', 'btnSyncJira', 'Pushing to Jira…', 'Jira', (d) => {
+    return `Jira (${d.projectKey}): ${d.totalEpics} epics & ${d.totalStories} stories — ${d.updatedCount} updated, ${d.createdCount} created${d.failedCount ? `, ${d.failedCount} failed` : ''}.`;
+  });
+  if (r) await refreshAtlassianHistory();
+  return r;
 };
 
 window.executeJiraPull = async function () {
-  const btn = document.getElementById('btnPullJira');
-  const originalHtml = btn ? btn.innerHTML : '';
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span> Pulling from JIRA Board...';
-  }
-
-  try {
-    const res = await safeFetchJson('/api/atlassian/pull-jira', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-    const result = res.data;
-    if (res.ok && result.success) {
-      let bannerMsg = '';
-      if (result.updatedCount === 0 && result.createdCount === 0) {
-        bannerMsg =
-          '📥 JIRA Pull Complete: All ' +
-          (result.unchangedCount || result.totalFetched) +
-          ' stories are already up to date! Zero changes detected, all approval statuses preserved.';
-      } else {
-        bannerMsg =
-          '📥 Successfully pulled from JIRA (' +
-          result.projectKey +
-          '): ' +
-          result.updatedCount +
-          " changed stories set to 'In Review', " +
-          result.createdCount +
-          ' new stories created. (' +
-          (result.unchangedCount || 0) +
-          ' unchanged stories kept untouched)';
-      }
-      displaySyncResultBanner(bannerMsg, 'jira');
-      renderAtlassianSuite(true);
-      if (typeof window.syncFromLiveDisk === 'function') {
-        await window.syncFromLiveDisk(false);
-      }
-      if (typeof loadFile === 'function' && typeof activeFileId !== 'undefined' && activeFileId) {
-        loadFile(activeFileId);
-      }
-    } else {
-      alert('⚠️ JIRA Pull error: ' + (result.error || 'Failed to pull from JIRA'));
-    }
-  } catch (err) {
-    alert('⚠️ Network error during JIRA pull: ' + err.message);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = originalHtml;
-    }
-  }
+  const r = await runPull('pull-jira', 'btnPullJira', 'Pulling from Jira…', 'Jira');
+  if (r) await refreshAtlassianHistory();
+  return r;
 };
 
 window.executeConfluenceSync = async function () {
-  if (typeof window.saveCurrentFile === 'function') {
-    try {
-      await window.saveCurrentFile();
-    } catch (e) {}
-  }
-
-  const btn = document.getElementById('btnSyncConfluence');
-  const originalHtml = btn ? btn.innerHTML : '';
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span> Syncing Deliverables to Confluence...';
-  }
-
-  try {
-    const res = await safeFetchJson('/api/atlassian/sync-confluence', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-    const result = res.data;
-    if (res.ok && result.success) {
-      const detailMsg =
-        result.updatedCount !== undefined
-          ? `(${result.updatedCount} updated in-place, ${result.createdCount} published - no duplicates!)`
-          : '';
-      displaySyncResultBanner(
-        `📘 Successfully synced ${result.totalPages} Phase Deliverables to Confluence Space ${result.spaceKey} ${detailMsg}`,
-        'confluence',
-      );
-      renderAtlassianSuite(true);
-    } else {
-      alert('⚠️ Confluence Sync error: ' + (result.error || 'Failed to sync'));
-    }
-  } catch (err) {
-    alert('⚠️ Network error during Confluence sync: ' + err.message);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = originalHtml;
-    }
-  }
+  const r = await runPush('sync-confluence', 'btnSyncConfluence', 'Pushing to Confluence…', 'Confluence', (d) => {
+    return `Confluence (${d.spaceKey}): ${d.totalPages} pages — ${d.updatedCount} updated, ${d.createdCount} created${d.failedCount ? `, ${d.failedCount} failed` : ''}.`;
+  });
+  if (r) await refreshAtlassianHistory();
+  return r;
 };
 
 window.executeConfluencePull = async function () {
-  const btn = document.getElementById('btnPullConfluence');
-  const originalHtml = btn ? btn.innerHTML : '';
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span> Pulling from Confluence Space...';
-  }
-
-  try {
-    const res = await safeFetchJson('/api/atlassian/pull-confluence', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-    const result = res.data;
-    if (res.ok && result.success) {
-      let bannerMsg = '';
-      if (result.updatedCount === 0 && result.createdCount === 0) {
-        bannerMsg =
-          '📥 Confluence Pull Complete: All ' +
-          (result.unchangedCount || result.totalFetched) +
-          ' deliverables are already up to date! Zero changes detected, all approval statuses preserved.';
-      } else {
-        bannerMsg =
-          '📥 Successfully pulled from Confluence (' +
-          result.spaceKey +
-          '): ' +
-          result.updatedCount +
-          " changed deliverables set to 'In Review', " +
-          result.createdCount +
-          ' new deliverables created. (' +
-          (result.unchangedCount || 0) +
-          ' unchanged kept untouched)';
-      }
-      displaySyncResultBanner(bannerMsg, 'confluence');
-      renderAtlassianSuite(true);
-      if (typeof window.syncFromLiveDisk === 'function') {
-        await window.syncFromLiveDisk(false);
-      }
-      if (typeof loadFile === 'function' && typeof activeFileId !== 'undefined' && activeFileId) {
-        loadFile(activeFileId);
-      }
-    } else {
-      alert('⚠️ Confluence Pull error: ' + (result.error || 'Failed to pull from Confluence'));
-    }
-  } catch (err) {
-    alert('⚠️ Network error during Confluence pull: ' + err.message);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = originalHtml;
-    }
-  }
+  const r = await runPull('pull-confluence', 'btnPullConfluence', 'Pulling from Confluence…', 'Confluence');
+  if (r) await refreshAtlassianHistory();
+  return r;
 };
 
 window.executeSyncAll = async function () {
-  const btn = document.getElementById('btnSyncAll');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span> Running Full Atlassian Synchronization...';
-  }
-
+  const cfg = atlassianState.cfg || {};
+  const jiraOn = atlassianEngineState(cfg, 'jira').enabled;
+  const confOn = atlassianEngineState(cfg, 'confluence').enabled;
+  if (!jiraOn && !confOn) return;
+  const done = setBusy('btnSyncAll', 'Syncing…');
   try {
-    await executeJiraSync();
-    await executeConfluenceSync();
-    displaySyncResultBanner('⚡ Full Enterprise Synchronization Pass Completed!', 'jira');
-  } catch (err) {
-    alert('⚠️ Error during batch sync: ' + err.message);
+    if (jiraOn) await window.executeJiraSync();
+    if (confOn) await window.executeConfluenceSync();
   } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<span>⚡</span> Sync All to Atlassian';
-    }
+    done();
   }
 };
 
-function displaySyncResultBanner(msg, type) {
-  const container = document.getElementById('atlassianSyncResultContainer');
-  if (container) container.style.display = 'block';
+async function refreshAtlassianHistory() {
+  const [hist, cfgRes] = await Promise.all([safeFetchJson('/api/atlassian/sync-history'), safeFetchJson('/api/atlassian/config')]);
   const logBox = document.getElementById('atlassianLogBox');
-  if (logBox) {
-    const banner = document.createElement('div');
-    banner.style.cssText =
-      'background: #f0fdf4; border: 1px solid #86efac; color: #166534; padding: 0.6rem 0.85rem; border-radius: 6px; margin-bottom: 0.5rem; font-size: 0.82rem; font-weight: 500;';
-    banner.textContent = msg;
-    logBox.prepend(banner);
+  if (logBox && hist.ok && Array.isArray(hist.data)) {
+    const banners = [...logBox.querySelectorAll('.atl-banner')];
+    logBox.innerHTML = renderSyncHistoryItems(hist.data);
+    banners.forEach((b) => logBox.prepend(b));
   }
+  if (cfgRes.ok) atlassianState.cfg = cfgRes.data;
+  refreshAtlassianCounts();
+}
+
+function displaySyncResultBanner(msg, kind) {
+  const logBox = document.getElementById('atlassianLogBox');
+  if (!logBox) {
+    alert(msg);
+    return;
+  }
+  const banner = document.createElement('div');
+  banner.className = `atl-banner atl-banner-${kind || 'ok'}`;
+  banner.textContent = msg;
+  logBox.prepend(banner);
 }
 
 function renderSyncHistoryItems(history) {
   if (!history || history.length === 0) {
-    return '<div style="text-align: center; color: #94a3b8; padding: 1.5rem;">No synchronization runs recorded yet. Click Sync to push deliverables.</div>';
+    return '<div class="atl-history-empty">No synchronization runs recorded yet.</div>';
   }
   return history
     .slice(0, 10)
-    .map(
-      (item) => `
+    .map((item) => {
+      const isJira = /jira/i.test(item.action || '');
+      const resets = Array.isArray(item.reviewReset) ? item.reviewReset : [];
+      return `
     <div class="atlassian-log-item">
-      <div style="display: flex; gap: 0.5rem; align-items: center;">
-        <span class="atlassian-log-icon">${item.action && item.action.includes('JIRA') ? '🎯' : '📘'}</span>
-        <strong style="color: #1e293b;">${item.action || 'Sync Pass'}</strong>
-        <span style="font-size: 0.74rem; color: #64748b;">${new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+      <div class="atl-log-head">
+        <span class="atlassian-log-icon">${isJira ? '🎯' : '📘'}</span>
+        <strong>${escapeHtmlText(item.action || 'Sync')}</strong>
+        <span class="atl-log-time">${escapeHtmlText(new Date(item.timestamp).toLocaleString())}</span>
       </div>
-      <div class="atlassian-log-title" title="${item.summary || ''}">
-        ${item.summary || 'Synchronized deliverables'}
-      </div>
-      <div>
-        <span style="font-size: 0.75rem; font-weight: 600; color: #16a34a; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">Verified</span>
-      </div>
-    </div>
-  `,
-    )
+      <div class="atlassian-log-title" title="${escapeHtmlText(item.summary || '')}">${escapeHtmlText(item.summary || '')}</div>
+      ${
+        resets.length
+          ? `<ul class="atl-review-reset-list">${resets
+              .map(
+                (r) =>
+                  `<li><span class="atl-file">${escapeHtmlText(
+                    String(r.file || '')
+                      .split('/')
+                      .pop(),
+                  )}</span> → <span class="atl-inreview">In Review</span> <span class="atl-reason">(${escapeHtmlText(r.reason || '')})</span></li>`,
+              )
+              .join('')}</ul>`
+          : ''
+      }
+    </div>`;
+    })
     .join('');
 }
 
 window.refreshGitHubUserControl = refreshGitHubUserControl;
 window.applyGitDetailsToStudio = applyGitDetailsToStudio;
 window.hydrateGithubRepoFromGitDetails = hydrateGithubRepoFromGitDetails;
+window.renderGitDashboard = renderGitDashboard;
+window.renderAtlassianDashboard = renderAtlassianDashboard;
+window.refreshAtlassianCounts = refreshAtlassianCounts;
+window.fetchGitDetails = fetchGitDetails;

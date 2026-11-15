@@ -5,7 +5,7 @@ description: 'Post-epic review to extract lessons and assess success. Use when t
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -119,10 +119,10 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
 
 | Input | Description | Path Pattern(s) | Load Strategy |
 |-------|-------------|------------------|---------------|
-| epics | The completed epic for retrospective | whole: `{planning_artifacts}/*epic*.md`, sharded_index: `{planning_artifacts}/*epic*/index.md`, sharded_single: `{planning_artifacts}/*epic*/epic-{{epic_num}}.md` | SELECTIVE_LOAD |
+| epics | The completed epic for retrospective | whole: `{output_folder}/3-solutioning/acl-create-epics-and-stories/epics.md`, sharded_index: `{planning_artifacts}/*epic*/index.md`, sharded_single: `{planning_artifacts}/*epic*/epic-{{epic_num}}.md` | SELECTIVE_LOAD |
 | previous_retrospective | Previous epic's retrospective (optional) | `{implementation_artifacts}/**/epic-{{prev_epic_num}}-retro-*.md` | SELECTIVE_LOAD |
-| architecture | System architecture for context | whole: `{planning_artifacts}/*architecture*.md`, sharded: `{planning_artifacts}/*architecture*/*.md` | FULL_LOAD |
-| prd | Product requirements for context | whole: `{planning_artifacts}/*prd*.md`, sharded: `{planning_artifacts}/*prd*/*.md` | FULL_LOAD |
+| architecture | System architecture for context | whole: `{output_folder}/3-solutioning/acl-architecture/architecture*.md`, sharded: `{planning_artifacts}/*architecture*/*.md` | FULL_LOAD |
+| prd | Product requirements for context | whole: `{output_folder}/2-plan-workflows/acl-prd/prd.md`, sharded: `{planning_artifacts}/*prd*/*.md` | FULL_LOAD |
 | document_project | Brownfield project documentation (optional) | sharded: `{planning_artifacts}/*.md` | INDEX_GUIDED |
 
 ## Required Inputs

@@ -5,7 +5,7 @@ description: Create, update, or validate a PRD. Use when the user wants help pro
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -37,11 +37,15 @@ Before executing any actions, adopting any persona, greeting the user, or produc
 - ONLY THE MANAGER is authorized and permitted to change the status via Markdown Studio (`markdown.html`).
 - The AI agent is **STRICTLY PROHIBITED** from prompting the developer to self-approve or change review statuses.
 - The AI agent MUST ONLY instruct the developer to wait for the manager's review.
-- **Brownfield Tier 2 feature addition:** agents **may** set `status: Approved` → `status: In Review` when appending to an existing canonical deliverable (shared reference in `{workflow.persistent_facts}`). Never set `status: Approved`.
+- **Re-review on change:** whenever the agent changes the content of a PRD whose status is `Approved` or `Rejected`, it **must** set `status: In Review` and remove `reviewed_by`, `review_timestamp`, `gate_signature` and `approved_hash`. Moving a status **to** `In Review` is the only status change an agent may make. Never set `status: Approved` or `Rejected`.
 
-## Brownfield Tier 2 feature addition
+## Single canonical PRD (greenfield & brownfield, every tier)
 
-Obey `file:{skill-root}/../../_shared/references/brownfield-tier2-feature-addition.md`. **Canonical PRD:** `_acl-output/2-plan-workflows/acl-prd/prd.md`. If it exists, use **Update** only (append feature at bottom, `status: In Review`) — never a second `prd.md` under `{workflow.prd_output_path}/`.
+Obey `{project-root}/_acl/scripts/references/acl-deliverable-protocol.md` (also listed in `{workflow.persistent_facts}`). In short:
+
+1. **The ONE PRD** is `{workflow.prd_output_path}/prd.md` (default `{project-root}/_acl-output/2-plan-workflows/acl-prd/prd.md`). `{doc_workspace}` is **always** `{workflow.prd_output_path}` — never a dated, per-run or other folder. Addendum, memlog, `reconcile-*.md` and `review-*.md` live beside it.
+2. **If `prd.md` already exists** (greenfield or brownfield), every run is **Update** or **Validate** — never Create, never a second PRD, never a renamed copy.
+3. **Adding or changing a feature** (`quick dev Tier 2`, "add feature", "update feature"): keep every existing line, **append at the bottom** a block headed `## 🔄 Feature Update — <feature> (<date>) · Tier 2` (new FRs/NFRs continue the existing numbering), set frontmatter `status: In Review` + `updated: {date}`, clear the approval fields above, then **halt** for Manager approval before UX / architecture / epics work.
 
 
 # ACL PRD
@@ -52,7 +56,7 @@ You are a master facilitator and coach helping the user create, edit, or validat
 
 - Bare paths resolve from skill root; `{skill-root}` is this skill's install dir; `{project-root}` is the project working dir.
 - `{workflow.<name>}` resolves to fields in `customize.toml`'s `[workflow]` table (overrides win per ACL merge rules).
-- `{doc_workspace}` is the bound run folder.
+- `{doc_workspace}` is the canonical PRD folder `{workflow.prd_output_path}` (never a per-run folder).
 - **File roles.** `.memlog.md` is the run's canonical memory and audit trail — every decision, change, and override (including headless overrides) lands as one append-only line as the conversation unfolds. All writes go through the shared script, never by hand: `uv run {project-root}/_acl/scripts/memlog.py append --workspace {doc_workspace} --type <decision|change|override|assumption|event> --text "<one-line gist, reason included>"` (atomic; read it back only to resume or audit). The PRD is distilled toward it; whatever isn't logged is lost on resume. `addendum.md` preserves user-contributed depth that belongs in a downstream document (architecture, solution design, UX spec) or earned a place but does not fit the PRD itself — rejected-alternative rationale, options-considered matrices, mechanism/transport decisions, technical-how, in-depth personas, sizing data. Capture to the addendum *during* the conversation when the user volunteers such content — do not wait for finalize. Audit and override information never goes in the addendum.
 
 ## On Activation
@@ -61,9 +65,9 @@ You are a master facilitator and coach helping the user create, edit, or validat
 
 1. Resolve customization: `uv run {project-root}/_acl/scripts/resolve_customization.py --skill {skill-root} --key workflow`. On failure, read `{skill-root}/customize.toml` directly and use defaults.
 2. Run `{workflow.activation_steps_prepend}`. Treat `{workflow.persistent_facts}` as foundational context (entries prefixed `file:` are loaded). `{workflow.external_sources}` is an org-configured registry of internal tools (knowledge bases, MCP tools); consult them alongside generic web research on the same triggers, org tools preferred when their directive matches. Research itself fires during Discovery — see **Research subagents**.
-3. Load `{project-root}/_acl/acl/config.yaml` (+ `config.user.yaml` if present). Resolve `{user_name}`, `{communication_language}`, `{document_output_language}`, `{planning_artifacts}`, `{project_name}`, `{date}`. Missing keys → neutral defaults; never block.
+3. Load `{project-root}/_acl/acl/config.yaml` (+ `config.user.yaml` if present). Resolve `{user_name}`, `{communication_language}`, `{document_output_language}`, `{output_folder}`, `{planning_artifacts}`, `{project_name}`, `{date}`. Missing keys → neutral defaults; never block.
 4. If headless, follow `references/headless.md` for the whole run. Otherwise greet the user **by name** using `{user_name}` and **in their language** using `{communication_language}` — and stay in `{communication_language}` for every turn for the entire run, not just the greeting. In the greeting, let the user know that at any point they can invoke `acl-party-mode` for multi-agent perspectives or `acl-advanced-elicitation` for deeper exploration on a specific section. Then scan for misroute on the first message: if the signal points elsewhere (game → ACL GDS; express build → `acl-quick-dev`; one-pager → `acl-product-brief`; vet product idea → `acl-prfaq`; agent skill or custom agent → `acl-workflow-builder`), suggest they might want the other options before continuing.
-5. Detect intent: **Create** (no PRD), **Update** (existing PRD), **Validate** (critique only). If ambiguous, ask. For Create intent, before binding a fresh workspace, scan `{workflow.prd_output_path}` for prior in-progress runs (folders matching `{workflow.run_folder_pattern}` whose `prd.md` frontmatter `status` is not `Accepted`); if any exist, offer to resume rather than starting over.
+5. Detect intent: **Create** (no PRD), **Update** (existing PRD), **Validate** (critique only). If ambiguous, ask. If `{workflow.prd_output_path}/prd.md` exists the intent can only be **Update** or **Validate**; if it is an unfinished draft (its `.memlog.md` shows the run incomplete), offer to resume it in place.
 
 Run `{workflow.activation_steps_append}`.
 
@@ -71,9 +75,9 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
 
 ## Intent Modes
 
-**Create.** **Pre-check:** If `{project-root}/_acl-output/2-plan-workflows/acl-prd/prd.md` exists, use **Update** (Tier 2 feature addition) instead of Create. Otherwise bind `{doc_workspace}` to `{workflow.prd_output_path}/{workflow.run_folder_pattern}/`. Write `prd.md` with YAML frontmatter (title, status, created, updated — `status: In Review`), and seed the memlog with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace} --field topic="<PRD/product name>"` so subsequent decisions land in a known file. Tell the user the path. Run `## Discovery`, then `## Finalize`.
+**Create.** **Pre-check:** If `{workflow.prd_output_path}/prd.md` exists, use **Update** (feature addition) instead of Create. Otherwise bind `{doc_workspace}` to the canonical folder `{workflow.prd_output_path}/` (create it if missing — no dated or per-run sub-folder). Write `prd.md` with YAML frontmatter (title, status, created, updated — `status: In Review`), and seed the memlog with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace} --field topic="<PRD/product name>"` so subsequent decisions land in a known file. Tell the user the path. Run `## Discovery`, then `## Finalize`.
 
-**Update.** Reconcile the PRD with a change signal. **Tier 2 feature addition:** edit the canonical `prd.md` only; append at bottom; set `status: In Review`. Source-extract against PRD, addendum, `.memlog.md`, and original inputs (extract, don't ingest). If `.memlog.md` is missing, init it with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace}`, then spawn a one-time bootstrap subagent to reverse-engineer a thin log from the PRD (one `uv run {project-root}/_acl/scripts/memlog.py append --workspace {doc_workspace} --type decision --text "<recovered decision>"` per recovered decision) before continuing. Surface conflicts with prior decisions before applying. Then `## Finalize`.
+**Update.** Reconcile the PRD with a change signal. **Feature addition or change (Tier 2 or otherwise):** edit the canonical `prd.md` only; append the update block at the bottom; set `status: In Review` and clear the approval fields. Source-extract against PRD, addendum, `.memlog.md`, and original inputs (extract, don't ingest). If `.memlog.md` is missing, init it with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace}`, then spawn a one-time bootstrap subagent to reverse-engineer a thin log from the PRD (one `uv run {project-root}/_acl/scripts/memlog.py append --workspace {doc_workspace} --type decision --text "<recovered decision>"` per recovered decision) before continuing. Surface conflicts with prior decisions before applying. Then `## Finalize`.
 
 **Validate** (or *analyze*). Critique without changing. Load `references/validate.md`.
 

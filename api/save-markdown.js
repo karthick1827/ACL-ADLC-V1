@@ -2,6 +2,17 @@
 // Works seamlessly across Vercel, Netlify, AWS Lambda, Firebase Functions, and local Node.js
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+
+/** Load tools/acl-deliverables.cjs (canonical paths + review-status invariants). */
+async function loadDeliverables() {
+  const candidates = [path.join(process.cwd(), 'tools', 'acl-deliverables.cjs')];
+  if (typeof __dirname !== 'undefined') candidates.push(path.join(__dirname, '..', 'tools', 'acl-deliverables.cjs'));
+  const found = candidates.find((p) => fs.existsSync(p));
+  if (!found) return null;
+  const mod = await import(pathToFileURL(found).href);
+  return mod.default || mod;
+}
 
 async function universalHandler(arg1, arg2) {
   const corsHeaders = {
@@ -96,39 +107,43 @@ async function universalHandler(arg1, arg2) {
       }
     }
 
-    const { folderPath, filename, content, status } = payload || {};
+    const { folderPath, filename } = payload || {};
+    let { content, status } = payload || {};
 
     if (!filename || typeof content !== 'string') {
       return reply(400, { success: false, error: 'Missing required fields: filename and content.' });
     }
 
-    // Path normalization: canonical phase structure inside _acl-output/
+    const deliverables = await loadDeliverables();
+    const outputFolder = deliverables ? deliverables.resolveOutputFolder(process.cwd()) : '_acl-output';
+    const escapedOutput = outputFolder.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Review invariants: approving records a body hash; editing an Approved doc sends it back to In Review.
+    let reviewAction = 'none';
+    if (deliverables) {
+      const result = deliverables.applyReviewInvariants(content, { statusChanged: Boolean(payload && payload.statusChanged) });
+      content = result.content;
+      reviewAction = result.action;
+      status = deliverables.readReviewStatus(content) || status;
+    }
+
+    // Path normalization: canonical phase structure inside the output folder
     let cleanFolder = (folderPath || '').replaceAll('\\', '/').trim();
-    cleanFolder = cleanFolder.replace(/^(_acl-output|_acl_output|acl-output)\/?/i, '');
+    cleanFolder = cleanFolder.replace(new RegExp(`^(${escapedOutput}|_acl-output|_acl_output|acl-output)\\/?`, 'i'), '');
     cleanFolder = cleanFolder.replace(/^\/+/, '').replace(/\/+$/, '');
     const cleanFilename = filename.replace(/^\/+/, '').trim();
     const lowerName = cleanFilename.toLowerCase();
+    const canonicalDir = deliverables ? deliverables.canonicalDirForFileName(cleanFilename) : null;
 
     if (lowerName === 'project-context.md') {
       cleanFolder = '';
+    } else if ((!cleanFolder || cleanFolder === 'root' || cleanFolder === '.') && canonicalDir) {
+      // A bare deliverable filename always resolves to its ONE canonical folder.
+      cleanFolder = canonicalDir;
     } else if (!cleanFolder || cleanFolder === 'root' || cleanFolder === '.') {
       switch (lowerName) {
-        case 'brief.md': {
-          cleanFolder = '1-analysis/acl-product-brief';
-          break;
-        }
-        case 'prd.md':
         case 'reconcile-brief.md': {
           cleanFolder = '2-plan-workflows/acl-prd';
-          break;
-        }
-        case 'architecture-spine.md':
-        case 'architecture.md': {
-          cleanFolder = '3-solutioning/acl-architecture';
-          break;
-        }
-        case 'epics.md': {
-          cleanFolder = '3-solutioning/acl-create-epics-and-stories';
           break;
         }
         default: {
@@ -147,7 +162,7 @@ async function universalHandler(arg1, arg2) {
       }
     }
 
-    const repoFilePath = cleanFolder ? `_acl-output/${cleanFolder}/${cleanFilename}` : `_acl-output/${cleanFilename}`;
+    const repoFilePath = cleanFolder ? `${outputFolder}/${cleanFolder}/${cleanFilename}` : `${outputFolder}/${cleanFilename}`;
 
     // Detect GitHub Configuration: Check headers, body, or environment variables
     const rawHeaderAuth = rawHeaders['authorization'] || rawHeaders['Authorization'] || '';
@@ -323,6 +338,8 @@ async function universalHandler(arg1, arg2) {
         path: repoFilePath,
         commitSha: commitResult.commit?.sha || commitResult.sha,
         status: status,
+        content,
+        reviewAction,
         message: `Successfully committed ${cleanFilename} to ${owner}/${repo}@${branch}`,
       });
     }
@@ -340,6 +357,8 @@ async function universalHandler(arg1, arg2) {
         gitPushed: false,
         path: repoFilePath,
         status: status,
+        content,
+        reviewAction,
         warning:
           'Saved to local disk only. To enable cloud commits on Vercel or Netlify, configure GITHUB_TOKEN in platform environment variables or enter it in Markdown Studio Cloud Sync settings.',
       });

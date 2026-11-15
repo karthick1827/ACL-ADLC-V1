@@ -5,7 +5,7 @@ description: 8-Layer Figma Precision Engine for 100% deterministic, pixel-perfec
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -45,12 +45,12 @@ This skill enables agents to translate Figma designs into 100% mathematically an
 
 ## Phase Gate Guard Precondition (Mandatory)
 Before generating or modifying UI components or downloading Figma production assets:
-1. Verify that Phase 2 (PRD) and Phase 3 (Architecture Spine) are marked `status: Accepted` (or execute `node tools/adlc-gate-guard.cjs phase4`).
+1. Verify that Phase 2 (PRD) and Phase 3 (Architecture Spine) are marked `status: Approved` (or execute `node tools/adlc-gate-guard.cjs phase4`).
 2. If prerequisite artifacts are `In Review` or `Rejected`:
    - **HALT IMMEDIATELY. DO NOT GENERATE UI CODE.**
    - Output structured gate blocked error:
      "❌ [ADLC GATE REJECTED / BLOCKED]: Cannot proceed with Figma Code Generation.
-      Prerequisite artifacts in Phase 2/3 must be reviewed and marked 'Accepted' by your manager in Markdown Studio before Figma translation can start."
+      Prerequisite artifacts in Phase 2/3 must be reviewed and marked 'Approved' by your manager in Markdown Studio before Figma translation can start."
 
 ## The 8-Layer Precision Pipeline
 

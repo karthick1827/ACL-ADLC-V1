@@ -5,7 +5,7 @@ description: Plan UX patterns and design specifications. Use when the user says 
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -37,6 +37,15 @@ Before executing any actions, adopting any persona, greeting the user, or produc
 - ONLY THE MANAGER is authorized and permitted to change the status via Markdown Studio (`markdown.html`).
 - The AI agent is **STRICTLY PROHIBITED** from prompting the developer to self-approve or change review statuses.
 - The AI agent MUST ONLY instruct the developer to wait for the manager's review.
+- **Re-review on change:** whenever the agent changes the content of a `DESIGN.md` or `EXPERIENCE.md` whose status is `Approved` or `Rejected`, it **must** set `status: In Review` and remove `reviewed_by`, `review_timestamp`, `gate_signature` and `approved_hash`. Moving a status **to** `In Review` is the only status change an agent may make. Never set `status: Approved` or `Rejected`.
+
+## Single canonical UX folder (greenfield & brownfield, every tier)
+
+Obey `{project-root}/_acl/scripts/references/acl-deliverable-protocol.md` (also listed in `{workflow.persistent_facts}`). In short:
+
+1. **The ONE UX folder** is `{workflow.ux_output_path}` (default `{project-root}/_acl-output/2-plan-workflows/acl-ux/`) holding exactly one `DESIGN.md` and one `EXPERIENCE.md`. `{doc_workspace}` is **always** that folder — never a dated, per-run or other folder.
+2. **If `DESIGN.md` or `EXPERIENCE.md` already exists**, every run is **Update** or **Validate** — never Create, never a second copy.
+3. **Adding or changing a feature** (`quick dev Tier 2`, "add feature", "update feature"): keep every existing line, **append at the bottom** of each affected file a block headed `## 🔄 Feature Update — <feature> (<date>) · Tier 2`, set that file's `status: In Review` + `updated: {date}`, clear the approval fields above, then **halt** for Manager approval.
 
 
 # ACL UX
@@ -69,9 +78,9 @@ UX may lead, follow, or stand alone. Inherit `sources:` by reference; the spines
 
 1. Resolve customization: `uv run {project-root}/_acl/scripts/resolve_customization.py --skill {skill-root} --key workflow`. On failure, read `{skill-root}/customize.toml` directly and use defaults.
 2. Run `{workflow.activation_steps_prepend}`. Treat `{workflow.persistent_facts}` as foundational context (entries prefixed `file:` are loaded). `{workflow.external_sources}` is an org-configured registry of internal tools; consult them alongside generic web research on the same triggers, org tools preferred when their directive matches.
-3. Load `{project-root}/_acl/acl/config.yaml` (+ `config.user.yaml` if present). Resolve `{user_name}`, `{communication_language}`, `{document_output_language}`, `{planning_artifacts}`, `{project_name}`, `{date}`. Missing keys → neutral defaults; never block.
+3. Load `{project-root}/_acl/acl/config.yaml` (+ `config.user.yaml` if present). Resolve `{user_name}`, `{communication_language}`, `{document_output_language}`, `{output_folder}`, `{planning_artifacts}`, `{project_name}`, `{date}`. Missing keys → neutral defaults; never block.
 4. If headless, follow `references/headless.md` for the whole run. Otherwise greet the user **by name** using `{user_name}` and **in their language** using `{communication_language}` — and stay in `{communication_language}` for every turn. In the greeting, let the user know `acl-party-mode` and `acl-advanced-elicitation` are always available. Then scan for misroute on the first message: PRD → `acl-prd`; architecture → `acl-architecture`; game UX → ACL GDS; agent/skill → `acl-workflow-builder`; brief → `acl-product-brief`.
-5. Detect intent: **Create**, **Update**, **Validate**. For Create, before binding a fresh workspace, scan `{workflow.ux_output_path}` for prior in-progress runs (folders matching `{workflow.run_folder_pattern}` whose `DESIGN.md` frontmatter `status` is not `final`) and offer to resume rather than starting over.
+5. Detect intent: **Create**, **Update**, **Validate**. If `DESIGN.md` or `EXPERIENCE.md` already exists in `{workflow.ux_output_path}`, the intent can only be **Update** or **Validate**; if they are unfinished drafts (memlog shows the run incomplete), offer to resume them in place.
 
 Run `{workflow.activation_steps_append}`.
 
@@ -79,9 +88,9 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
 
 ## Modes
 
-**Create.** Bind `{doc_workspace}` to `{workflow.ux_output_path}/{workflow.run_folder_pattern}/`. Create `.working/` and `imports/`; seed the memlog with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace} --field topic="<product/UX>"`; create `DESIGN.md` (frontmatter only) and `EXPERIENCE.md` (frontmatter only). Run Discovery → Finalize.
+**Create.** Only when neither spine exists yet. Bind `{doc_workspace}` to the canonical folder `{workflow.ux_output_path}/` (create it if missing — no dated or per-run sub-folder). Create `.working/` and `imports/`; seed the memlog with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace} --field topic="<product/UX>"`; create `DESIGN.md` (frontmatter only) and `EXPERIENCE.md` (frontmatter only). Run Discovery → Finalize.
 
-**Update.** Read spines + memlog + sources. If `.memlog.md` is missing, init it with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace}` — this update is entry one. Surface conflicts with prior decisions. Run Finalize.
+**Update.** `{doc_workspace}` is `{workflow.ux_output_path}/`. For a feature addition or change, append the update block at the bottom of each affected spine and set its `status: In Review` (approval fields cleared). Read spines + memlog + sources. If `.memlog.md` is missing, init it with `uv run {project-root}/_acl/scripts/memlog.py init --workspace {doc_workspace}` — this update is entry one. Surface conflicts with prior decisions. Run Finalize.
 
 **Validate.** See `references/validate.md`.
 
@@ -89,7 +98,7 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
 
 **Capture; do not author.** The spines are distilled at Finalize toward the memlog. Decisions → `.memlog.md` (canonical), each appended via `uv run {project-root}/_acl/scripts/memlog.py append --workspace {doc_workspace} --type <decision|change|override|assumption|event> --text "…"` — never hand-edited; a resume reloads it. Creative-tool artifacts → `.working/`. User-supplied visuals (Figma, sketches, brand decks, image folders) → `imports/`, one `memlog.py append` per item. Spines win on conflict.
 
-**Source scan.** Glob `{planning_artifacts}/` for candidate input paths; surface paths only — never read content in the parent. User confirms which apply or adds others; subagent-extracts on confirm.
+**Source scan.** Glob `{output_folder}/` (canonical deliverables) and `{planning_artifacts}/` (research, brainstorming) for candidate input paths; surface paths only — never read content in the parent. User confirms which apply or adds others; subagent-extracts on confirm.
 
 Brain dump first — even when the user opens with paragraphs (that's intake). Subagent-extract big docs. One "anything else?" probe. Stakes: hobby / internal / consumer / regulated.
 

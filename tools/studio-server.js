@@ -4,8 +4,21 @@ const path = require('node:path');
 const { execSync } = require('node:child_process');
 
 const PORT = 3333;
+const deliverables = require('./acl-deliverables.cjs');
+
 const PROJECT_ROOT = process.env.ACL_PROJECT_ROOT || process.cwd();
-const ACL_OUTPUT_DIR = path.join(PROJECT_ROOT, '_acl-output');
+const ACL_OUTPUT_DIR = path.join(PROJECT_ROOT, deliverables.resolveOutputFolder(PROJECT_ROOT));
+
+/**
+ * Where a deliverable lives (relative to the output folder): the existing file if there is one
+ * (legacy spine names included), otherwise its ONE canonical path. Never a second copy.
+ */
+function deliverableLocation(key) {
+  const existing = deliverables.findExistingDeliverable(key, PROJECT_ROOT);
+  const rel = existing ? existing.relativePath : deliverables.canonicalRelativePath(key);
+  const idx = rel.lastIndexOf('/');
+  return { folderPath: idx === -1 ? 'root' : rel.slice(0, idx), filename: rel.slice(idx + 1) };
+}
 
 // Recursive scanner for .md files on disk
 function getDiskMarkdownFiles() {
@@ -535,16 +548,7 @@ ${frsMd}
     }
 
     case 'architecture': {
-      let archFolder = '3-solutioning/acl-architecture';
-      const sampleArchDir = path.join(ACL_OUTPUT_DIR, 'planning-artifacts', 'architecture');
-      if (fs.existsSync(sampleArchDir)) {
-        const subdirs = fs.readdirSync(sampleArchDir, { withFileTypes: true }).filter((d) => d.isDirectory());
-        if (subdirs.length > 0) {
-          archFolder = `planning-artifacts/architecture/${subdirs[0].name}`;
-        } else {
-          archFolder = 'planning-artifacts/architecture';
-        }
-      }
+      const archLocation = deliverableLocation('architecture');
 
       const entityModels = featuresList
         .slice(0, 4)
@@ -574,8 +578,8 @@ ${frsMd}
         .join('\n');
 
       return {
-        folderPath: archFolder,
-        filename: 'architecture.md',
+        folderPath: archLocation.folderPath,
+        filename: archLocation.filename,
         phaseName: 'Phase 3A: Solutioning (Architecture)',
         content: `---
 name: "${projectTitle}"
@@ -668,16 +672,7 @@ ${capabilityRows}
     }
 
     case 'ux': {
-      let uxFolder = '3-solutioning/acl-ux';
-      const sampleUxDir = path.join(ACL_OUTPUT_DIR, 'planning-artifacts', 'ux');
-      if (fs.existsSync(sampleUxDir)) {
-        const subdirs = fs.readdirSync(sampleUxDir, { withFileTypes: true }).filter((d) => d.isDirectory());
-        if (subdirs.length > 0) {
-          uxFolder = `planning-artifacts/ux/${subdirs[0].name}`;
-        } else {
-          uxFolder = 'planning-artifacts/ux';
-        }
-      }
+      const uxLocation = deliverableLocation('ux');
 
       const colors =
         briefData && briefData.colorTokens.length > 0
@@ -695,8 +690,8 @@ ${capabilityRows}
       const figmaRef = allFigmaLinks.length > 0 ? allFigmaLinks[0] : 'https://www.figma.com/design/project-spec';
 
       return {
-        folderPath: uxFolder,
-        filename: 'ux.md',
+        folderPath: uxLocation.folderPath,
+        filename: uxLocation.filename,
         phaseName: 'Phase 3B: Solutioning (UX & Design System)',
         content: `---
 status: In Review
@@ -1024,22 +1019,22 @@ function readSkillInstructions(stepKey) {
 function resolveDeliverableFolder(stepKey, options = {}) {
   switch (stepKey) {
     case 'project_context': {
-      return { folderPath: 'root', filename: 'project-context.md' };
+      return deliverableLocation('projectContext');
     }
     case 'brief': {
-      return { folderPath: '1-analysis/acl-product-brief', filename: 'brief.md' };
+      return deliverableLocation('brief');
     }
     case 'prd': {
-      return { folderPath: '2-plan-workflows/acl-prd', filename: 'prd.md' };
+      return deliverableLocation('prd');
     }
     case 'architecture': {
-      return { folderPath: '3-solutioning/acl-architecture', filename: 'ARCHITECTURE-SPINE.md' };
+      return deliverableLocation('architecture');
     }
     case 'ux': {
-      return { folderPath: '3-solutioning/acl-ux', filename: 'ux.md' };
+      return deliverableLocation('ux');
     }
     case 'epics_stories': {
-      return { folderPath: '3-solutioning/acl-create-epics-and-stories', filename: 'epics.md' };
+      return deliverableLocation('epics');
     }
     case 'story_impl': {
       const progress = getImplementationProgress();
@@ -1382,7 +1377,7 @@ const server = http.createServer(async (req, res) => {
           fs.mkdirSync(ACL_OUTPUT_DIR, { recursive: true });
         }
         const baseDir = ACL_OUTPUT_DIR;
-        const targetDir = path.join(baseDir, generated.folderPath);
+        const targetDir = generated.folderPath === 'root' ? baseDir : path.join(baseDir, generated.folderPath);
         fs.mkdirSync(targetDir, { recursive: true });
 
         const targetFile = path.join(targetDir, generated.filename);

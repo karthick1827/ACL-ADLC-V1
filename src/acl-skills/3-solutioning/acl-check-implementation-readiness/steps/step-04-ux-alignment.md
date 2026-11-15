@@ -55,7 +55,7 @@ I will:
 
 Search patterns:
 
-- `{planning_artifacts}/*ux*.md` (whole document)
+- `{output_folder}/2-plan-workflows/acl-ux/*.md` (whole document)
 - `{planning_artifacts}/*ux*/index.md` (sharded)
 - Look for UI-related terms in other documents
 

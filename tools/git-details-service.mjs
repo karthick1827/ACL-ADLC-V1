@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { fetchGitHubRepo, fetchGitHubUser } from './github-api.mjs';
+import { fetchAuthenticatedUser, fetchOrgMembership, fetchUserTeams, githubGetJson } from './github-api.mjs';
 import { resolveGitHubToken } from './github-token.mjs';
 
 function buildGitEnv() {
@@ -111,228 +111,286 @@ export function resolveGitHubCoordinates(projectRoot, query = {}) {
   };
 }
 
+const NOT_AVAILABLE = 'Not available';
+
+function runGit(args, projectRoot, env, extra = {}) {
+  return execFileSync('git', args, { cwd: projectRoot, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...extra }).trim();
+}
+
+/**
+ * Token for GitHub API calls: request header / query / env first, then the local GitHub CLI
+ * (`gh auth token`) when running on a developer machine. Never logged or returned.
+ */
+function resolveToken(headers, query, env) {
+  const explicit = resolveGitHubToken({ headers, query });
+  if (explicit) return { token: explicit, source: 'request-or-env' };
+  if (process.env.VERCEL || process.env.NETLIFY) return { token: '', source: 'none' };
+  try {
+    const fromCli = execFileSync('gh', ['auth', 'token'], {
+      env,
+      encoding: 'utf8',
+      timeout: 4000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (fromCli) return { token: fromCli, source: 'gh-cli' };
+  } catch {
+    /* gh not installed or not logged in */
+  }
+  return { token: '', source: 'none' };
+}
+
+/**
+ * `git ls-remote` probe using the developer's own git credentials.
+ * @returns {'reachable'|'not-found'|'unreachable'}
+ */
+function probeRemote(projectRoot, env) {
+  try {
+    const out = runGit(['ls-remote', '--exit-code', 'origin', 'HEAD'], projectRoot, env, {
+      timeout: 8000,
+      env: { ...env, GIT_TERMINAL_PROMPT: '0' },
+    });
+    return out ? 'reachable' : 'unreachable';
+  } catch (err) {
+    const text = `${err.stderr || ''} ${err.stdout || ''} ${err.message || ''}`.toLowerCase();
+    if (text.includes('not found') || text.includes('does not exist')) return 'not-found';
+    return 'unreachable';
+  }
+}
+
+/** Map the GitHub `permissions` object of a repo to the highest role. */
+export function permissionLevelFromRepo(repoData) {
+  const p = repoData && repoData.permissions;
+  if (!p || typeof p !== 'object') return NOT_AVAILABLE;
+  if (p.admin) return 'Admin';
+  if (p.maintain) return 'Maintain';
+  if (p.push) return 'Write';
+  if (p.triage) return 'Triage';
+  if (p.pull) return 'Read';
+  return 'No access';
+}
+
+function titleCase(value) {
+  const s = String(value || '');
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
 /**
  * @param {string} projectRoot
  * @param {{ query?: Record<string, string>, headers?: Record<string, string> }} [options]
+ *
+ * repoStatus: 'connected' | 'not-linked' | 'deleted' | 'inaccessible' | 'unreachable'
+ *  - connected:    GitHub confirms the repository exists and is readable
+ *  - not-linked:   no remote / owner+repo could be resolved
+ *  - deleted:      authenticated GitHub check says 404 AND git cannot find the remote either
+ *  - inaccessible: private or deleted — cannot tell without a token that has access (nothing is wiped)
+ *  - unreachable:  network / rate-limit problem (nothing is wiped)
  */
 export async function getGitDetails(projectRoot, options = {}) {
   const fetchedAt = new Date().toISOString();
   const query = options.query || {};
   const headers = options.headers || {};
-  const simulateUnpushed = query.simulate === 'unpushed' || query.unpushed === 'true';
+  const env = buildGitEnv();
 
-  if (simulateUnpushed) {
+  if (query.simulate === 'unpushed' || query.unpushed === 'true') {
     return {
+      repoStatus: 'not-linked',
       isPushed: false,
       repoConnected: false,
       repoDeleted: false,
       simulated: true,
       fetchedAt,
       message: 'Repository simulated as not pushed to GitHub',
+      authenticatedUser: null,
       userDetails: null,
       projectDetails: null,
       gitDetails: null,
     };
   }
 
-  const env = buildGitEnv();
   const coords = resolveGitHubCoordinates(projectRoot, query);
   let remoteOrigin = coords.remoteOrigin || '';
-
-  if (!remoteOrigin && coords.owner && coords.repo) {
-    remoteOrigin = `https://github.com/${coords.owner}/${coords.repo}.git`;
-  }
+  if (!remoteOrigin && coords.owner && coords.repo) remoteOrigin = `https://github.com/${coords.owner}/${coords.repo}.git`;
+  const parsed = parseRemoteOwnerRepo(remoteOrigin);
+  const owner = parsed.owner || coords.owner || '';
+  const repo = parsed.repo || coords.repo || '';
 
   let currentBranch = coords.branch || '';
   try {
-    const gitBranch = execFileSync('git', ['branch', '--show-current'], { cwd: projectRoot, env, encoding: 'utf8' }).trim();
-    if (gitBranch) currentBranch = gitBranch;
+    currentBranch = runGit(['branch', '--show-current'], projectRoot, env) || currentBranch;
   } catch {
-    /* ignore */
+    /* not a git checkout */
   }
 
   let gitUserName = '';
   let gitUserEmail = '';
-  let lastActivityDate = fetchedAt;
-  let lastCommitMsg = 'Latest commit';
+  let lastCommit = null;
   try {
-    gitUserName = execFileSync('git', ['config', 'user.name'], { cwd: projectRoot, env, encoding: 'utf8' }).trim();
+    gitUserName = runGit(['config', 'user.name'], projectRoot, env);
   } catch {
-    /* ignore */
+    /* unset */
   }
   try {
-    gitUserEmail = execFileSync('git', ['config', 'user.email'], { cwd: projectRoot, env, encoding: 'utf8' }).trim();
+    gitUserEmail = runGit(['config', 'user.email'], projectRoot, env);
   } catch {
-    /* ignore */
+    /* unset */
   }
   try {
-    const commitLog = execFileSync('git', ['log', '-1', '--format=%an%x00%ae%x00%cd%x00%s'], {
-      cwd: projectRoot,
-      env,
-      encoding: 'utf8',
-    }).trim();
-    if (commitLog) {
-      const parts = commitLog.split('\0');
-      if (!gitUserName && parts[0]) gitUserName = parts[0].trim();
-      if (!gitUserEmail && parts[1]) gitUserEmail = parts[1].trim();
-      if (parts[2]) lastActivityDate = parts[2].trim();
-      if (parts[3]) lastCommitMsg = parts[3].trim();
+    const log = runGit(['log', '-1', '--format=%an%x00%ae%x00%cI%x00%s'], projectRoot, env);
+    if (log) {
+      const [author, email, date, subject] = log.split('\0');
+      lastCommit = { author, email, date, subject };
     }
   } catch {
-    /* ignore */
+    /* no commits */
   }
 
-  const { owner: repoOwner, repo: repoName } = parseRemoteOwnerRepo(remoteOrigin);
-  const effectiveOwner = repoOwner || coords.owner;
-  const effectiveRepo = repoName || coords.repo;
-
-  let repoDeleted = false;
-  let liveRemoteExists = false;
   let isPushed = false;
-  let ghUserData = null;
-  let ghRepoData = null;
-
   if (remoteOrigin) {
     try {
-      const lsOut = execFileSync('git', ['ls-remote', '--exit-code', 'origin', 'HEAD'], {
-        cwd: projectRoot,
-        env,
-        encoding: 'utf8',
-        timeout: 6000,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }).trim();
-      if (lsOut && lsOut.length > 0) liveRemoteExists = true;
-    } catch (err) {
-      const errText = (
-        (err.stderr ? err.stderr.toString() : '') +
-        ' ' +
-        (err.stdout ? err.stdout.toString() : '') +
-        ' ' +
-        (err.message || '')
-      ).toLowerCase();
-      if (errText.includes('not found') || errText.includes('does not exist') || errText.includes('fatal: repository')) {
-        repoDeleted = true;
-      }
-    }
-
-    try {
-      const unpushedCommits = execFileSync('git', ['log', '@{u}..HEAD', '--oneline'], {
-        cwd: projectRoot,
-        env,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
-      isPushed = unpushedCommits.length === 0;
+      isPushed = runGit(['log', '@{u}..HEAD', '--oneline'], projectRoot, env).length === 0;
     } catch {
-      try {
-        const localCommits = execFileSync('git', ['log', '-1', '--oneline'], {
-          cwd: projectRoot,
-          env,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'ignore'],
-        }).trim();
-        isPushed = Boolean(localCommits);
-      } catch {
-        isPushed = true;
-      }
+      isPushed = false; // no upstream tracking branch
     }
   }
 
-  const token = resolveGitHubToken({ headers, query });
+  const { token } = resolveToken(headers, query, env);
+  const hasToken = Boolean(token);
 
-  if (effectiveOwner && effectiveRepo && !repoDeleted) {
-    try {
-      const repoRes = await fetchGitHubRepo(effectiveOwner, effectiveRepo, token);
-      if (repoRes.status === 404) {
-        repoDeleted = true;
-        liveRemoteExists = false;
-      } else if (repoRes.ok) {
-        ghRepoData = await repoRes.json();
-        liveRemoteExists = true;
-      }
-    } catch {
-      /* ignore */
-    }
+  // Authenticated GitHub account = the token's owner (not the repository owner).
+  let authUser = null;
+  let authUserError = '';
+  if (hasToken) {
+    const u = await fetchAuthenticatedUser(token);
+    if (u.ok && u.data && u.data.login) authUser = u.data;
+    else authUserError = u.status === 401 ? 'GitHub token is invalid or expired' : u.error || `GitHub returned HTTP ${u.status}`;
+  }
 
-    if (!repoDeleted) {
-      try {
-        const userRes = await fetchGitHubUser(effectiveOwner, token);
-        if (userRes.ok) ghUserData = await userRes.json();
-      } catch {
-        /* ignore */
+  let repoStatus = 'not-linked';
+  let repoData = null;
+  let message = 'No GitHub repository is linked to this project (no git remote "origin").';
+
+  if (owner && repo) {
+    const repoRes = await githubGetJson(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, authUser ? token : '');
+    if (repoRes.ok && repoRes.data) {
+      repoStatus = 'connected';
+      repoData = repoRes.data;
+      message = isPushed ? 'Repository linked and in sync with GitHub.' : 'Repository linked; local commits may be pending push.';
+    } else if (repoRes.status === 404) {
+      const remoteProbe = remoteOrigin ? probeRemote(projectRoot, env) : 'not-found';
+      if (authUser && remoteProbe === 'not-found') {
+        repoStatus = 'deleted';
+        message = `The repository ${owner}/${repo} no longer exists on GitHub (deleted or renamed).`;
+      } else if (remoteProbe === 'reachable') {
+        repoStatus = 'inaccessible';
+        message = authUser
+          ? `The repository ${owner}/${repo} is private and the GitHub token in use has no access to it.`
+          : `The repository ${owner}/${repo} is private. Add a GitHub token (GITHUB_TOKEN, "gh auth login", or the Studio token) to read its details.`;
+      } else {
+        repoStatus = 'inaccessible';
+        message = `The repository ${owner}/${repo} is not accessible (private or deleted). Add a GitHub token with access to confirm.`;
       }
+    } else {
+      repoStatus = 'unreachable';
+      if (repoRes.rateLimited) message = 'GitHub API rate limit reached. Add a GitHub token or try again later.';
+      else if (repoRes.status === 0) message = `GitHub could not be reached: ${repoRes.error || 'network error'}.`;
+      else message = `GitHub returned HTTP ${repoRes.status} for ${owner}/${repo}.`;
     }
   }
 
-  const repoConnected = Boolean(!repoDeleted && liveRemoteExists && effectiveOwner && effectiveRepo);
+  const base = {
+    repoStatus,
+    repoConnected: repoStatus === 'connected',
+    repoDeleted: repoStatus === 'deleted',
+    needsToken: repoStatus === 'inaccessible',
+    hasToken,
+    isPushed: repoStatus === 'connected' && isPushed,
+    remoteOrigin: remoteOrigin || null,
+    githubOwner: owner || null,
+    githubRepo: repo || null,
+    githubBranch: currentBranch || null,
+    fetchedAt,
+    message,
+    authenticatedUser: authUser
+      ? { login: authUser.login, name: authUser.name || null, avatarUrl: authUser.avatar_url || null, htmlUrl: authUser.html_url || null }
+      : null,
+    authenticatedUserError: authUserError || null,
+  };
 
-  if (!remoteOrigin || repoDeleted || !repoConnected) {
-    return {
-      isPushed: false,
-      repoConnected: false,
-      repoDeleted: Boolean(repoDeleted),
-      remoteOrigin: remoteOrigin || null,
-      githubOwner: effectiveOwner || null,
-      githubRepo: effectiveRepo || null,
-      githubBranch: currentBranch || null,
-      fetchedAt,
-      message: repoDeleted
-        ? `The remote repository (${remoteOrigin || 'origin'}) was deleted or does not exist on GitHub.`
-        : remoteOrigin
-          ? 'Remote repository is not reachable on GitHub.'
-          : 'No remote repository has been linked to this project.',
-      userDetails: {
-        username: '',
-        fullName: gitUserName || '',
-        email: gitUserEmail || '',
-        avatarUrl: null,
-        orgRole: '',
-      },
-      projectDetails: {
-        projectName: effectiveRepo || path.basename(projectRoot),
-        userRole: '',
-        projectStatus: repoDeleted ? 'Remote repository was deleted on GitHub' : 'No repository connected to GitHub',
-        linkedRepositories: remoteOrigin ? [remoteOrigin] : [],
-        assignedDate: '',
-      },
-      gitDetails: {
-        permissionLevel: '',
-        teams: [],
-        twoFactorStatus: '',
-        lastActivity: '',
-      },
-    };
+  if (repoStatus !== 'connected') {
+    return { ...base, userDetails: null, projectDetails: null, gitDetails: null };
   }
+
+  // ---- Real repository / account data (anything that cannot be read reports "Not available")
+  const ownerLogin = (repoData.owner && repoData.owner.login) || owner;
+  const isOrg = Boolean(repoData.owner && repoData.owner.type === 'Organization');
+
+  let orgRole = NOT_AVAILABLE;
+  let teams = null; // null → not available
+  if (isOrg) {
+    if (authUser) {
+      const m = await fetchOrgMembership(ownerLogin, token);
+      if (m.ok && m.data && m.data.role) {
+        orgRole = `${titleCase(m.data.role)}${m.data.state && m.data.state !== 'active' ? ` (${m.data.state})` : ''}`;
+      } else if (m.status === 404) {
+        orgRole = 'Not a member';
+      }
+      const t = await fetchUserTeams(token);
+      if (t.ok && Array.isArray(t.data)) {
+        teams = t.data
+          .filter((team) => team.organization && String(team.organization.login).toLowerCase() === String(ownerLogin).toLowerCase())
+          .map((team) => team.name || team.slug);
+      }
+    }
+  } else {
+    orgRole = 'Personal repository';
+    teams = [];
+  }
+
+  let twoFactorStatus = NOT_AVAILABLE;
+  if (authUser && typeof authUser.two_factor_authentication === 'boolean') {
+    twoFactorStatus = authUser.two_factor_authentication ? 'Enabled' : 'Disabled';
+  }
+
+  const permissionLevel = permissionLevelFromRepo(repoData);
+  const isRepoOwner = Boolean(authUser && authUser.login && authUser.login.toLowerCase() === String(ownerLogin).toLowerCase());
+  let userRole = NOT_AVAILABLE;
+  if (isRepoOwner) userRole = 'Owner';
+  else if (permissionLevel !== NOT_AVAILABLE) userRole = permissionLevel;
+
+  let lastActivity = NOT_AVAILABLE;
+  if (lastCommit) lastActivity = `${lastCommit.date} (${lastCommit.subject})`;
+  else if (repoData.pushed_at) lastActivity = `${repoData.pushed_at} (last push to GitHub)`;
+
+  let projectStatus = `Active — branch ${currentBranch || repoData.default_branch || ''} has commits pending push`;
+  if (repoData.archived) projectStatus = 'Archived on GitHub';
+  else if (isPushed) projectStatus = 'Active — in sync with GitHub';
 
   return {
-    isPushed: Boolean(isPushed),
-    repoConnected: true,
-    repoDeleted: false,
-    remoteOrigin,
-    githubOwner: effectiveOwner,
-    githubRepo: effectiveRepo,
-    githubBranch: currentBranch || coords.branch || 'main',
-    fetchedAt,
-    message: isPushed ? 'Repository linked and in sync with GitHub.' : 'Repository linked; local commits may be pending push.',
+    ...base,
     userDetails: {
-      username: (ghUserData && ghUserData.login) || effectiveOwner || gitUserName || 'Developer',
-      fullName: (ghUserData && ghUserData.name) || gitUserName || effectiveOwner || 'Developer',
-      email: gitUserEmail || (ghUserData && ghUserData.email) || '',
-      avatarUrl: (ghUserData && ghUserData.avatar_url) || null,
-      orgRole: 'Admin / Maintainer',
+      username: authUser ? authUser.login : '',
+      fullName: (authUser && authUser.name) || gitUserName || '',
+      email: (authUser && authUser.email) || gitUserEmail || '',
+      avatarUrl: authUser ? authUser.avatar_url || null : null,
+      orgRole,
     },
     projectDetails: {
-      projectName: (ghRepoData && ghRepoData.name) || effectiveRepo || path.basename(projectRoot),
-      userRole: 'Lead Developer',
-      projectStatus: isPushed ? 'Active (GitHub Linked)' : `Active (Branch: ${currentBranch || 'main'} - Pending Push)`,
-      linkedRepositories: [remoteOrigin],
-      assignedDate: lastActivityDate ? new Date(lastActivityDate).toLocaleDateString() : new Date().toLocaleDateString(),
+      projectName: repoData.name || repo,
+      fullName: repoData.full_name || `${owner}/${repo}`,
+      visibility: repoData.visibility || (repoData.private ? 'private' : 'public'),
+      defaultBranch: repoData.default_branch || null,
+      userRole,
+      projectStatus,
+      linkedRepositories: [repoData.html_url || remoteOrigin],
+      createdAt: repoData.created_at || null,
+      pushedAt: repoData.pushed_at || null,
     },
     gitDetails: {
-      permissionLevel: 'Admin / Maintainer',
-      teams: effectiveOwner ? [`@${effectiveOwner}`] : ['Core Engineering'],
-      twoFactorStatus: 'Enabled',
-      lastActivity: `${lastActivityDate} (${lastCommitMsg})`,
+      permissionLevel,
+      teams,
+      twoFactorStatus,
+      lastActivity,
+      orgRole,
     },
   };
 }

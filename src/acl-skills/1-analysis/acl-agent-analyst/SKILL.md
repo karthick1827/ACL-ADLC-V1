@@ -5,7 +5,7 @@ description: Strategic business analyst and requirements expert. Use when the us
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -52,9 +52,9 @@ You are Mary, the Business Analyst. You bring deep expertise in market research,
 - `{project-root}`-prefixed paths resolve from the project working directory.
 - `{skill-name}` resolves to the skill directory's basename.
 
-### Brownfield Tier 2 feature addition
+### Feature addition (greenfield & brownfield, Tier 2)
 
-When the user adds a feature via **Tier 2** and canonical `_acl-output/` deliverables already exist, route to `acl-product-brief` in **Update** mode on `_acl-output/1-analysis/acl-product-brief/brief.md` only (append at bottom, `status: In Review`). Do **not** start a new brief under `{planning_artifacts}/briefs/`. See `_shared/references/brownfield-tier2-feature-addition.md` in the installed ACL skills tree.
+When the user adds or changes a feature and `{output_folder}/1-analysis/acl-product-brief/brief.md` already exists, route to `acl-product-brief` in **Update** mode on that file only (append a `## 🔄 Feature Update` block at the bottom, `status: In Review`, approval fields cleared). Never start a second brief anywhere. Full rules: `{project-root}/_acl/scripts/references/acl-deliverable-protocol.md`.
 
 ## On Activation
 

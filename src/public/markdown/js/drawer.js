@@ -82,6 +82,7 @@ function switchAppView(view) {
   const navDeveloper = document.getElementById('navItemDeveloper');
   const navWorkingTree = document.getElementById('navItemWorkingTree');
   const navGit = document.getElementById('navItemGit');
+  const navAtlassian = document.getElementById('navItemAtlassian');
   const navAgents = document.getElementById('navItemAgents');
 
   const railStudio = document.getElementById('railItemStudio');
@@ -90,6 +91,7 @@ function switchAppView(view) {
   const railDeveloper = document.getElementById('railItemDeveloper');
   const railWorkingTree = document.getElementById('railItemWorkingTree');
   const railGit = document.getElementById('railItemGit');
+  const railAtlassian = document.getElementById('railItemAtlassian');
   const railAgents = document.getElementById('railItemAgents');
 
   const btnSave = document.getElementById('btnSave');
@@ -102,6 +104,7 @@ function switchAppView(view) {
     if (navDeveloper) navDeveloper.classList.remove('active');
     if (navWorkingTree) navWorkingTree.classList.remove('active');
     if (navGit) navGit.classList.remove('active');
+    if (navAtlassian) navAtlassian.classList.remove('active');
     if (navAgents) navAgents.classList.remove('active');
 
     if (railStudio) railStudio.classList.remove('active');
@@ -110,6 +113,7 @@ function switchAppView(view) {
     if (railDeveloper) railDeveloper.classList.remove('active');
     if (railWorkingTree) railWorkingTree.classList.remove('active');
     if (railGit) railGit.classList.remove('active');
+    if (railAtlassian) railAtlassian.classList.remove('active');
     if (railAgents) railAgents.classList.remove('active');
   }
 
@@ -188,6 +192,21 @@ function switchAppView(view) {
     if (btnSave) btnSave.style.display = 'none';
     if (syncStatus) syncStatus.style.display = 'none';
     renderGitDashboard();
+  } else if (view === 'dashboard-atlassian') {
+    activeAppView = 'dashboard-atlassian';
+    document.body.classList.add('view-dashboard');
+    document.body.classList.remove('view-studio');
+    document.body.classList.remove('view-agents');
+    if (studioView) studioView.style.display = 'none';
+    if (agentsView) agentsView.style.display = 'none';
+    if (dashboardView) dashboardView.style.display = 'block';
+    if (headerTitle) headerTitle.textContent = '';
+    clearNavActive();
+    if (navAtlassian) navAtlassian.classList.add('active');
+    if (railAtlassian) railAtlassian.classList.add('active');
+    if (btnSave) btnSave.style.display = 'none';
+    if (syncStatus) syncStatus.style.display = 'none';
+    renderAtlassianDashboard();
   } else if (view === 'agents') {
     activeAppView = 'agents';
     document.body.classList.remove('view-dashboard');

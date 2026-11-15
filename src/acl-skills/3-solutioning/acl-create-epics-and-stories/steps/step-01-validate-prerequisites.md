@@ -2,21 +2,21 @@
 
 ## 🛑 MANDATORY PHASE GATE VALIDATION (DO FIRST BEFORE ANYTHING)
 Before extracting requirements or editing epics.md:
-1. Verify that 'prd.md' AND 'ARCHITECTURE-SPINE.md' (or 'architecture.md') have 'status: Accepted'.
+1. Verify that `{output_folder}/2-plan-workflows/acl-prd/prd.md` AND the spine in `{output_folder}/3-solutioning/acl-architecture/` (`architecture-spine.md`, or legacy `ARCHITECTURE-SPINE.md` / `architecture.md`) have `status: Approved`.
 2. If ANY prerequisite is 'status: In Review' or 'status: Rejected' (or missing):
    - **HALT IMMEDIATELY. DO NOT PROCEED. DO NOT WRITE EPICS.MD.**
 
-## Canonical output (Brownfield Tier 2 feature addition)
+## Canonical output (greenfield & brownfield, every tier)
 
-**canonical_epics** = `{project-root}/_acl-output/3-solutioning/acl-create-epics-and-stories/epics.md`.
+**{epics_file}** = `{project-root}/{output_folder}/3-solutioning/acl-create-epics-and-stories/epics.md` (default `_acl-output/...`). It is the ONLY `epics.md` this workflow ever reads or writes — every `{epics_file}` below means this exact path.
 
-If **canonical_epics** already exists (typical when adding a feature after an approved pipeline):
+If **{epics_file}** already exists (greenfield or brownfield):
 
-- Use **canonical_epics** as the only gate `epics.md` for this run — do **not** create a second copy under `{planning_artifacts}/` or elsewhere.
-- **Append** new FR/NFR/epic/story content at the **bottom**; preserve existing `- [x]` completed stories.
-- When updating a previously `Approved` file, set frontmatter `status: In Review` (Manager re-approves before implementation).
+- Never create a second copy anywhere (not `{epics_file}`, not a dated folder, not a renamed file) and never re-initialize it from the template.
+- **Append** new FR/NFR/epic/story content at the **bottom** under `## 🔄 Feature Update — <feature> (<date>) · Tier 2`; preserve every existing line and existing `- [x]` completed stories; numbering continues after the last existing epic/story.
+- When the file's status was `Approved` or `Rejected`, set frontmatter `status: In Review`, `updated: {date}`, and remove `reviewed_by`, `review_timestamp`, `gate_signature`, `approved_hash` (Manager re-approves before implementation).
 
-If **canonical_epics** does not exist, initialize `{planning_artifacts}/epics.md` (prefer aligning `{planning_artifacts}` with `_acl-output/3-solutioning/acl-create-epics-and-stories`).
+If **{epics_file}** does not exist, create it (and its folder) from the template at that exact path.
 
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
@@ -46,7 +46,7 @@ If **canonical_epics** does not exist, initialize `{planning_artifacts}/epics.md
 ## EXECUTION PROTOCOLS:
 
 - 🎯 Extract requirements systematically from all documents
-- 💾 Populate {planning_artifacts}/epics.md with extracted requirements
+- 💾 Populate {epics_file} with extracted requirements
 - 📖 Update frontmatter with extraction progress
 - 🚫 FORBIDDEN to load next step until user selects 'C' and requirements are extracted
 
@@ -70,31 +70,30 @@ Search for required documents using these patterns (sharded means a large docume
 
 **PRD Document Search Priority:**
 
-1. `{planning_artifacts}/*prd*.md` (whole document)
-2. `{planning_artifacts}/*prd*/index.md` (sharded version)
+1. `{output_folder}/2-plan-workflows/acl-prd/prd.md` (canonical)
+2. `{planning_artifacts}/*prd*.md` / `{planning_artifacts}/*prd*/index.md` (legacy projects only)
 
 **Architecture Document Search Priority:**
 
-1. `{planning_artifacts}/*architecture*.md` (whole document)
-2. `{planning_artifacts}/*architecture*/index.md` (sharded version)
+1. `{output_folder}/3-solutioning/acl-architecture/architecture-spine.md` (canonical; legacy `ARCHITECTURE-SPINE.md` / `architecture.md` in the same folder)
+2. `{planning_artifacts}/*architecture*.md` / `{planning_artifacts}/*architecture*/index.md` (legacy projects only)
 
 **UX Design Document Search (Optional):**
 
-1. `{planning_artifacts}/ux-designs/ux-*/DESIGN.md` and `{planning_artifacts}/ux-designs/ux-*/EXPERIENCE.md` (acl-ux spine pair)
-2. `{planning_artifacts}/*ux*.md` (legacy whole document)
-3. `{planning_artifacts}/*ux*/index.md` (legacy sharded version)
+1. `{output_folder}/2-plan-workflows/acl-ux/DESIGN.md` and `{output_folder}/2-plan-workflows/acl-ux/EXPERIENCE.md` (canonical acl-ux spine pair)
+2. `{planning_artifacts}/ux-designs/ux-*/DESIGN.md` + `EXPERIENCE.md`, `{planning_artifacts}/*ux*.md` (legacy projects only)
 
-For each matching acl-ux run folder, treat `DESIGN.md` and `EXPERIENCE.md` as one UX design contract:
+Treat `DESIGN.md` and `EXPERIENCE.md` as one UX design contract:
 
 - Confirm and load both files together. `DESIGN.md` owns visual identity and design tokens; `EXPERIENCE.md` owns information architecture, behavior, states, interactions, accessibility, and journeys.
 - Add both files to the `inputDocuments: []` frontmatter array.
 - If only one spine exists, report the incomplete pair and ask whether the user wants to include the partial UX handoff.
-- If multiple run folders match, show each run folder with the spine frontmatter `status` and `updated` values when available, then ask the user which UX design contract to include.
+- If (legacy projects only) more than one candidate matches, show each with its frontmatter `status` and `updated` values, then ask the user which UX design contract to include.
 
 Before proceeding, Ask the user if there are any other documents to include for analysis, and if anything found should be excluded. Wait for user confirmation. Then initialize the epics output file:
 
-- If **canonical_epics** exists: open it for update (append feature addition); do **not** replace from template wholesale.
-- Else: create `{planning_artifacts}/epics.md` from `../templates/epics-template.md` and in the front matter list the files in the array of `inputDocuments: []`.
+- If **{epics_file}** exists: open it for update (append feature addition); do **not** replace from template wholesale.
+- Else: create **{epics_file}** from `../templates/epics-template.md` and in the front matter list the files in the array of `inputDocuments: []`.
 
 ### 3. Extract Functional Requirements (FRs)
 
@@ -185,11 +184,11 @@ UX-DR2: [Actionable UX design requirement with clear implementation scope]
 
 ### 7. Load and Initialize Template
 
-**If canonical_epics exists:** Load **canonical_epics**, append a `## Feature addition: …` section at the bottom for new requirements (do not delete prior epics/stories). Set `status: In Review` in frontmatter when the file was previously Approved.
+**If {epics_file} exists:** Load **{epics_file}**, append a `## 🔄 Feature Update — <feature> (<date>) · Tier 2` section at the bottom for new requirements (do not delete prior epics/stories). Set `status: In Review` in frontmatter (and clear the approval fields) when the file was previously Approved or Rejected.
 
-**Otherwise:** Load ../templates/epics-template.md and initialize {planning_artifacts}/epics.md:
+**Otherwise:** Load ../templates/epics-template.md and initialize {epics_file}:
 
-1. Copy the entire template to {planning_artifacts}/epics.md
+1. Copy the entire template to {epics_file}
 2. Replace {{project_name}} with the actual project name
 3. Replace placeholder sections with extracted requirements:
    - {{fr_list}} → extracted FRs
@@ -233,7 +232,7 @@ Update the requirements based on user feedback until confirmation is received.
 
 ## CONTENT TO SAVE TO DOCUMENT:
 
-After extraction and confirmation, update {planning_artifacts}/epics.md with:
+After extraction and confirmation, update {epics_file} with:
 
 - Complete FR list in {{fr_list}} section
 - Complete NFR list in {{nfr_list}} section
@@ -252,7 +251,7 @@ Display: `**Confirm the Requirements are complete and correct to [C] continue:**
 
 #### Menu Handling Logic:
 
-- IF C: Save all to {planning_artifacts}/epics.md, update frontmatter, then read fully and follow: ./step-02-design-epics.md
+- IF C: Save all to {epics_file}, update frontmatter, then read fully and follow: ./step-02-design-epics.md
 - IF Any other comments or queries: help user respond then [Redisplay Menu Options](#10-present-menu-options)
 
 ## CRITICAL STEP COMPLETION NOTE

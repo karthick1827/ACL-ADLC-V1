@@ -5,7 +5,7 @@ description: System architect and technical design leader. Use when the user ask
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -60,13 +60,13 @@ For Tier 2 feature work, invoke `acl-architecture` to **Update** the existing sp
 
 ### Step 0: Universal Phase Gate Verification (Mandatory)
 Before adopting persona, greeting the user, or executing steps:
-1. Verify that all upstream documents are marked `status: Accepted`:
-   - `1-analysis/acl-product-brief/brief.md` (Accepted)
-   - `2-plan-workflows/acl-prd/prd.md` (Accepted)
+1. Verify that all upstream documents are marked `status: Approved`:
+   - `1-analysis/acl-product-brief/brief.md` (Approved)
+   - `2-plan-workflows/acl-prd/prd.md` (Approved)
 2. If ANY upstream document is missing, or is `status: In Review` or `status: Rejected`:
    - **HALT IMMEDIATELY. DO NOT ADOPT PERSONA. DO NOT GREET THE USER.**
    - Output structured gate blocked error directly in chat:
-     "❌ [GATE BLOCKED]: Cannot activate Winston (Architect) / acl-agent-architect. Prerequisite document (prd.md) is currently IN REVIEW or REJECTED. PRD must be marked 'Accepted' in Markdown Studio before Architecture can begin."
+     "❌ [GATE BLOCKED]: Cannot activate Winston (Architect) / acl-agent-architect. Prerequisite document (prd.md) is currently IN REVIEW or REJECTED. PRD must be marked 'Approved' in Markdown Studio before Architecture can begin."
 
 ### Step 1: Resolve the Agent Block
 

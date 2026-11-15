@@ -82,8 +82,42 @@ Please choose which Tier you want to proceed with:
 ---
 
 ## 🔴 TIER 2 WORKFLOW (Major Overhaul / Full Cascade)
-- Sequential deliverables (`brief.md` -> `prd.md` -> `architecture-spine.md` -> `epics.md` -> story spec).
+- Sequential deliverables (`brief.md` -> `prd.md` -> UX (if any) -> `architecture-spine.md` -> `epics.md` -> story spec).
 - Each deliverable must have `status: Approved` by the Manager in Markdown Studio before downstream phases unlock.
+- **Adding or changing a feature (greenfield AND brownfield): UPDATE THE EXISTING FILES — NEVER CREATE NEW ONES.**
+  For each deliverable in order, one at a time:
+  1. If the canonical file exists, open **that** file, keep every existing line, and **append at the bottom**:
+     ```markdown
+
+     ---
+
+     ## 🔄 Feature Update — <feature name> (<YYYY-MM-DD>) · Tier 2
+     ...feature content for this deliverable...
+     ```
+  2. In the same file's frontmatter set `status: In Review` and `updated: <YYYY-MM-DD>`, and remove
+     `reviewed_by`, `review_timestamp`, `gate_signature`, `approved_hash`.
+  3. **HALT** with the Gate Lock banner for that file. Update the next deliverable only after the Manager
+     marks this one `Approved` in Markdown Studio.
+  4. If the canonical file does not exist yet, create it at its canonical path (below).
+
+---
+
+## 📁 ONE FILE PER DELIVERABLE (greenfield & brownfield, every tier)
+Each deliverable exists exactly once, at this path under `_acl-output/` (or the configured `output_folder`):
+
+| Deliverable | Canonical file |
+|---|---|
+| Product Brief | `1-analysis/acl-product-brief/brief.md` |
+| PRD | `2-plan-workflows/acl-prd/prd.md` |
+| UX Design | `2-plan-workflows/acl-ux/DESIGN.md` + `EXPERIENCE.md` |
+| Architecture Spine | `3-solutioning/acl-architecture/architecture-spine.md` |
+| Epics & Stories | `3-solutioning/acl-create-epics-and-stories/epics.md` |
+| Project Context | `project-context.md` |
+
+- **NEVER** create dated or per-run folders (`brief-<project>-<date>/`, `planning-artifacts/prds/...`), second copies in other folders, or renamed copies (`brief-v2.md`, `prd-feature.md`).
+- Companion files (`addendum.md`, `.memlog.md`, `reconcile-*.md`, reviews) live in the deliverable's own folder.
+- If an older spine named `ARCHITECTURE-SPINE.md` or `architecture.md` already exists, update that file instead of adding a new one.
+- Full rules: `_acl/scripts/references/acl-deliverable-protocol.md`. Verify with `node tools/adlc-gate-guard.cjs --validate-all`.
 
 ---
 
@@ -94,6 +128,7 @@ Please choose which Tier you want to proceed with:
 ---
 
 ## 🛑 STRICT PROHIBITION: No Direct AI Status Manipulation & Manager-Only Approval
-- The AI agent is STRICTLY PROHIBITED from self-approving or modifying `status: In Review` -> `status: Approved`.
-- Only the Manager in Markdown Studio (`markdown.html`) can approve documents.
+- The AI agent is STRICTLY PROHIBITED from self-approving or modifying `status: In Review` -> `status: Approved` (or `Rejected`).
+- Only the Manager in Markdown Studio (`markdown.html`) can approve or reject documents.
 - Frontmatter status is strictly a 3-value enum: `In Review`, `Approved`, `Rejected`.
+- **Re-review on change:** whenever the agent changes the content of any `.md` file under `_acl-output/` whose status is `Approved` or `Rejected`, it MUST set `status: In Review` and remove `reviewed_by`, `review_timestamp`, `gate_signature`, `approved_hash`. Moving a status **to** `In Review` is the only status change an agent may make. Metadata-only edits (e.g. writing back `jira_key`) do not count as content changes.

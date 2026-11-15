@@ -5,7 +5,7 @@ description: 'Deprecated — forwards to acl-prd (update intent).'
 
 ## 🚦 Universal Phase Gate Precondition (Mandatory & Non-Negotiable)
 Before executing any actions, adopting any persona, greeting the user, or producing output:
-1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.js`).
+1. Scan all existing markdown files in `_acl-output/` (or run `node tools/adlc-gate-guard.cjs`).
 2. If ANY prerequisite markdown file in `_acl-output/` is missing, or has ANY status other than `Approved` (e.g. `In Review`, `draft`, `Pending`, `Rejected`):
    - **TOTAL AGENT BLOCK (NO PERSONAS, NO CHATTING, NO BRAINSTORMING, NO FILE GENERATION)**:
      - The AI Agent is **STRICTLY FORBIDDEN** from adopting personas or greeting the user as an agent.
@@ -51,12 +51,12 @@ This skill was consolidated into `acl-prd`. It is retained as a thin compatibili
 
 3. Emit a deprecation notice to the user in `{communication_language}`:
 
-   > Notice: `acl-edit-prd` is deprecated and will be removed in a future release. It now forwards to `acl-prd` with update intent. To silence this notice and access the full new customization surface (`prd_template`, `validation_checklist_template`, `validation_report_template`, `doc_standards`, `finalize_reviewers`, `external_sources`, `external_handoffs`, `prd_output_path`, `run_folder_pattern`), migrate `_acl/custom/acl-edit-prd.toml` to `_acl/custom/acl-prd.toml` and invoke `acl-prd` directly next time. Customization fields that were in this version still remain in the new version and will be respected if present in `_acl/custom/acl-prd.toml`, but the new version also supports additional fields that you can take advantage of by migrating.
+   > Notice: `acl-edit-prd` is deprecated and will be removed in a future release. It now forwards to `acl-prd` with update intent. To silence this notice and access the full new customization surface (`prd_template`, `validation_checklist_template`, `validation_report_template`, `doc_standards`, `finalize_reviewers`, `external_sources`, `external_handoffs`, `prd_output_path`), migrate `_acl/custom/acl-edit-prd.toml` to `_acl/custom/acl-prd.toml` and invoke `acl-prd` directly next time. Customization fields that were in this version still remain in the new version and will be respected if present in `_acl/custom/acl-prd.toml`, but the new version also supports additional fields that you can take advantage of by migrating.
 
 4. Invoke `acl-prd` with the following context. Pass these as the activating context so `acl-prd` honors them instead of resolving its own customization from scratch:
 
    - **Intent:** `update` — skip `acl-prd`'s usual intent detection step.
-   - **Pre-resolved legacy customization** — use these in place of resolving from `acl-prd`'s own `customize.toml` for the four legacy fields. For everything else (`prd_template`, `validation_checklist_template`, `validation_report_template`, `doc_standards`, `finalize_reviewers`, `prd_output_path`, `run_folder_pattern`, `external_sources`, `external_handoffs`), use `acl-prd`'s own defaults and overrides as normal:
+   - **Pre-resolved legacy customization** — use these in place of resolving from `acl-prd`'s own `customize.toml` for the four legacy fields. For everything else (`prd_template`, `validation_checklist_template`, `validation_report_template`, `doc_standards`, `finalize_reviewers`, `prd_output_path`, `external_sources`, `external_handoffs`), use `acl-prd`'s own defaults and overrides as normal:
      - `activation_steps_prepend` = the resolved value from step 1
      - `activation_steps_append` = the resolved value from step 1
      - `persistent_facts` = the resolved value from step 1

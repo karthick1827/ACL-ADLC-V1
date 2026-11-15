@@ -1,6 +1,20 @@
 // Universal Serverless Function: git-details.js
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
+const crypto = require('node:crypto');
+
+// Short-lived cache: the Studio polls the git status frequently, GitHub's anonymous API limit is 60 req/h.
+const CACHE_TTL_MS = 30_000;
+const cache = new Map();
+
+function cacheKey(projectRoot, query, headers) {
+  const token = String(
+    headers['x-github-token'] || headers['X-GitHub-Token'] || headers.authorization || headers.Authorization || query.token || '',
+  );
+  const tokenHash = token ? crypto.createHash('sha256').update(token).digest('hex').slice(0, 16) : '';
+  const { t, refresh, ...rest } = query;
+  return JSON.stringify([projectRoot, tokenHash, rest]);
+}
 
 async function loadGitDetailsService(projectRoot) {
   const candidates = [
@@ -63,8 +77,14 @@ async function universalHandler(arg1, arg2) {
       headers = arg1.headers || {};
     }
 
+    const key = cacheKey(projectRoot, query, headers);
+    const hit = cache.get(key);
+    if (hit && query.refresh !== '1' && Date.now() - hit.at < CACHE_TTL_MS) return reply(200, hit.payload);
+
     const mod = await loadGitDetailsService(projectRoot);
     const payload = await mod.getGitDetails(projectRoot, { query, headers });
+    cache.set(key, { at: Date.now(), payload });
+    if (cache.size > 50) cache.delete(cache.keys().next().value);
     return reply(200, payload);
   } catch (err) {
     return reply(500, { success: false, error: err.message, repoConnected: false });
