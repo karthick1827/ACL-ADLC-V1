@@ -361,17 +361,29 @@ export async function getGitDetails(projectRoot, options = {}) {
   if (lastCommit) lastActivity = `${lastCommit.date} (${lastCommit.subject})`;
   else if (repoData.pushed_at) lastActivity = `${repoData.pushed_at} (last push to GitHub)`;
 
+  // Who to show in the sidebar. With a token: the token's GitHub account. Without one, a personal
+  // (non-organization) repository belongs to its owner, whose public login + avatar come with the
+  // repository data — so no extra request and no token are needed. Org repos show no person.
+  let displayIdentity = null;
+  if (authUser && authUser.login) {
+    displayIdentity = { login: authUser.login, avatarUrl: authUser.avatar_url || null, source: 'token' };
+  } else if (!isOrg && repoData.owner && repoData.owner.login) {
+    displayIdentity = { login: repoData.owner.login, avatarUrl: repoData.owner.avatar_url || null, source: 'repository-owner' };
+  }
+
   let projectStatus = `Active — branch ${currentBranch || repoData.default_branch || ''} has commits pending push`;
   if (repoData.archived) projectStatus = 'Archived on GitHub';
   else if (isPushed) projectStatus = 'Active — in sync with GitHub';
 
   return {
     ...base,
+    displayIdentity,
     userDetails: {
-      username: authUser ? authUser.login : '',
+      username: displayIdentity ? displayIdentity.login : '',
       fullName: (authUser && authUser.name) || gitUserName || '',
       email: (authUser && authUser.email) || gitUserEmail || '',
-      avatarUrl: authUser ? authUser.avatar_url || null : null,
+      avatarUrl: displayIdentity ? displayIdentity.avatarUrl : null,
+      identitySource: displayIdentity ? displayIdentity.source : 'none',
       orgRole,
     },
     projectDetails: {

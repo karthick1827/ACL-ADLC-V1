@@ -1489,7 +1489,8 @@ function renderNavIdentity(iconEl, avatarUrl, login, size) {
 
 function updateNavUserControlCentre(data) {
   const status = gitStatusOf(data);
-  const authUser = data && data.authenticatedUser;
+  // displayIdentity: token account, or (no token) the owner of a personal repository.
+  const authUser = (data && (data.displayIdentity || data.authenticatedUser)) || null;
   const showUser = status === 'connected' && Boolean(authUser && authUser.login);
   const title = showUser ? authUser.login : 'Git Details';
   const subtitle = showUser ? 'Git Details' : GIT_STATUS_LABELS[status] || GIT_STATUS_LABELS.unknown;
@@ -1723,9 +1724,15 @@ async function renderGitDashboard(force = false) {
     teamsHtml = git.teams.length ? git.teams.map((t) => `<span class="git-team-chip">${escapeHtmlText(t)}</span>`).join(' ') : 'No teams';
   }
 
+  const ownerFallback = !authUser && user.identitySource === 'repository-owner';
+  const accountReason = data.authenticatedUserError || 'no GitHub token is configured';
   const accountNote = authUser
     ? ''
-    : `<div class="git-account-note">GitHub account details need a token: ${escapeHtmlText(data.authenticatedUserError || 'no GitHub token is configured')} — set <code>GITHUB_TOKEN</code>, run <code>gh auth login</code>, or add the Studio GitHub token.</div>`;
+    : `<div class="git-account-note">${
+        ownerFallback
+          ? `Showing the repository owner's public GitHub profile (${escapeHtmlText(accountReason)}). Add a GitHub token to show your own signed-in account, 2FA status and teams.`
+          : `GitHub account details need a token: ${escapeHtmlText(accountReason)}.`
+      }${renderGitTokenForm()}</div>`;
 
   container.innerHTML = `
     <div class="git-dashboard-wrapper">

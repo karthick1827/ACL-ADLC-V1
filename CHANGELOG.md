@@ -1,5 +1,12 @@
 # Changelog
 
+## v6.12.2 - 2026-11-15
+
+### Git Details profile picture without a token
+
+- Sidebar and Git Details card show the GitHub login and profile picture of a personal repository's owner when no GitHub token is configured (taken from the repository data already fetched — no extra requests). With a token, the signed-in account is shown; organization repositories keep the git icon.
+- The connected Git Details card explains which profile is shown and offers the GitHub token field.
+
 ## v6.12.1 - 2026-11-15
 
 ### Markdown Studio fixes
