@@ -34,6 +34,9 @@ const SKILL_MODULE_MAP = {
 
   // Phase 4: Implementation
   'acl-agent-dev': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
+  'acl-agent-react-reviewer': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
+  'acl-react-code-review': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
+  'acl-react-code-fix': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
   'acl-checkpoint-preview': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
   'acl-code-review': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
   'acl-correct-course': { module: '4-implementation', label: 'Phase 4 · Implementation', short: 'Implementation' },
@@ -165,8 +168,11 @@ async function loadAgentsData(forceReload = false) {
   }
 
   // Fallback to embedded agents if provided
-  if (agentsList.length === 0 && Array.isArray(window.__ACL_EMBEDDED_AGENTS__)) {
-    agentsList = window.__ACL_EMBEDDED_AGENTS__;
+  // The installer embeds the full /api/list-agents payload ({ agents: [...] }); older builds embedded a bare array.
+  if (agentsList.length === 0) {
+    const embedded = window.__ACL_EMBEDDED_AGENTS__;
+    const embeddedAgents = Array.isArray(embedded) ? embedded : embedded && Array.isArray(embedded.agents) ? embedded.agents : [];
+    if (embeddedAgents.length > 0) agentsList = embeddedAgents;
   }
 
   isAgentsLoading = false;
@@ -408,6 +414,20 @@ const SKILL_OFFICE_REGISTRY = {
       'Writes application code strictly against approved criteria.',
       'Runs automated quality checks and conventional commits.',
       'Does not take unapproved shortcuts or alter unassigned files.',
+    ],
+  },
+  'acl-agent-react-reviewer': {
+    title: 'Senior React & JavaScript Code Reviewer',
+    subtitle:
+      'Audits components for React 18/19 best practices, hook safety, antipatterns, and clean JS, generating reports and applying fixes.',
+    businessValue: 'Guarantees component stability, eliminates subtle memory leaks, prevents ghost re-renders, and elevates code quality.',
+    deliverable: 'react-code-review-*.md in the implementation artifacts folder (acl-react-code-review/)',
+    governance: 'Quality & Remediation Gate',
+    inputs: 'React components (.jsx/.tsx), JavaScript modules (.js/.ts), or whole codebase',
+    stakeholderGuide: [
+      'Specialized reviewer for modern React, Hooks, state immutability, and component composition.',
+      'Supports Mode [RO] (Report Only) to generate actionable markdown reports without touching code.',
+      'Supports Mode [RF] (Report & Fix) to generate the report and automatically refactor the codebase.',
     ],
   },
   'acl-code-review': {

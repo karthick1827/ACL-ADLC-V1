@@ -49,6 +49,7 @@ const isWatch = args.includes('--watch') || args.includes('-w');
 const isServe = args.includes('--serve') || args.includes('-s');
 const customTarget = args.find((arg) => !arg.startsWith('-'));
 
+// No built-in target: pass a path argument or set ACL_TARGET_PROJECT (comma-separated) in .env.
 const DEFAULT_TARGETS = [];
 
 function resolveTarget(p) {
@@ -59,12 +60,12 @@ function resolveTarget(p) {
 const rawTargets = customTarget
   ? [customTarget]
   : process.env.ACL_TARGET_PROJECT
-    ? process.env.ACL_TARGET_PROJECT.split(',').map((t) => t.trim()).filter(Boolean)
+    ? process.env.ACL_TARGET_PROJECT.split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
     : DEFAULT_TARGETS;
 
-const targetProjects = rawTargets
-  .map(resolveTarget)
-  .filter((p) => p && fs.existsSync(p));
+const targetProjects = rawTargets.map(resolveTarget).filter((p) => p && fs.existsSync(p));
 
 if (targetProjects.length === 0) {
   console.error(`[SYNC-ERROR] No valid target projects found. Make sure ACL_TARGET_PROJECT is set in .env or pass as argument.`);

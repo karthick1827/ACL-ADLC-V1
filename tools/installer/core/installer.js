@@ -1634,25 +1634,24 @@ export default async function handler(req, res) {
       await fs.writeFile(rootJson, manifestContent, 'utf8');
       this.installedFiles.add(rootJson);
 
-      // 2. Embed window.__ACL_EMBEDDED_AGENTS__ into markdown.html files
+      // 2. Embed window.__ACL_EMBEDDED_AGENTS__ into markdown.html files.
+      // Escape "<" so skill text containing "</script>" cannot close the tag. JSON.stringify emits
+      // no raw newlines, so the assignment is always one line and can be replaced whole (array or
+      // object form from older installs). Function replacers keep "$" sequences in skill text literal.
+      const embedded = `window.__ACL_EMBEDDED_AGENTS__ = ${manifestContent.replaceAll('<', String.raw`<`)};`;
+      const existingEmbed = /window\.__ACL_EMBEDDED_AGENTS__\s*=[^\n]*?;[ \t]*(?=\r?\n|<\/script>)/;
       const mdTargets = [path.join(projectRoot, 'public', 'markdown.html'), path.join(projectRoot, 'markdown.html')];
       for (const mdTarget of mdTargets) {
         if (await fs.pathExists(mdTarget)) {
           let html = await fs.readFile(mdTarget, 'utf8');
-          const scriptTag = `  <script>window.__ACL_EMBEDDED_AGENTS__ = ${manifestContent};</script>\n`;
-          if (html.includes('window.__ACL_EMBEDDED_AGENTS__ = [];')) {
-            html = html.replace('window.__ACL_EMBEDDED_AGENTS__ = [];', `window.__ACL_EMBEDDED_AGENTS__ = ${manifestContent};`);
-            await fs.writeFile(mdTarget, html, 'utf8');
-          } else if (html.includes('window.__ACL_EMBEDDED_AGENTS__ =')) {
-            html = html.replace(
-              /window\.__ACL_EMBEDDED_AGENTS__\s*=\s*\[[\s\S]*?\];/,
-              `window.__ACL_EMBEDDED_AGENTS__ = ${manifestContent};`,
-            );
-            await fs.writeFile(mdTarget, html, 'utf8');
+          if (existingEmbed.test(html)) {
+            html = html.replace(existingEmbed, () => embedded);
           } else if (html.includes('</head>')) {
-            html = html.replace('</head>', `${scriptTag}</head>`);
-            await fs.writeFile(mdTarget, html, 'utf8');
+            html = html.replace('</head>', () => `  <script>${embedded}</script>\n</head>`);
+          } else {
+            continue;
           }
+          await fs.writeFile(mdTarget, html, 'utf8');
         }
       }
     } catch {

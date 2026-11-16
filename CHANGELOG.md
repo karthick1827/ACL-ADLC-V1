@@ -1,5 +1,23 @@
 # Changelog
 
+## v6.12.3 - 2026-11-17
+
+### New agent: React & JavaScript Code Reviewer (Rachel)
+
+- `acl-agent-react-reviewer` persona plus two workflows: `acl-react-code-review` (report only) and `acl-react-code-fix` (report and apply fixes). Reports go to `{implementation_artifacts}/acl-react-code-review/` (configurable via `report_folder` in `_acl/custom/<skill>.toml`). Listed in the Agents page, `module.yaml` and the help catalog.
+
+### Workflow images
+
+- Greenfield and Brownfield workflow images now show the agent name for each phase.
+- Studio logo falls back to a relative path when served from a sub-folder.
+
+### Fixes
+
+- Agents page: the embedded agent list written by the installer is now read whether it is an array or the full `{ agents: [...] }` payload, and is replaced correctly on re-install (it was left stale before). Skill text containing `$` or `</script>` can no longer corrupt `markdown.html`.
+- Static `acl-agents.json` snapshots refreshed from the current skills (version 6.12.3); entries from a developer's personal skill folders removed.
+- No hardcoded values in the new agent: report locations come from the project config, and an unused alias entry (`acl-agent-react-code-reviewer`) was removed.
+- `tools/sync-studio.js` reads `ACL_TARGET_PROJECT` (comma-separated, relative or absolute) from `.env`; no built-in default target. See `.env.example`.
+
 ## v6.12.2 - 2026-11-15
 
 ### Git Details profile picture without a token
